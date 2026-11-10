@@ -66,6 +66,35 @@
     return { villages: vs.length, buildings, army: armyPts, total: buildings + armyPts,
       units: sumUnits(army), attack: attackPower(army), defense: defensePower(army) };
   }
+  /* ---------- punkty za zniszczone jednostki i ranking ---------- */
+  // Punkty za pokonane jednostki wroga = ich koszt / SCORE.costDivisor (tak samo jak punkty wojska).
+  // killsAtt – zniszczone w ataku, killsDef – zniszczone w obronie (także zginęli zwiadowcy wysłani na obronioną wioskę).
+  function addKills(state, owner, destroyed, as) {
+    const f = owner !== null && state.factions[owner];
+    if (!f) return 0;
+    const pts = unitPoints(destroyed);
+    f[as === 'def' ? 'killsDef' : 'killsAtt'] = (f[as === 'def' ? 'killsDef' : 'killsAtt'] || 0) + pts;
+    f.killUnits = (f.killUnits || 0) + sumUnits(destroyed);
+    return pts;
+  }
+  function killsOf(state, owner) {
+    const f = state.factions[owner] || {};
+    const att = f.killsAtt || 0, def = f.killsDef || 0;
+    return { att, def, total: att + def, units: f.killUnits || 0 };
+  }
+  // Ranking wszystkich frakcji. Nie zdradza siły wojska AI – tylko wioski, punkty budynków i pokonanych wrogów.
+  function ranking(state, sortBy) {
+    const rows = Object.values(state.factions).map(f => {
+      const vs = villagesOf(state, f.id), k = killsOf(state, f.id);
+      return { id: f.id, name: f.name, color: f.color, ai: !!f.ai, personality: f.personality, alive: vs.length > 0,
+        villages: vs.length, buildings: vs.reduce((a, v) => a + points(v), 0),
+        killsAtt: k.att, killsDef: k.def, kills: k.total, killUnits: k.units };
+    });
+    const by = sortBy === 'villages' ? ['villages', 'buildings', 'kills'] : sortBy === 'buildings' ? ['buildings', 'villages', 'kills'] : ['kills', 'villages', 'buildings'];
+    rows.sort((a, b) => (b[by[0]] - a[by[0]]) || (b[by[1]] - a[by[1]]) || (b[by[2]] - a[by[2]]));
+    rows.forEach((r, i) => { r.rank = i + 1; });
+    return rows;
+  }
   function ownerName(state, owner) { return owner === null ? C.NEUTRAL.name : (state.factions[owner] ? state.factions[owner].name : '?'); }
   function ownerColor(state, owner) { return owner === null ? C.NEUTRAL.color : (state.factions[owner] ? state.factions[owner].color : '#888'); }
 
@@ -111,10 +140,11 @@
       difficulty: C.DIFFICULTY[difficulty] ? difficulty : C.DEFAULT_DIFFICULTY,
       stats: { battles: 0, conquests: 0 }
     };
-    state.factions.player = { id: 'player', name: C.PLAYER.name, color: C.PLAYER.color, ai: false, alive: true };
+    state.factions.player = { id: 'player', name: C.PLAYER.name, color: C.PLAYER.color, ai: false, alive: true, killsAtt: 0, killsDef: 0, killUnits: 0 };
     aiFactions.forEach((f, i) => {
       state.factions[f.id] = {
         id: f.id, name: f.name, color: f.color, personality: f.personality, ai: true, alive: true,
+        killsAtt: 0, killsDef: 0, killUnits: 0,
         nextThink: now + Math.round(C.AI.thinkInterval * 1000 * (1 + i / aiFactions.length))
       };
     });
@@ -733,6 +763,7 @@
     const success = att > def;
     const lost = success ? Math.min(att, Math.round(att * Math.pow(def / att, C.SPY.lossExponent))) : att;
     const survivors = emptyUnits(); survivors.scout = att - lost;
+    if (lost > 0) { const dead = emptyUnits(); dead.scout = lost; addKills(state, target.owner, dead, 'def'); }
     const intel = success ? snapshot(target, t) : null;
     if (survivors.scout > 0) {
       state.movements.push({ id: newId(state, 'm'), type: 'return', owner: m.owner, from: m.from, to: m.to,
@@ -798,6 +829,8 @@
     }
     const survivors = emptyUnits();
     UNITS.forEach(k => { survivors[k] = attUnits[k] - attLoss[k]; });
+    // punkty za zniszczone jednostki: atakujący za straty obrońców, obrońca za straty atakujących
+    const killPts = { att: addKills(state, m.owner, defLoss, 'att'), def: addKills(state, defOwner, attLoss, 'def') };
     // tarany burzą mur na stałe
     let wallAfter = wallBefore;
     if (attackerWon && ramCount(survivors) > 0 && wallBefore > 0) {
@@ -859,7 +892,7 @@
       toName: target.name, toX: target.x, toY: target.y, to: target.id,
       attUnits, attLoss, defUnits, defLoss, attackerWon, loot, luck: Math.round((luck - 1) * 100),
       loyaltyBefore: defOwner !== null && attUnits.noble > 0 ? loyaltyBefore : null, loyaltyAfter, conquered,
-      wallBefore, wallFight, wallAfter, hadSupport, lootCapacity, lootHidden,
+      wallBefore, wallFight, wallAfter, hadSupport, lootCapacity, lootHidden, killPts,
       intel: intel && intel.buildings ? intel : null
     };
     if (m.owner === 'player' || defOwner === 'player') {
@@ -995,7 +1028,7 @@
   MP.Engine = {
     RES, UNITS, BUILDINGS, ramCount, diff, useDifficulty, hiddenRes,
     rand, randInt, dist, emptyUnits, cleanUnits, sumUnits, attackPower, defensePower,
-    tileAt, villagesOf, points, unitPoints, armyOf, accountPower, ownerName, ownerColor,
+    tileAt, villagesOf, points, unitPoints, armyOf, accountPower, addKills, killsOf, ranking, ownerName, ownerColor,
     newGame, worldOf, winVillages, productionPerMin, storageCap, popCap, popUsed, tickVillage,
     buildInfo, queueBuild, recruitInfo, queueRecruit, recruitPer,
     travelTime, slowest, sendAttack, sendSpy, advance, nextEvent,

@@ -24,7 +24,7 @@ Serwer jest potrzebny do działania jako PWA (Service Worker, instalacja, tryb o
 ## Jak grać
 
 1. **Wioska** – rozbudowuj budynki. Tartak, Cegielnia i Kopalnia produkują surowce, Ratusz powiększa magazyn i pozwala budować wyżej (inne budynki: maks. poziom Ratusza + 2), Farma daje miejsce na wojsko, Koszary odblokowują jednostki.
-2. **Wojsko** – rekrutuj jednostki (wpisz liczbę albo „Maks.”). Topornik – Koszary 2, Lekka kawaleria – Koszary 3, Dowódca podboju – Koszary 5. Łucznik i Procarz (Koszary 2, patrz niżej) to jednostki prawie bez żelaza.
+2. **Wojsko** – rekrutuj jednostki (wpisz liczbę albo „Maks.”). Topornik – Koszary 2, Lekka kawaleria – Koszary 3, Dowódca podboju – Koszary 5. Łucznik (Koszary 2) to jednostka prawie bez żelaza, a koszty pozostałych jednostek mają różne proporcje drewna, gliny i żelaza (punkt 17).
 3. **Mapa** – wybierz osadę, kliknij „Atakuj”, wybierz jednostki. Czas marszu zależy od odległości i najwolniejszej jednostki.
 4. **Raporty** – wynik bitwy, straty, łupy, poparcie.
 
@@ -42,11 +42,21 @@ Serwer jest potrzebny do działania jako PWA (Service Worker, instalacja, tryb o
 13. **Zbieranie i rozdzielanie wojska** – drugi przycisk w Przeglądzie („Zbierz / rozdziel wojsko”) działa tak samo, ale dla jednostek: zbierasz wojsko z wielu wiosek do jednej albo rozdzielasz je po równo z jednej do pozostałych. Wybierasz jednostki (domyślnie bez Zwiadowców i Osadników), ile procent zostaje w wiosce wysyłającej oraz rodzaj wysyłki: wsparcie (odwoływalne) albo przeniesienie na stałe (z przycinaniem do wolnego miejsca na farmie celu).
 14. **Brak wyskakujących powiadomień** – nie zasłaniają już gry; komunikat o błędzie pojawia się w otwartym oknie, a zdarzenia znajdziesz w Raportach i na ekranie Przegląd.
 15. **Rozmiar świata** – przy nowej grze (Menu → Zacznij od nowa) wybierasz mapę: Mała 15×15 i 4 przeciwników (cel 20 wiosek), Średnia 25×25 i 8 (cel 30), Duża 35×35 i 12 (cel 40) albo Ogromna 45×45 i 15 (cel 50). Ustawienia w `WORLDS` w `config.js`; legenda mapy dopasowuje się do liczby frakcji. Na większych mapach nadrabianie nieobecności trwa dłużej (Ogromna: ok. 4 s na 4 h gry).
-17. **Jednostki prawie bez żelaza** – w późnej grze zwykle zostaje dużo drewna i gliny, a brakuje żelaza. Dwie jednostki z Koszar 2 zamieniają ten nadmiar w wojsko (10 żelaza na sztukę zamiast 33–50):
-   - **Łucznik** – 60 drewna, 45 gliny, 10 żelaza; atak 15, obrona 28 (zamiast Pikiniera).
-   - **Procarz** – 30 drewna, 90 gliny, 10 żelaza; atak 32, obrona 14 (zamiast Topornika), więc najlepiej zużywa nadmiar gliny.
+17. **Koszty jednostek i brak żelaza** – w późnej grze zostawało dużo drewna i gliny, a żelaza brakowało, bo wojsko kosztowało go najwięcej (w typowej armii ok. 38% kosztu). Koszty zostały przebalansowane: suma kosztu każdej jednostki jest taka sama jak wcześniej (siła na surowiec bez zmian), ale każda ma inny dominujący surowiec, a w typowej armii żelazo to ok. 27%:
 
-   AI też je rekrutuje. Zapisy ze starszych wersji są migrowane automatycznie (nowe jednostki = 0). Liczby w `UNITS` w `config.js`; test: `node tests/units.js`.
+   | Jednostka | Drewno / Glina / Żelazo | Dominuje |
+   |---|---|---|
+   | Pikinier | 37 / 38 / 21 | glina |
+   | Łucznik (Koszary 2, atak 15, obrona 28) | 60 / 40 / 15 | drewno |
+   | Topornik | 44 / 30 / 39 | drewno |
+   | Zwiadowca | 25 / 55 / 21 | glina |
+   | Lekka kawaleria | 100 / 90 / 170 | żelazo |
+   | Taran | 190 / 320 / 140 | glina |
+   | Dowódca podboju | 950 / 1250 / 900 | glina |
+   | Osadnik | 850 / 950 / 600 | glina |
+
+   Dzięki temu możesz sterować tym, czego zużywasz najwięcej: Łucznicy i Topornicy są „drewniani”, Pikinierzy, tarany i dowódcy „gliniani”, a tylko kawaleria jest „żelazna”. AI korzysta z tych samych kosztów. Wszystkie liczby w `UNITS` w `config.js`; testy: `node tests/units.js`.
+18. **Pokonani i ranking** – za zniszczone jednostki wroga dostajesz punkty (koszt jednostki / `SCORE.costDivisor`, tak jak punkty wojska), osobno za atak i za obronę. Liczą się też zwiadowcy zabici przy obronie przed szpiegami. Punkty widać w raporcie bitwy („Punkty za pokonanych”), na ekranie Wojsko, w Mocy konta i w panelu bocznym. W Menu jest ranking wszystkich frakcji z zakładkami Pokonani, Budynki i Wioski oraz Twoim miejscem. Ranking nie zdradza siły wojska frakcji AI. Stare zapisy zaczynają z zerem (bitwy z przeszłości nie są liczone wstecz). Test: `node tests/ranking.js`.
 16. **Czytelniejsza grafika** – przerysowane ikony wojsk (16×16 px), większe proporce właścicieli i cień pod osadami na mapie; tabela bitwy w raportach mieści się na telefonie.
 
 Wolną osadę przejmujesz, wygrywając bitwę. Wioskę frakcji AI – wysyłając Dowódcę podboju: każda wygrana z żywym dowódcą obniża poparcie o 25–40%, przy 0% wioska jest Twoja. Przez pierwsze 10 minut AI nie atakuje gracza i nie zabiera osad leżących bliżej Ciebie.
@@ -87,7 +97,7 @@ Nadrabianie nieobecności trwa ok. 1–2 s na dobę gry (tydzień ok. 9 s).
 
 ## Moc konta
 
-Menu → „Moc konta” (skrót: panel „Imperium” z boku i kafelek na ekranie Przegląd) pokazuje: punkty budynków (1 pkt za poziom), punkty wojska, siłę ataku i obrony całej armii oraz sumę. Wojsko liczy się razem z oddziałami w marszu i na wsparciu w innych wioskach. Punkty jednostki to jej koszt podzielony przez `SCORE.costDivisor` w `config.js` (Pikinier ≈ 1, Lekka kawaleria ≈ 3,6, Dowódca ≈ 31). Moc frakcji AI nie jest pokazywana – ich armię trzeba rozpoznać zwiadem.
+Menu → „Moc konta” (z licznikiem pokonanych wrogów; skrót: panel „Imperium” z boku i kafelek na ekranie Przegląd) pokazuje: punkty budynków (1 pkt za poziom), punkty wojska, siłę ataku i obrony całej armii oraz sumę. Wojsko liczy się razem z oddziałami w marszu i na wsparciu w innych wioskach. Punkty jednostki to jej koszt podzielony przez `SCORE.costDivisor` w `config.js` (Pikinier ≈ 1, Lekka kawaleria ≈ 3,6, Dowódca ≈ 31). Moc frakcji AI nie jest pokazywana – ich armię trzeba rozpoznać zwiadem.
 
 ## Zapis
 

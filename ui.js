@@ -297,6 +297,7 @@
       '<div class="kpi"><small>Poza wioską</small><b>' + fmt(totalAway) + '</b></div>' +
       '<div class="kpi"><small>Siła ataku</small><b>' + fmt(E.attackPower(v.units)) + '</b></div>' +
       '<div class="kpi" title="Wojsko w wiosce, wsparcie i mur"><small>Obrona wioski</small><b>' + fmt(E.villageDefense(v)) + '</b></div>' +
+      '<div class="kpi" title="Punkty za zniszczone jednostki wroga"><small>Pokonani wrogowie</small><b>' + fmt(Math.round(E.killsOf(s, 'player').total)) + '</b></div>' +
       '<div class="kpi wide"><small>Farma</small><b>' + fmt(used) + ' / ' + fmt(cap) + '</b><span class="meter"><i style="width:' + Math.min(100, used / cap * 100).toFixed(1) + '%"></i></span></div>' +
       '</div></section>';
 
@@ -494,6 +495,11 @@
         reportUnitsTable(r, hideDef);
       if (hideDef) html += '<p class="muted">Nikt nie wrócił z bitwy – brak informacji o obrońcach.</p>';
       html += '<p>Szczęście atakującego: ' + (r.luck > 0 ? '+' : '') + r.luck + '%</p>';
+      if (r.killPts) {
+        const mine = r.attacker === 'player' ? r.killPts.att : r.defender === 'player' ? r.killPts.def : null;
+        const theirs = r.attacker === 'player' ? r.killPts.def : r.defender === 'player' ? r.killPts.att : null;
+        if (mine != null) html += '<p>Punkty za pokonanych: <b class="ok">+' + fmt(Math.round(mine)) + '</b>' + (theirs ? ' <span class="muted">(wróg zyskał +' + fmt(Math.round(theirs)) + ')</span>' : '') + '</p>';
+      }
       if (r.wallBefore) html += '<p>Mur obronny: poziom ' + r.wallBefore + (r.wallFight < r.wallBefore ? ', w bitwie osłabiony taranami do ' + r.wallFight : '') +
         (r.wallAfter < r.wallBefore ? '. Tarany zburzyły go do poziomu ' + r.wallAfter + '.' : '.') + '</p>';
       if (r.hadSupport) html += '<p class="muted">W obronie walczyło też wsparcie z innych wiosek – straty liczone łącznie.</p>';
@@ -897,24 +903,36 @@
     }
   }
 
+  /* ---------- ranking ---------- */
+  const RANK_TABS = [['kills', 'Pokonani'], ['buildings', 'Budynki'], ['villages', 'Wioski']];
+  function rankingSection(s) {
+    const sort = (UI.modal && UI.modal.sort) || 'kills';
+    const rows = E.ranking(s, sort);
+    const me = rows.find(r => r.id === 'player');
+    const pts = n => fmt(Math.round(n));
+    return '<section><h3>Ranking</h3>' +
+      '<div class="seg seg3" role="tablist" aria-label="Kategoria rankingu">' + RANK_TABS.map(t =>
+        '<button role="tab" aria-selected="' + (t[0] === sort) + '" class="' + (t[0] === sort ? 'on' : '') + '" data-act="rank-sort" data-s="' + t[0] + '">' + t[1] + '</button>').join('') + '</div>' +
+      (me ? '<p class="muted seg-note">Twoje miejsce: <b>' + me.rank + '.</b> z ' + rows.length + '. „Pokonani” to punkty za zniszczone jednostki wroga (koszt jednostki / ' + C.SCORE.costDivisor +
+        '), osobno w ataku i w obronie.</p>' : '') +
+      '<div class="tablewrap"><table class="units rank"><thead><tr><th>#</th><th>Frakcja</th><th>Wioski</th><th>Budynki</th><th>Pokonani</th></tr></thead><tbody>' +
+      rows.map(r => '<tr' + (r.id === 'player' ? ' class="me"' : '') + '><td>' + r.rank + '</td><td><span class="flag" style="--fc:' + r.color + '"></span>' + esc(r.name) +
+        (r.ai ? ' <span class="muted">' + C.AI.personalities[r.personality].label + '</span>' : '') + (r.alive ? '' : ' <span class="muted">(pokonana)</span>') +
+        '<br><small class="muted">atak ' + pts(r.killsAtt) + ' · obrona ' + pts(r.killsDef) + '</small></td>' +
+        '<td class="num">' + r.villages + '</td><td class="num">' + fmt(r.buildings) + '</td><td class="num"><b>' + pts(r.kills) + '</b></td></tr>').join('') +
+      '<tr><td></td><td><span class="flag" style="--fc:' + C.NEUTRAL.color + '"></span>Wolne osady</td><td class="num">' + E.villagesOf(s, null).length + '</td><td></td><td></td></tr>' +
+      '</tbody></table></div></section>';
+  }
+
   /* ---------- menu ---------- */
   function menuModal() {
     const s = st();
     const own = E.villagesOf(s, 'player').length;
-    const rows = Object.values(s.factions).map(f => {
-      const vs = E.villagesOf(s, f.id);
-      return { f, n: vs.length, pts: vs.reduce((a, v) => a + E.points(v), 0) };
-    }).sort((a, b) => b.n - a.n || b.pts - a.pts);
     return '<h2>Menu</h2>' +
       '<section><h3>Cel gry</h3><p>Zdobądź ' + E.winVillages(s) + ' wiosek. Masz ' + own + '.</p>' +
       '<div class="goal"><i style="width:' + Math.min(100, own / E.winVillages(s) * 100) + '%"></i></div></section>' +
       powerSection(s) +
-      '<section><h3>Ranking</h3><div class="tablewrap"><table class="units"><thead><tr><th>Frakcja</th><th>Wioski</th><th>Punkty</th></tr></thead><tbody>' +
-      rows.map(r => '<tr' + (r.f.id === 'player' ? ' class="me"' : '') + '><td><span class="flag" style="--fc:' + r.f.color + '"></span>' + esc(r.f.name) +
-        (r.f.ai ? ' <span class="muted">' + C.AI.personalities[r.f.personality].label + '</span>' : '') + (r.n ? '' : ' <span class="muted">(pokonana)</span>') +
-        '</td><td>' + r.n + '</td><td>' + r.pts + '</td></tr>').join('') +
-      '<tr><td><span class="flag" style="--fc:' + C.NEUTRAL.color + '"></span>Wolne osady</td><td>' + E.villagesOf(s, null).length + '</td><td></td></tr>' +
-      '</tbody></table></div></section>' +
+      rankingSection(s) +
       '<section><h3>Poziom trudności</h3>' + diffPicker(s.difficulty, 'set-diff') +
       '<p class="muted seg-note">' + E.diff(s).desc + ' Zmiana działa od razu.</p></section>' +
       '<section><h3>Zapis gry</h3><p class="muted">Gra zapisuje się sama. Kopia zapasowa przyda się przy zmianie przeglądarki lub urządzenia.</p>' +
@@ -936,11 +954,12 @@
 
   // Moc konta gracza: punkty budynków + wojska oraz siła ataku i obrony całej armii.
   function powerSection(s) {
-    const p = E.accountPower(s, 'player');
+    const p = E.accountPower(s, 'player'), kl = E.killsOf(s, 'player');
     const row = (a, b) => '<tr><td>' + a + '</td><td class="num">' + b + '</td></tr>';
     return '<section><h3>Moc konta</h3><div class="tablewrap"><table class="units"><tbody>' +
       row('Wioski', p.villages) + row('Punkty budynków', fmt(p.buildings)) + row('Punkty wojska (' + fmt(p.units) + ' jedn.)', fmt(p.army)) +
       row('Siła ataku', fmt(p.attack)) + row('Siła obrony (bez muru)', fmt(p.defense)) +
+      row('Pokonani wrogowie (' + fmt(kl.units) + ' jedn.)', fmt(Math.round(kl.total)) + ' <small class="muted">atak ' + fmt(Math.round(kl.att)) + ' · obrona ' + fmt(Math.round(kl.def)) + '</small>') +
       '<tr class="me"><td><b>Razem</b></td><td class="num"><b>' + fmt(p.total) + '</b></td></tr></tbody></table></div>' +
       '<p class="muted seg-note">Wojsko liczy się razem z oddziałami w marszu i na wsparciu. Punkty jednostki = koszt / ' + C.SCORE.costDivisor + '.</p></section>';
   }
@@ -1019,12 +1038,12 @@
     const own = E.villagesOf(s, 'player');
     const mv = playerMovements(s);
     const pw = E.accountPower(s, 'player');
-    const sig = JSON.stringify([own.map(v => v.id + E.points(v)), pw.total, mv.map(m => m.id), Object.values(s.factions).map(f => E.villagesOf(s, f.id).length)]);
+    const sig = JSON.stringify([own.map(v => v.id + E.points(v)), pw.total, mv.map(m => m.id), Object.values(s.factions).map(f => E.villagesOf(s, f.id).length), Math.round(E.killsOf(s, 'player').total)]);
     if (UI.sigs.aside === sig) return;
     UI.sigs.aside = sig;
     let html = '<section class="panel"><h2>Imperium</h2><p>' + own.length + ' z ' + E.winVillages(s) + ' wiosek</p>' +
       '<div class="goal"><i style="width:' + Math.min(100, own.length / E.winVillages(s) * 100) + '%"></i></div>' +
-      '<p class="tags"><span>Moc: ' + fmt(pw.total) + ' pkt</span><span>Atak ' + fmt(pw.attack) + '</span><span>Obrona ' + fmt(pw.defense) + '</span></p>' +
+      '<p class="tags"><span>Moc: ' + fmt(pw.total) + ' pkt</span><span>Atak ' + fmt(pw.attack) + '</span><span>Obrona ' + fmt(pw.defense) + '</span><span>Pokonani ' + fmt(Math.round(E.killsOf(s, 'player').total)) + '</span></p>' +
       '<ul class="vlist">' + own.map(v => '<li><button class="link" data-act="goto" data-id="' + v.id + '">' + esc(v.name) + '</button> <span class="muted">' + xy(v.x, v.y) + ', ' + E.points(v) + ' pkt</span></li>').join('') + '</ul></section>';
     html += '<section class="panel"><h2>Ruchy wojsk</h2>' + (mv.length ? '<ul class="mvlist compact">' + mv.slice(0, 8).map(m => movementItem(s, m)).join('') + '</ul>'
       : '<p class="muted">Brak ruchów wojsk.</p>') + '</section>';
@@ -1324,6 +1343,7 @@
         break;
       }
       case 'menu': openModal('menu'); break;
+      case 'rank-sort': if (UI.modal) { UI.modal.sort = b.dataset.s; renderModal(); } break;
       case 'close': closeModal(); break;
       case 'export': {
         const d = new Date();

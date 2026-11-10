@@ -92,7 +92,7 @@
       s.version = 4;
       return s;
     },
-    // v4 → v5: nowe jednostki (Łucznik, Procarz) – wszędzie 0
+    // v4 → v5: nowa jednostka (Łucznik) – wszędzie 0
     4: s => {
       const fillUnits = u => { if (u && typeof u === 'object') Object.keys(C.UNITS).forEach(k => { if (u[k] == null) u[k] = 0; }); };
       Object.values(s.villages || {}).forEach(v => {
@@ -103,6 +103,11 @@
       (s.reports || []).forEach(r => ['attUnits', 'attLoss', 'defUnits', 'defLoss'].forEach(k => fillUnits(r[k])));
       Object.values(s.intel || {}).forEach(i => fillUnits(i.units));
       s.version = 5;
+      return s;
+    },
+    // v5 → v6: punkty za zniszczone jednostki i ranking (liczniki na frakcjach; stare bitwy nie są liczone wstecz)
+    5: s => {
+      s.version = 6;
       return s;
     }
   };
@@ -117,8 +122,37 @@
       state = fn(state);
       v = state.version;
     }
+    normalizeUnits(state);
+    normalizeFactions(state);
     validate(state);
     return state;
+  }
+
+  // Dopasowuje wszystkie liczniki jednostek do aktualnej listy z config.js – niezależnie od wersji zapisu:
+  // brakujące jednostki dostają 0 (bez NaN), usunięte z gry są wyrzucane, kolejki z nieznaną jednostką znikają.
+  function normalizeUnits(s) {
+    const keys = Object.keys(C.UNITS);
+    const fix = u => {
+      if (!u || typeof u !== 'object') return;
+      Object.keys(u).forEach(k => { if (!C.UNITS[k]) delete u[k]; });
+      keys.forEach(k => { const n = Number(u[k]); u[k] = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0; });
+    };
+    Object.values(s.villages || {}).forEach(v => {
+      fix(v.units);
+      Object.values(v.support || {}).forEach(fix);
+      if (Array.isArray(v.recruitQueue)) v.recruitQueue = v.recruitQueue.filter(e => e && C.UNITS[e.unit]);
+    });
+    (s.movements || []).forEach(m => fix(m.units));
+    (s.reports || []).forEach(r => ['attUnits', 'attLoss', 'defUnits', 'defLoss'].forEach(k => fix(r[k])));
+    Object.values(s.intel || {}).forEach(i => fix(i && i.units));
+  }
+
+  // Liczniki pokonanych jednostek muszą być liczbami (zapisy sprzed rankingu ich nie mają).
+  function normalizeFactions(s) {
+    Object.values(s.factions || {}).forEach(f => {
+      ['killsAtt', 'killsDef', 'killUnits'].forEach(k => { const n = Number(f[k]); f[k] = Number.isFinite(n) && n > 0 ? n : 0; });
+    });
+    if (s.reports) s.reports.forEach(r => { if (r && r.kind && r.killPts && !(Number.isFinite(r.killPts.att) && Number.isFinite(r.killPts.def))) r.killPts = null; });
   }
 
   function validate(s) {
