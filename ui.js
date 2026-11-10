@@ -679,7 +679,7 @@
     let est = 'nieznana';
     if (I) {
       const wallKnown = I.buildings ? I.buildings.wall || 0 : 0;
-      const wall = Math.max(0, wallKnown - Math.floor((u.ram || 0) / C.RAM.fightPerLevel));
+      const wall = Math.max(0, wallKnown - Math.floor(E.ramCount(u) / C.RAM.fightPerLevel));
       est = fmt(E.defenseFrom(I.units, wall)) + (I.buildings ? (wallKnown ? ' (mur ' + wall + ')' : '') : ' (mur nieznany)');
     }
     box.innerHTML = '<div><span>Siła ataku</span><b>' + fmt(E.attackPower(u)) + '</b></div>' +

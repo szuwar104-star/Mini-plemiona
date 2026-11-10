@@ -91,6 +91,19 @@
       s.lastHit = s.lastHit || {};
       s.version = 4;
       return s;
+    },
+    // v4 → v5: nowa jednostka (Łucznik) – wszędzie 0
+    4: s => {
+      const fillUnits = u => { if (u && typeof u === 'object') Object.keys(C.UNITS).forEach(k => { if (u[k] == null) u[k] = 0; }); };
+      Object.values(s.villages || {}).forEach(v => {
+        fillUnits(v.units);
+        Object.values(v.support || {}).forEach(fillUnits);
+      });
+      (s.movements || []).forEach(m => fillUnits(m.units));
+      (s.reports || []).forEach(r => ['attUnits', 'attLoss', 'defUnits', 'defLoss'].forEach(k => fillUnits(r[k])));
+      Object.values(s.intel || {}).forEach(i => fillUnits(i.units));
+      s.version = 5;
+      return s;
     }
   };
 

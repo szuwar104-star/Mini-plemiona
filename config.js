@@ -23,7 +23,7 @@
   }
 
   MP.CONFIG = {
-    SAVE_VERSION: 4,
+    SAVE_VERSION: 5,
 
     // Poziomy trudności – mnożniki dla gracza i AI.
     // playerProd / aiProd: produkcja surowców; graceMinutes: ochrona gracza na starcie;
@@ -68,7 +68,7 @@
     START: {
       resources: { wood: 800, clay: 800, iron: 700 },
       buildings: { hq: 1, wood: 1, clay: 1, iron: 1, farm: 1, barracks: 1, market: 0, wall: 0 },
-      units: { spear: 12, axe: 0, scout: 0, light: 0, ram: 0, noble: 0, settler: 0 }
+      units: { spear: 12 }
     },
 
     BUILD_QUEUE_MAX: 3,
@@ -164,11 +164,18 @@
     },
 
     // speed = sekundy na jedno pole mapy; carry = udźwig łupu; pop = miejsce na farmie
+    // role: 'def' – AI część takich jednostek zostawia w domu; wallPower: ile "taranów" liczy jednostka przy burzeniu muru.
+    // Łucznik to jednostka "bez żelaza": zamienia nadwyżkę drewna i gliny w obronę (10 żelaza zamiast 33 u Pikiniera).
     UNITS: {
       spear: {
         name: 'Pikinier', desc: 'Tani i wytrzymały w obronie.',
         cost: { wood: 33, clay: 30, iron: 33 }, time: 6,
-        att: 10, def: 25, speed: 14, pop: 1, carry: 25, barracks: 1
+        att: 10, def: 25, speed: 14, pop: 1, carry: 25, barracks: 1, role: 'def'
+      },
+      archer: {
+        name: 'Łucznik', desc: 'Łuk i strzały z drewna – obrona prawie bez żelaza.',
+        cost: { wood: 60, clay: 45, iron: 10 }, time: 7,
+        att: 15, def: 28, speed: 14, pop: 1, carry: 15, barracks: 2, role: 'def'
       },
       axe: {
         name: 'Topornik', desc: 'Silny w ataku, słaby w obronie.',
@@ -188,7 +195,7 @@
       ram: {
         name: 'Taran', desc: 'Kruszy mur obronny wroga. Wolny i słaby w walce.',
         cost: { wood: 220, clay: 230, iron: 200 }, time: 25,
-        att: 2, def: 20, speed: 30, pop: 5, carry: 0, barracks: 4
+        att: 2, def: 20, speed: 30, pop: 5, carry: 0, barracks: 4, wallPower: 1
       },
       noble: {
         name: 'Dowódca podboju', desc: 'Obniża poparcie wioski frakcji. Przy 0 wioska przechodzi na Ciebie.',
@@ -241,9 +248,9 @@
       graceMinutes: 10,          // przez tyle minut AI nie atakuje gracza
       maxOrder: 40,              // maks. liczba jednostek w jednym zleceniu AI
       startBuildings: { hq: 3, wood: 3, clay: 3, iron: 2, farm: 2, barracks: 2 },
-      startUnits: { spear: 20, axe: 10, scout: 0, light: 0, ram: 0, noble: 0, settler: 0 },
+      startUnits: { spear: 20, axe: 10 },
       secondBuildings: { hq: 1, wood: 1, clay: 1, iron: 1, farm: 1, barracks: 1 },
-      secondUnits: { spear: 8, axe: 0, scout: 0, light: 0, ram: 0, noble: 0, settler: 0 },
+      secondUnits: { spear: 8 },
       factions: [
         { id: 'ai1', name: 'Czerwony Klan', color: '#c23a2b', personality: 'aggressive' },
         { id: 'ai2', name: 'Kupcy z Doliny', color: '#3f8f3a', personality: 'economic' },
@@ -266,7 +273,7 @@
         aggressive: {
           label: 'agresywna',
           buildWeights: { hq: 1, wood: 1, clay: 1, iron: 1.2, farm: 1.2, barracks: 1.5, market: 0.4, wall: 0.6 },
-          unitWeights: { spear: 1, axe: 4, scout: 0.3, light: 3, ram: 0.5 },
+          unitWeights: { spear: 1, axe: 4, scout: 0.3, light: 3, ram: 0.5, archer: 0.5 },
           recruitShare: 0.7, attackChance: 0.6, attackRatio: 1.3, keepHome: 0.2,
           minPower: 250, range: 8, targets: 'any', anyAfterMin: 0,
           neutralBias: 1, playerBias: 1.6, nobles: true, maxVillages: 10, settle: false, spyChance: 0.15
@@ -274,7 +281,7 @@
         economic: {
           label: 'gospodarcza',
           buildWeights: { hq: 1.3, wood: 1.5, clay: 1.5, iron: 1.4, farm: 1, barracks: 0.7, market: 0.6, wall: 0.8 },
-          unitWeights: { spear: 2, axe: 1, scout: 0.2, light: 1, ram: 0.1 },
+          unitWeights: { spear: 2, axe: 1, scout: 0.2, light: 1, ram: 0.1, archer: 2 },
           recruitShare: 0.35, attackChance: 0.25, attackRatio: 2.0, keepHome: 0.5,
           minPower: 300, range: 6, targets: 'neutral', anyAfterMin: 30,
           neutralBias: 2, playerBias: 0.8, nobles: true, maxVillages: 7, settleMax: 11, settle: true, spyChance: 0.05
@@ -282,7 +289,7 @@
         defensive: {
           label: 'obronna',
           buildWeights: { hq: 1.2, wood: 1.2, clay: 1.2, iron: 1, farm: 1.4, barracks: 1, market: 0.4, wall: 1.4 },
-          unitWeights: { spear: 5, axe: 1, scout: 0.5, light: 0.5, ram: 0 },
+          unitWeights: { spear: 5, axe: 1, scout: 0.5, light: 0.5, ram: 0, archer: 4 },
           recruitShare: 0.5, attackChance: 0.2, attackRatio: 2.5, keepHome: 0.8,
           minPower: 300, range: 5, targets: 'neutral', anyAfterMin: 45,
           neutralBias: 2, playerBias: 0.6, nobles: false, maxVillages: 5, settle: false, spyChance: 0
@@ -290,7 +297,7 @@
         expansionist: {
           label: 'ekspansywna',
           buildWeights: { hq: 1.2, wood: 1.1, clay: 1.1, iron: 1.1, farm: 1.2, barracks: 1.3, market: 0.4, wall: 0.6 },
-          unitWeights: { spear: 1, axe: 3, scout: 0.3, light: 2, ram: 0.3 },
+          unitWeights: { spear: 1, axe: 3, scout: 0.3, light: 2, ram: 0.3, archer: 0.5 },
           recruitShare: 0.55, attackChance: 0.5, attackRatio: 1.5, keepHome: 0.3,
           minPower: 200, range: 9, targets: 'any', anyAfterMin: 0,
           neutralBias: 2.5, playerBias: 1, nobles: true, maxVillages: 12, settleMax: 16, settle: true, spyChance: 0.1

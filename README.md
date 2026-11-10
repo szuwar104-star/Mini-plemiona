@@ -24,7 +24,7 @@ Serwer jest potrzebny do działania jako PWA (Service Worker, instalacja, tryb o
 ## Jak grać
 
 1. **Wioska** – rozbudowuj budynki. Tartak, Cegielnia i Kopalnia produkują surowce, Ratusz powiększa magazyn i pozwala budować wyżej (inne budynki: maks. poziom Ratusza + 2), Farma daje miejsce na wojsko, Koszary odblokowują jednostki.
-2. **Wojsko** – rekrutuj jednostki (wpisz liczbę albo „Maks.”). Topornik – Koszary 2, Lekka kawaleria – Koszary 3, Dowódca podboju – Koszary 5.
+2. **Wojsko** – rekrutuj jednostki (wpisz liczbę albo „Maks.”). Topornik – Koszary 2, Lekka kawaleria – Koszary 3, Dowódca podboju – Koszary 5. Łucznik (Koszary 2, patrz niżej) to jednostka prawie bez żelaza.
 3. **Mapa** – wybierz osadę, kliknij „Atakuj”, wybierz jednostki. Czas marszu zależy od odległości i najwolniejszej jednostki.
 4. **Raporty** – wynik bitwy, straty, łupy, poparcie.
 
@@ -42,6 +42,7 @@ Serwer jest potrzebny do działania jako PWA (Service Worker, instalacja, tryb o
 13. **Zbieranie i rozdzielanie wojska** – drugi przycisk w Przeglądzie („Zbierz / rozdziel wojsko”) działa tak samo, ale dla jednostek: zbierasz wojsko z wielu wiosek do jednej albo rozdzielasz je po równo z jednej do pozostałych. Wybierasz jednostki (domyślnie bez Zwiadowców i Osadników), ile procent zostaje w wiosce wysyłającej oraz rodzaj wysyłki: wsparcie (odwoływalne) albo przeniesienie na stałe (z przycinaniem do wolnego miejsca na farmie celu).
 14. **Brak wyskakujących powiadomień** – nie zasłaniają już gry; komunikat o błędzie pojawia się w otwartym oknie, a zdarzenia znajdziesz w Raportach i na ekranie Przegląd.
 15. **Rozmiar świata** – przy nowej grze (Menu → Zacznij od nowa) wybierasz mapę: Mała 15×15 i 4 przeciwników (cel 20 wiosek), Średnia 25×25 i 8 (cel 30), Duża 35×35 i 12 (cel 40) albo Ogromna 45×45 i 15 (cel 50). Ustawienia w `WORLDS` w `config.js`; legenda mapy dopasowuje się do liczby frakcji. Na większych mapach nadrabianie nieobecności trwa dłużej (Ogromna: ok. 4 s na 4 h gry).
+17. **Łucznik (prawie bez żelaza)** – w późnej grze zwykle zostaje dużo drewna i gliny, a brakuje żelaza. Łucznik (Koszary 2) kosztuje 60 drewna, 45 gliny i tylko 10 żelaza (Pikinier: 33 żelaza), ma atak 15 i obronę 28. AI również go rekrutuje. Zapisy ze starszych wersji są migrowane automatycznie (Łucznicy = 0). Liczby w `UNITS` w `config.js`; test: `node tests/units.js`.
 16. **Czytelniejsza grafika** – przerysowane ikony wojsk (16×16 px), większe proporce właścicieli i cień pod osadami na mapie; tabela bitwy w raportach mieści się na telefonie.
 
 Wolną osadę przejmujesz, wygrywając bitwę. Wioskę frakcji AI – wysyłając Dowódcę podboju: każda wygrana z żywym dowódcą obniża poparcie o 25–40%, przy 0% wioska jest Twoja. Przez pierwsze 10 minut AI nie atakuje gracza i nie zabiera osad leżących bliżej Ciebie.

@@ -93,25 +93,28 @@
     }
     // zwiadowców wystarczy kilku
     const scoutCap = 6;
-    const unlocked = ['spear', 'axe', 'scout', 'light', 'ram'].filter(u => v.buildings.barracks >= C.UNITS[u].barracks && (P.unitWeights[u] || 0) > 0 &&
-      !(u === 'scout' && v.units.scout >= scoutCap) && !(u === 'ram' && v.units.ram >= 20));
+    const siegeCap = 20;
+    const unlocked = Object.keys(C.UNITS).filter(u => !C.UNITS[u].conquer && !C.UNITS[u].settler &&
+      v.buildings.barracks >= C.UNITS[u].barracks && (P.unitWeights[u] || 0) > 0 &&
+      !(u === 'scout' && v.units.scout >= scoutCap) && !(C.UNITS[u].wallPower && E.ramCount(v.units) >= siegeCap));
     if (!unlocked.length) return;
     const unit = pickWeighted(state, unlocked.map(k => [k, P.unitWeights[k]]));
     const U = C.UNITS[unit];
     const ri = E.recruitInfo(state, v, unit);
     if (!ri.ok) return;
     const byBudget = Math.min.apply(null, E.RES.map(r => Math.floor(v.res[r] * P.recruitShare / U.cost[r])));
-    const n = Math.min(ri.max, byBudget, unit === 'scout' ? 3 : unit === 'ram' ? 5 : C.AI.maxOrder);
+    const n = Math.min(ri.max, byBudget, unit === 'scout' ? 3 : U.wallPower ? 5 : C.AI.maxOrder);
     if (n >= 1) E.queueRecruit(state, v, unit, n, t);
   }
 
   function tryAttack(state, v, P, t) {
     if (state.movements.some(m => m.from === v.id && m.type === 'attack')) return; // jedna wyprawa naraz
     const send = E.emptyUnits();
-    send.spear = Math.floor(v.units.spear * (1 - P.keepHome));
-    send.axe = v.units.axe;
-    send.light = v.units.light;
-    send.ram = v.units.ram;
+    Object.keys(C.UNITS).forEach(k => {
+      const U = C.UNITS[k];
+      if (U.conquer || U.settler || U.scout) return;
+      send[k] = U.role === 'def' ? Math.floor(v.units[k] * (1 - P.keepHome)) : v.units[k];
+    });
     const A = E.attackPower(send);
     if (A < P.minPower) return;
 
@@ -136,7 +139,7 @@
       // okres ochronny: osady bliższe graczowi zostają dla niego
       if (grace && target.owner === null && playerVs.some(pv => E.dist(pv, target) < d)) continue;
       E.tickVillage(state, target, t);
-      const wall = Math.max(0, target.buildings.wall - Math.floor(send.ram / C.RAM.fightPerLevel));
+      const wall = Math.max(0, target.buildings.wall - Math.floor(E.ramCount(send) / C.RAM.fightPerLevel));
       const Dv = E.villageDefense(target, wall);
       if (A < Dv * P.attackRatio * (target.owner === 'player' ? D.aiCaution : 1)) continue;
       let w = 1 / (1 + d);

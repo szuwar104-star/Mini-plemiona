@@ -27,6 +27,8 @@
   function cleanUnits(u) { const o = emptyUnits(); UNITS.forEach(k => { o[k] = Math.max(0, Math.floor(Number(u && u[k]) || 0)); }); return o; }
   function sumUnits(u) { return UNITS.reduce((s, k) => s + (u[k] || 0), 0); }
   function attackPower(u) { return UNITS.reduce((s, k) => s + (u[k] || 0) * C.UNITS[k].att, 0); }
+  // Ile "taranów" liczą jednostki przy burzeniu muru (Taran i Taran z bali mają wallPower w config.js).
+  function ramCount(u) { return UNITS.reduce((s, k) => s + (u[k] || 0) * (C.UNITS[k].wallPower || 0), 0); }
   function defensePower(u) { return UNITS.reduce((s, k) => s + (u[k] || 0) * C.UNITS[k].def, 0); }
   // Wszystkie jednostki broniące wioski: własne + wsparcie z innych wiosek.
   function defenders(v) {
@@ -769,7 +771,7 @@
     const defUnits = defenders(target);
     const hadSupport = Object.keys(target.support || {}).length > 0;
     const wallBefore = target.buildings.wall || 0;
-    const wallFight = Math.max(0, wallBefore - Math.floor(attUnits.ram / C.RAM.fightPerLevel));
+    const wallFight = Math.max(0, wallBefore - Math.floor(ramCount(attUnits) / C.RAM.fightPerLevel));
     const luck = 1 + (rand(state) * 2 - 1) * C.COMBAT.luck;
     const A = attackPower(attUnits) * luck;
     const D = defenseFrom(defUnits, wallFight);
@@ -798,8 +800,8 @@
     UNITS.forEach(k => { survivors[k] = attUnits[k] - attLoss[k]; });
     // tarany burzą mur na stałe
     let wallAfter = wallBefore;
-    if (attackerWon && survivors.ram > 0 && wallBefore > 0) {
-      wallAfter = Math.max(0, wallBefore - Math.floor(survivors.ram / C.RAM.destroyPerLevel));
+    if (attackerWon && ramCount(survivors) > 0 && wallBefore > 0) {
+      wallAfter = Math.max(0, wallBefore - Math.floor(ramCount(survivors) / C.RAM.destroyPerLevel));
       target.buildings.wall = wallAfter;
       target.buildQueue = target.buildQueue.filter(e => e.building !== 'wall');
     }
@@ -991,7 +993,7 @@
   function hiddenRes(state, v) { return v.owner === 'player' ? Math.floor(storageCap(v) * diff(state).lootProtect) : 0; }
 
   MP.Engine = {
-    RES, UNITS, BUILDINGS, diff, useDifficulty, hiddenRes,
+    RES, UNITS, BUILDINGS, ramCount, diff, useDifficulty, hiddenRes,
     rand, randInt, dist, emptyUnits, cleanUnits, sumUnits, attackPower, defensePower,
     tileAt, villagesOf, points, unitPoints, armyOf, accountPower, ownerName, ownerColor,
     newGame, worldOf, winVillages, productionPerMin, storageCap, popCap, popUsed, tickVillage,
