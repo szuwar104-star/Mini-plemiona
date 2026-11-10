@@ -33,7 +33,7 @@
         }
       } else {
         this.state = E.newGame(Date.now(), (Math.random() * 4294967295) >>> 0);
-        UI().toast('info', 'Nowa gra. Rozbuduj wioskę i zdobądź ' + MP.CONFIG.WIN_VILLAGES + ' osad.');
+        UI().toast('info', 'Nowa gra. Rozbuduj wioskę i zdobądź ' + E.winVillages(this.state) + ' osad.');
       }
       await this.save();
       document.body.classList.remove('loading');
@@ -87,8 +87,8 @@
       }
     },
 
-    async newGame(difficulty) {
-      this.state = E.newGame(Date.now(), (Math.random() * 4294967295) >>> 0, difficulty);
+    async newGame(difficulty, world) {
+      this.state = E.newGame(Date.now(), (Math.random() * 4294967295) >>> 0, difficulty, world);
       const ui = UI().state;
       ui.vid = null; ui.sel = null; ui.recruit = {}; ui.atk = {}; ui.filter = 'all';
       MP.Map.reset();

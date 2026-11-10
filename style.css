@@ -512,6 +512,9 @@ input:disabled { opacity: .4; }
   background: rgba(14, 19, 24, .75); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--line-2); border-radius: 14px;
 }
+.legend.many { grid-template-columns: repeat(2, auto); column-gap: 1rem; max-height: 46%; overflow: auto; font-size: .72rem; }
+.pick-h { margin: .9rem 0 .35rem; color: var(--muted); font-size: .82rem; }
+.seg.seg4 { grid-template-columns: repeat(4, 1fr); }
 .flag { display: inline-block; width: .7em; height: .7em; margin-right: .45em; background: var(--fc); border-radius: 3px; vertical-align: .02em; box-shadow: 0 0 0 1px rgba(0, 0, 0, .35); }
 
 .map-details {
@@ -658,6 +661,27 @@ input:disabled { opacity: .4; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* ---------- raporty: tabela bitwy ---------- */
+table.units.rep { table-layout: fixed; width: 100%; margin: .2rem 0 .6rem; }
+table.units.rep col.c-name { width: 38%; }
+table.units.rep th, table.units.rep td { padding: .4rem .35rem; text-align: right; }
+table.units.rep th:first-child, table.units.rep td.uname { text-align: left; }
+table.units.rep th { font-size: .74rem; line-height: 1.15; }
+table.units.rep th.grp { text-align: center; border-bottom: 1px solid var(--line); }
+table.units.rep td.uname .un { display: flex; align-items: center; gap: .4rem; min-width: 0; }
+table.units.rep td.uname .ico { flex: none; width: 26px; height: 26px; margin: 0; }
+table.units.rep td.uname .un span { min-width: 0; overflow-wrap: anywhere; line-height: 1.15; }
+table.units.rep td.zero { color: var(--muted); opacity: .5; }
+.dialog { overflow-x: hidden; }
+.dialog p, .dialog .sides p { overflow-wrap: anywhere; }
+@media (max-width: 520px) {
+  table.units.rep { font-size: .8rem; }
+  table.units.rep col.c-name { width: 34%; }
+  table.units.rep th, table.units.rep td { padding: .35rem .2rem; }
+  table.units.rep td.uname .ico { width: 22px; height: 22px; }
+  table.units.rep td.uname .un span { font-size: .72rem; }
 }
 
 /* ---------- zbieranie / rozdzielanie surowców ---------- */

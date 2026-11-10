@@ -21,7 +21,8 @@
   const pointers = new Map();
   let gesture = null;
 
-  function size() { return C.MAP.size * TILE; }
+  let N_ = C.MAP.size;                      // bok mapy bieżącej gry (zależy od wybranego świata)
+  function size() { return N_ * TILE; }
   function worldSize() { return HEAD + size(); }
 
   /* ---------- widok ---------- */
@@ -65,7 +66,8 @@
     const key = state.created + ':' + state.map.size + ':' + Object.keys(state.villages).length;
     if (builtFor === key) return false;
     builtFor = key;
-    const N = C.MAP.size, S = size();
+    N_ = state.map.size;
+    const N = N_, S = size();
     let html = '<div class="ruler top" style="left:' + HEAD + 'px;width:' + S + 'px">';
     for (let x = 0; x < N; x++) html += '<span>' + x + '</span>';
     html += '</div><div class="ruler left" style="top:' + HEAD + 'px;height:' + S + 'px">';
@@ -170,7 +172,7 @@
   function miniJump(e) {
     const r = mini.getBoundingClientRect();
     const fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
-    const N = C.MAP.size;
+    const N = N_;
     centerOn(fx * N - 0.5, fy * N - 0.5);
   }
 

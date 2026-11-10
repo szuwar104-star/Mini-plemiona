@@ -396,7 +396,7 @@
         '<td class="units-cell">' + unitsLine(v.units) + '</td>' +
         '<td>' + (attacks.length ? '<span class="alert">' + ico('sword') + attacks.length + ' <span class="timer" data-end="' + attacks[0].arrive + '"></span></span>' : '') + '</td></tr>';
     }).join('');
-    el.innerHTML = '<section class="ov-head panel"><div><h1>Przegląd wiosek</h1><p class="tags"><span>' + own.length + ' z ' + C.WIN_VILLAGES + ' wiosek</span>' +
+    el.innerHTML = '<section class="ov-head panel"><div><h1>Przegląd wiosek</h1><p class="tags"><span>' + own.length + ' z ' + E.winVillages(s) + ' wiosek</span>' +
       (inc.length ? '<span class="warn">Nadciągające ataki: ' + inc.length + '</span>' : '') + '</p>' +
       '<div class="actions left"><button class="btn" data-act="gather-open"' + (own.length > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"') + '>' + ico('merchant') + 'Zbierz / rozdziel surowce</button>' +
       '<button class="btn" data-act="troops-open"' + (own.length > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"') + '>' + ico('spear') + 'Zbierz / rozdziel wojsko</button></div></div>' +
@@ -461,6 +461,20 @@
     return h + '</div>';
   }
 
+  // Tabela bitwy: tylko jednostki, które brały udział (reszta to same zera), nagłówek dwupoziomowy,
+  // układ stały – mieści się na wąskim ekranie bez przewijania w bok.
+  function reportUnitsTable(r, hideDef) {
+    const kinds = E.UNITS.filter(k => r.attUnits[k] || r.attLoss[k] || (!hideDef && (r.defUnits[k] || r.defLoss[k])));
+    if (!kinds.length) return '';
+    const cell = (v, loss) => '<td class="num' + (loss && v ? ' loss' : '') + (v ? '' : ' zero') + '">' + (v || '–') + '</td>';
+    return '<table class="units rep"><colgroup><col class="c-name"><col><col><col><col></colgroup>' +
+      '<thead><tr><th rowspan="2">Jednostka</th><th colspan="2" class="grp">Atak</th><th colspan="2" class="grp">Obrona</th></tr>' +
+      '<tr><th>wysł.</th><th>strat.</th><th>stan</th><th>strat.</th></tr></thead><tbody>' +
+      kinds.map(k => '<tr><td class="uname" title="' + C.UNITS[k].name + '">' + ico(k) + '<span>' + C.UNITS[k].name + '</span></td>' +
+        cell(r.attUnits[k], false) + cell(r.attLoss[k], true) +
+        (hideDef ? '<td class="num">?</td><td class="num">?</td>' : cell(r.defUnits[k], false) + cell(r.defLoss[k], true)) + '</tr>').join('') +
+      '</tbody></table>';
+  }
   function reportModal(r) {
     const s = st();
     let html = '<h2>' + reportTitle(s, r) + '</h2><p class="muted">' + new Date(r.time).toLocaleString('pl-PL') + '</p>';
@@ -477,10 +491,7 @@
       const hideDef = r.kind === 'attack' && !r.attackerWon;
       html += '<div class="sides"><p><b>Atakujący:</b> ' + flag(s, r.attacker) + ', ' + esc(r.fromName) + ' ' + xy(r.fromX, r.fromY) + '</p>' +
         '<p><b>Obrońca:</b> ' + flag(s, r.defender) + ', ' + esc(r.toName) + ' ' + xy(r.toX, r.toY) + '</p></div>' +
-        '<div class="tablewrap"><table class="units"><thead><tr><th>Jednostka</th><th>Atak: wysłano</th><th>straty</th><th>Obrona: stan</th><th>straty</th></tr></thead><tbody>' +
-        E.UNITS.map(k => '<tr><td>' + ico(k) + C.UNITS[k].name + '</td><td>' + r.attUnits[k] + '</td><td class="loss">' + (r.attLoss[k] || '') +
-          '</td><td>' + (hideDef ? '?' : r.defUnits[k]) + '</td><td class="loss">' + (hideDef ? '?' : (r.defLoss[k] || '')) + '</td></tr>').join('') +
-        '</tbody></table></div>';
+        reportUnitsTable(r, hideDef);
       if (hideDef) html += '<p class="muted">Nikt nie wrócił z bitwy – brak informacji o obrońcach.</p>';
       html += '<p>Szczęście atakującego: ' + (r.luck > 0 ? '+' : '') + r.luck + '%</p>';
       if (r.wallBefore) html += '<p>Mur obronny: poziom ' + r.wallBefore + (r.wallFight < r.wallBefore ? ', w bitwie osłabiony taranami do ' + r.wallFight : '') +
@@ -524,7 +535,20 @@
       MP.Map.render(s, ctx);
     }
     MP.Map.renderMoves(s, playerMovements(s));
+    renderLegend(s);
     renderDetails();
+  }
+  // Legenda mapy zależy od liczby frakcji w danym świecie.
+  function renderLegend(s) {
+    const el = document.querySelector('.legend');
+    if (!el) return;
+    const key = s.created + ':' + Object.keys(s.factions).length;
+    if (el.dataset.key === key) return;
+    el.dataset.key = key;
+    const fs = Object.values(s.factions);
+    el.classList.toggle('many', fs.length > 7);
+    el.innerHTML = fs.map(f => '<span><i class="flag" style="--fc:' + f.color + '"></i>' + (f.id === 'player' ? 'Ty' : esc(f.name)) + '</span>').join('') +
+      '<span><i class="flag" style="--fc:#8a6b4d"></i>Wolne osady</span>';
   }
 
   function renderDetails() {
@@ -882,8 +906,8 @@
       return { f, n: vs.length, pts: vs.reduce((a, v) => a + E.points(v), 0) };
     }).sort((a, b) => b.n - a.n || b.pts - a.pts);
     return '<h2>Menu</h2>' +
-      '<section><h3>Cel gry</h3><p>Zdobądź ' + C.WIN_VILLAGES + ' wiosek. Masz ' + own + '.</p>' +
-      '<div class="goal"><i style="width:' + Math.min(100, own / C.WIN_VILLAGES * 100) + '%"></i></div></section>' +
+      '<section><h3>Cel gry</h3><p>Zdobądź ' + E.winVillages(s) + ' wiosek. Masz ' + own + '.</p>' +
+      '<div class="goal"><i style="width:' + Math.min(100, own / E.winVillages(s) * 100) + '%"></i></div></section>' +
       powerSection(s) +
       '<section><h3>Ranking</h3><div class="tablewrap"><table class="units"><thead><tr><th>Frakcja</th><th>Wioski</th><th>Punkty</th></tr></thead><tbody>' +
       rows.map(r => '<tr' + (r.f.id === 'player' ? ' class="me"' : '') + '><td><span class="flag" style="--fc:' + r.f.color + '"></span>' + esc(r.f.name) +
@@ -925,9 +949,15 @@
     return '<div class="seg seg3" role="radiogroup" aria-label="Poziom trudności">' + Object.entries(C.DIFFICULTY).map(([k, d]) =>
       '<button role="radio" aria-checked="' + (k === current) + '" class="' + (k === current ? 'on' : '') + '" data-act="' + act + '" data-d="' + k + '">' + d.label + '</button>').join('') + '</div>';
   }
+  function worldPicker(current) {
+    return '<div class="seg seg4" role="radiogroup" aria-label="Rozmiar świata">' + Object.entries(C.WORLDS).map(([k, w]) =>
+      '<button role="radio" aria-checked="' + (k === current) + '" class="' + (k === current ? 'on' : '') + '" data-act="pick-world" data-w="' + k + '">' + w.label + '</button>').join('') + '</div>';
+  }
   function newGameModal() {
-    const d = UI.modal.diff || C.DEFAULT_DIFFICULTY;
-    return '<h2>Nowa gra</h2><p>Wybierz poziom trudności. Możesz go później zmienić w menu.</p>' + diffPicker(d, 'pick-diff') +
+    const d = UI.modal.diff || C.DEFAULT_DIFFICULTY, w = UI.modal.world || C.DEFAULT_WORLD;
+    return '<h2>Nowa gra</h2><h3 class="pick-h">Rozmiar świata</h3>' + worldPicker(w) +
+      '<p class="muted seg-note">' + C.WORLDS[w].desc + '</p>' +
+      '<h3 class="pick-h">Poziom trudności</h3>' + diffPicker(d, 'pick-diff') +
       '<p class="muted seg-note">' + C.DIFFICULTY[d].desc + '</p>' +
       '<p class="why">Obecna rozgrywka zostanie usunięta. Jeśli chcesz ją zachować, najpierw pobierz kopię zapisu.</p>' +
       '<div class="actions"><button class="btn ghost" data-act="close">Anuluj</button><button class="btn danger" data-act="new-game-now">Zacznij nową grę</button></div>';
@@ -937,7 +967,7 @@
     const s = st(), win = s.ended.type === 'victory';
     return '<div class="endgame ' + (win ? 'win' : 'loss') + '">' + S.icon(win ? 'noble' : 'sword') +
       '<h2>' + (win ? 'Zwycięstwo!' : 'Twoje plemię upadło') + '</h2>' +
-      '<p>' + (win ? 'Zdobyłeś ' + C.WIN_VILLAGES + ' wiosek i zdominowałeś mapę. Możesz grać dalej albo zacząć nową kampanię.'
+      '<p>' + (win ? 'Zdobyłeś ' + E.winVillages(s) + ' wiosek i zdominowałeś mapę. Możesz grać dalej albo zacząć nową kampanię.'
         : 'Straciłeś ostatnią wioskę. Spróbuj ponownie – tym razem z mocniejszą obroną.') + '</p>' +
       '<div class="actions">' + (win ? '<button class="btn ghost" data-act="close">Graj dalej</button>' : '') +
       '<button class="btn" data-act="new-game-now">Nowa gra</button></div></div>';
@@ -992,8 +1022,8 @@
     const sig = JSON.stringify([own.map(v => v.id + E.points(v)), pw.total, mv.map(m => m.id), Object.values(s.factions).map(f => E.villagesOf(s, f.id).length)]);
     if (UI.sigs.aside === sig) return;
     UI.sigs.aside = sig;
-    let html = '<section class="panel"><h2>Imperium</h2><p>' + own.length + ' z ' + C.WIN_VILLAGES + ' wiosek</p>' +
-      '<div class="goal"><i style="width:' + Math.min(100, own.length / C.WIN_VILLAGES * 100) + '%"></i></div>' +
+    let html = '<section class="panel"><h2>Imperium</h2><p>' + own.length + ' z ' + E.winVillages(s) + ' wiosek</p>' +
+      '<div class="goal"><i style="width:' + Math.min(100, own.length / E.winVillages(s) * 100) + '%"></i></div>' +
       '<p class="tags"><span>Moc: ' + fmt(pw.total) + ' pkt</span><span>Atak ' + fmt(pw.attack) + '</span><span>Obrona ' + fmt(pw.defense) + '</span></p>' +
       '<ul class="vlist">' + own.map(v => '<li><button class="link" data-act="goto" data-id="' + v.id + '">' + esc(v.name) + '</button> <span class="muted">' + xy(v.x, v.y) + ', ' + E.points(v) + ' pkt</span></li>').join('') + '</ul></section>';
     html += '<section class="panel"><h2>Ruchy wojsk</h2>' + (mv.length ? '<ul class="mvlist compact">' + mv.slice(0, 8).map(m => movementItem(s, m)).join('') + '</ul>'
@@ -1302,17 +1332,18 @@
         break;
       }
       case 'import': $('#importFile').click(); break;
-      case 'new-game': openModal('newgame', { diff: st().difficulty }); break;
+      case 'new-game': openModal('newgame', { diff: st().difficulty, world: st().world || C.DEFAULT_WORLD }); break;
       case 'pick-diff': UI.modal.diff = b.dataset.d; renderModal(); break;
+      case 'pick-world': UI.modal.world = b.dataset.w; renderModal(); break;
       case 'set-diff':
         G.action(s => { s.difficulty = b.dataset.d; });
         toast('info', 'Poziom trudności: ' + C.DIFFICULTY[b.dataset.d].label + '.');
         renderModal();
         break;
       case 'new-game-now': {
-        const d = UI.modal && UI.modal.diff;
+        const d = UI.modal && UI.modal.diff, w = UI.modal && UI.modal.world;
         closeModal();
-        G.newGame(d);
+        G.newGame(d, w);
         break;
       }
     }
