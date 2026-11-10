@@ -92,7 +92,7 @@
       s.version = 4;
       return s;
     },
-    // v4 → v5: nowa jednostka (Łucznik) – wszędzie 0
+    // v4 → v5: nowe jednostki (Łucznik, Procarz) – wszędzie 0
     4: s => {
       const fillUnits = u => { if (u && typeof u === 'object') Object.keys(C.UNITS).forEach(k => { if (u[k] == null) u[k] = 0; }); };
       Object.values(s.villages || {}).forEach(v => {
