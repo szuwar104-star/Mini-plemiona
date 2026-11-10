@@ -685,3 +685,50 @@ table.gather tr.skipped td { opacity: .6; }
 table.gather td small { color: var(--muted); margin-left: .35rem; }
 .summary .wide { grid-column: 1 / -1; }
 @media (max-width: 640px) { .gopts { grid-template-columns: 1fr; } }
+
+/* ---------- telefon: czytelność i wygoda dotyku ---------- */
+@media (max-width: 760px) {
+  html { -webkit-text-size-adjust: 100%; }
+  body, button, select { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  /* 16 px w polach zapobiega samoczynnemu powiększaniu strony przy wpisywaniu */
+  input[type=number], input[type=text], select { font-size: 16px; }
+  .nav button { font-size: .72rem; }
+
+  /* dvh = faktycznie widoczna wysokość (bez paska adresu przeglądarki) */
+  @supports (height: 100dvh) {
+    .map-viewport { height: calc(100dvh - var(--top-h) - var(--nav-h) - 1.6rem - env(safe-area-inset-bottom)); }
+    .dialog { max-height: 92dvh; }
+    .map-details { max-height: 60dvh; }
+  }
+
+  /* powiadomienia nad dolnym paskiem, żeby nie zasłaniały nagłówków */
+  .toasts { top: auto; left: .5rem; right: .5rem; width: auto; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + .6rem); }
+
+  /* Przegląd: kafelek mocy na całą szerokość */
+  .ov-kpis .kpi:last-child:nth-child(odd) { grid-column: 1 / -1; }
+
+  /* Przegląd: wioski jako karty zamiast tabeli przewijanej w bok */
+  table.ov, table.ov tbody, table.ov tr, table.ov td { display: block; }
+  table.ov thead { display: none; }
+  .tablewrap:has(table.ov) { overflow: visible; }
+  table.ov tr {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem .6rem;
+    padding: .8rem; margin-bottom: .7rem; background: var(--surface-2); border: 1px solid var(--line-2); border-radius: 14px;
+  }
+  table.ov tr.cur { border-color: rgba(232, 182, 76, .45); }
+  table.ov td { position: static; padding: 0 !important; border: 0 !important; background: transparent !important; text-align: left !important; }
+  table.ov .vname { grid-column: 1 / -1; font-size: 1.05rem; }
+  table.ov td.num:nth-child(-n+4)::before { display: block; color: var(--muted); font-size: .72rem; font-weight: 700; margin-bottom: 2px; }
+  table.ov td:nth-child(2)::before { content: "Drewno"; }
+  table.ov td:nth-child(3)::before { content: "Glina"; }
+  table.ov td:nth-child(4)::before { content: "Żelazo"; }
+  table.ov .mini { width: 100%; margin-left: 0; }
+  table.ov td:nth-child(n+5) { grid-column: 1 / -1; display: flex; align-items: center; gap: .6rem; padding-top: .45rem !important; border-top: 1px solid var(--line) !important; }
+  table.ov td:nth-child(n+5)::before { flex: 0 0 5.2rem; color: var(--muted); font-size: .75rem; font-weight: 700; }
+  table.ov td:nth-child(5)::before { content: "Farma"; }
+  table.ov td:nth-child(6)::before { content: "Budowa"; }
+  table.ov td:nth-child(7)::before { content: "Rekrutacja"; }
+  table.ov td:nth-child(8)::before { content: "Wojsko"; }
+  table.ov td:nth-child(9)::before { content: "Ataki"; }
+  table.ov td:nth-child(9):empty { display: none; }
+}
