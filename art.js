@@ -142,11 +142,12 @@
     return { x: x - 1, y: by - h - rh, w: w + 2, h: h + rh };
   }
   function flag(p, x, top, color) {
-    p.rect(x, top, 1, 9, C.out);
-    p.rect(x + 1, top, 5, 3, color);
-    p.rect(x + 1, top, 5, 1, shade(color, 1.3));
-    p.px(x + 5, top + 2, 'rgba(0,0,0,0)');
-    p.rect(x + 1, top + 3, 3, 1, shade(color, 0.7));
+    p.rect(x, top, 1, 12, C.out);                         // maszt
+    p.rect(x + 1, top, 7, 5, C.out);                      // obrys proporca
+    p.rect(x + 1, top + 1, 6, 3, color);
+    p.rect(x + 1, top + 1, 6, 1, shade(color, 1.35));
+    p.rect(x + 1, top + 3, 6, 1, shade(color, 0.7));
+    p.px(x + 7, top + 2, 'rgba(0,0,0,0)');
   }
   function tower(p, x, by, w, h, roof, withFlag) {
     p.rect(x, by - h, w, h, C.stone);
@@ -163,8 +164,8 @@
         p.px(xx, by - h - 1 - rh + r, dx === -half || dx === half || r === rh ? C.out : dx < 0 ? shade(roof, 1.2) : shade(roof, 0.75));
       }
     }
-    if (withFlag) flag(p, Math.round(c), by - h - rh - 9, roof);
-    return { x, y: by - h - rh - (withFlag ? 9 : 1), w, h: h + rh + (withFlag ? 9 : 1) };
+    if (withFlag) flag(p, Math.round(c), by - h - rh - 12, roof);
+    return { x, y: by - h - rh - (withFlag ? 12 : 1), w, h: h + rh + (withFlag ? 12 : 1) };
   }
   function fence(p, cx, cy, rx, ry, front, stone) {
     for (let a = 0; a < 360; a += 4) {
@@ -188,15 +189,16 @@
     const cx = Math.round((v.x + 0.5) * AP), by = Math.round((v.y + 0.5) * AP) + 8;
     const tier = villageTier(MP.Engine.points(v));
     const showFlag = !neutral;
+    p.alpha(0.28); p.ellipse(cx, by + 1, 15 + tier, 4, '#102008'); p.alpha(1);   // cień pod osadą
     if (tier === 0) {
       field(p, cx + 3, by - 7, 9, 6, true);
       house(p, cx - 9, by, 10, 6, roof);
-      if (showFlag) flag(p, cx - 11, by - 18, roof);
+      if (showFlag) flag(p, cx - 12, by - 21, roof);
     } else if (tier === 1) {
       field(p, cx - 14, by - 3, 6, 5, true);
       house(p, cx - 10, by - 2, 9, 6, roof);
       house(p, cx + 1, by + 1, 11, 7, roof);
-      if (showFlag) flag(p, cx + 10, by - 19, roof);
+      if (showFlag) flag(p, cx + 10, by - 22, roof);
     } else if (tier === 2) {
       fence(p, cx, by - 5, 13, 8, false, false);
       house(p, cx - 12, by - 2, 8, 6, roof);

@@ -95,21 +95,25 @@
   /* ---------- nowa gra i generowanie mapy ---------- */
   function diff(state) { return C.DIFFICULTY[state.difficulty] || C.DIFFICULTY[C.DEFAULT_DIFFICULTY]; }
 
-  function newGame(now, seed, difficulty) {
-    const N = C.MAP.size;
+  function worldOf(key) { return C.WORLDS[key] || C.WORLDS[C.DEFAULT_WORLD]; }
+  function winVillages(state) { return (state && state.winVillages) || C.WIN_VILLAGES; }
+
+  function newGame(now, seed, difficulty, world) {
+    const W = worldOf(world), N = W.size, aiFactions = C.AI.factions.slice(0, W.ai);
     const state = {
       version: C.SAVE_VERSION, created: now, now: now,
       rng: (seed >>> 0) || 1, nextId: 1, usedNames: {},
       map: { size: N, tiles: [] }, villages: {}, factions: {},
+      world: C.WORLDS[world] ? world : C.DEFAULT_WORLD, winVillages: W.win,
       movements: [], reports: [], notices: [], ended: null, intel: {}, lastHit: {},
       difficulty: C.DIFFICULTY[difficulty] ? difficulty : C.DEFAULT_DIFFICULTY,
       stats: { battles: 0, conquests: 0 }
     };
     state.factions.player = { id: 'player', name: C.PLAYER.name, color: C.PLAYER.color, ai: false, alive: true };
-    C.AI.factions.forEach((f, i) => {
+    aiFactions.forEach((f, i) => {
       state.factions[f.id] = {
         id: f.id, name: f.name, color: f.color, personality: f.personality, ai: true, alive: true,
-        nextThink: now + Math.round(C.AI.thinkInterval * 1000 * (1 + i / C.AI.factions.length))
+        nextThink: now + Math.round(C.AI.thinkInterval * 1000 * (1 + i / aiFactions.length))
       };
     });
 
@@ -140,7 +144,7 @@
 
     // Stolice AI daleko od gracza i od siebie (z łagodzeniem warunków, gdy brak miejsca)
     const capitals = [];
-    C.AI.factions.forEach(f => {
+    aiFactions.forEach(f => {
       let spot = null;
       for (let relax = 0; relax < 5 && !spot; relax++) {
         const dP = C.MAP.aiMinDistFromPlayer - relax * 0.5, dA = C.MAP.aiMinDistBetween - relax * 0.5;
@@ -175,7 +179,7 @@
       const s = findSpot((x, y) => isFree(x, y, 1.4) && dist(player, { x, y }) >= 2 && dist(player, { x, y }) <= 4, 800);
       if (s) { neutral(s.x, s.y); made++; }
     }
-    for (let guard = 0; made < C.MAP.neutralCount && guard < 60; guard++) {
+    for (let guard = 0; made < W.neutral && guard < W.neutral * 3; guard++) {
       const s = findSpot((x, y) => isFree(x, y, 2), 300) || findSpot((x, y) => isFree(x, y, 1.4), 600);
       if (!s) break;
       neutral(s.x, s.y); made++;
@@ -710,7 +714,7 @@
       attacker: m.owner, defender: null, toName: v.name, toX: v.x, toY: v.y, to: v.id });
     if (m.owner === 'player') {
       notice(state, t, 'good', 'Założono nową osadę: ' + v.name + ' (' + v.x + ':' + v.y + ')!');
-      if (!state.ended && villagesOf(state, 'player').length >= C.WIN_VILLAGES) state.ended = { type: 'victory', time: t, seen: false };
+      if (!state.ended && villagesOf(state, 'player').length >= winVillages(state)) state.ended = { type: 'victory', time: t, seen: false };
     }
   }
 
@@ -897,7 +901,7 @@
           attacker: newOwner, defender: prevOwner, toName: v.name, toX: v.x, toY: v.y, to: v.id });
       }
     }
-    if (newOwner === 'player' && !state.ended && villagesOf(state, 'player').length >= C.WIN_VILLAGES) {
+    if (newOwner === 'player' && !state.ended && villagesOf(state, 'player').length >= winVillages(state)) {
       state.ended = { type: 'victory', time: t, seen: false };
     }
   }
@@ -990,7 +994,7 @@
     RES, UNITS, BUILDINGS, diff, useDifficulty, hiddenRes,
     rand, randInt, dist, emptyUnits, cleanUnits, sumUnits, attackPower, defensePower,
     tileAt, villagesOf, points, unitPoints, armyOf, accountPower, ownerName, ownerColor,
-    newGame, productionPerMin, storageCap, popCap, popUsed, tickVillage,
+    newGame, worldOf, winVillages, productionPerMin, storageCap, popCap, popUsed, tickVillage,
     buildInfo, queueBuild, recruitInfo, queueRecruit, recruitPer,
     travelTime, slowest, sendAttack, sendSpy, advance, nextEvent,
     unitsPop, supportRoom, sendSupport, withdrawSupport, defenders, defenseFrom, villageDefense,

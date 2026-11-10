@@ -43,7 +43,16 @@
                 playerProd: 1, aiProd: 0.95, graceMinutes: 10, aiAggro: 1, playerBias: 1, aiCaution: 1, lootProtect: 0.1, hitCooldownMin: 0,
                 aiExpand: 1, playerZone: 0 }
     },
-    WIN_VILLAGES: 20,
+    WIN_VILLAGES: 20,           // domyślny cel (stare zapisy); nowe gry biorą cel ze świata (WORLDS)
+
+    // Rozmiary świata wybierane przy nowej grze: bok mapy, liczba frakcji AI, wolnych osad i cel zwycięstwa.
+    DEFAULT_WORLD: 'small',
+    WORLDS: {
+      small:  { label: 'Mała',     size: 15, ai: 4,  neutral: 24,  win: 20, desc: 'Szybka gra: 15×15 pól, 4 przeciwników.' },
+      medium: { label: 'Średnia',  size: 25, ai: 8,  neutral: 70,  win: 30, desc: 'Większy świat: 25×25 pól, 8 przeciwników, cel 30 wiosek.' },
+      large:  { label: 'Duża',     size: 35, ai: 12, neutral: 140, win: 40, desc: 'Duży świat: 35×35 pól, 12 przeciwników, cel 40 wiosek.' },
+      huge:   { label: 'Ogromna',  size: 45, ai: 15, neutral: 230, win: 50, desc: 'Ogromny świat: 45×45 pól, 15 przeciwników, cel 50 wiosek. Wymaga mocniejszego telefonu.' }
+    },
     MAX_LEVEL: LEVELS,
 
     MAP: {
@@ -239,7 +248,19 @@
         { id: 'ai1', name: 'Czerwony Klan', color: '#c23a2b', personality: 'aggressive' },
         { id: 'ai2', name: 'Kupcy z Doliny', color: '#3f8f3a', personality: 'economic' },
         { id: 'ai3', name: 'Strażnicy Grani', color: '#7a4bb0', personality: 'defensive' },
-        { id: 'ai4', name: 'Wilcza Horda', color: '#d9861c', personality: 'expansionist' }
+        { id: 'ai4', name: 'Wilcza Horda', color: '#d9861c', personality: 'expansionist' },
+        // Dalsi przeciwnicy – używane tylko na większych mapach (patrz WORLDS)
+        { id: 'ai5', name: 'Bractwo Rzeki', color: '#19a39a', personality: 'economic' },
+        { id: 'ai6', name: 'Lisy z Bagien', color: '#e0679f', personality: 'aggressive' },
+        { id: 'ai7', name: 'Zakon Białej Skały', color: '#d8dbe0', personality: 'defensive' },
+        { id: 'ai8', name: 'Łowcy Wichru', color: '#9a9a2a', personality: 'expansionist' },
+        { id: 'ai9', name: 'Kowale Gór', color: '#8b5a2b', personality: 'defensive' },
+        { id: 'ai10', name: 'Ród Złotego Dębu', color: '#e4c02c', personality: 'economic' },
+        { id: 'ai11', name: 'Dzicy z Puszczy', color: '#86c232', personality: 'aggressive' },
+        { id: 'ai12', name: 'Synowie Burzy', color: '#7d2434', personality: 'aggressive' },
+        { id: 'ai13', name: 'Straż Północy', color: '#4fb0e0', personality: 'defensive' },
+        { id: 'ai14', name: 'Kupcy Szlaku', color: '#a82f8f', personality: 'economic' },
+        { id: 'ai15', name: 'Hufiec Czarnego Kruka', color: '#4a4f5c', personality: 'expansionist' }
       ],
       personalities: {
         aggressive: {
