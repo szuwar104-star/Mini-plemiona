@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0e1318">
+  <meta name="description" content="Mini Plemiona – strategiczna gra przeglądarkowa. Rozbuduj wioskę, zbierz armię i zdobądź 20 osad.">
+  <title>Mini Plemiona</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+  <link rel="stylesheet" href="assets/fonts/fonts.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="loading">
+  <div class="splash"><img src="assets/icon-192.png" alt="" width="96" height="96"><h1>Mini Plemiona</h1><p>Wczytuję grę i nadrabiam czas nieobecności…</p></div>
+  <header class="topbar">
+    <div class="brand"><img src="assets/favicon.png" alt="" width="30" height="30"><span>Mini Plemiona</span></div>
+    <div class="vswitch">
+      <button class="vnav" data-act="vprev" aria-label="Poprzednia wioska" title="Poprzednia wioska ( [ )">‹</button>
+      <label class="vsel"><span class="sr">Aktywna wioska</span><select id="villageSelect"></select></label>
+      <button class="vnav" data-act="vnext" aria-label="Następna wioska" title="Następna wioska ( ] )">›</button>
+    </div>
+    <div class="resbar" id="resbar" aria-live="off"></div>
+  </header>
+
+  <div class="layout">
+    <nav class="nav" aria-label="Nawigacja">
+      <button data-screen="village"><i class="nicon" data-icon="hq"></i><span>Wioska</span></button>
+      <button data-screen="overview"><i class="nicon" data-icon="noble"></i><span>Przegląd</span></button>
+      <button data-screen="map"><i class="nicon" data-icon="map"></i><span>Mapa</span></button>
+      <button data-screen="army"><i class="nicon" data-icon="sword"></i><span>Wojsko</span><b class="badge" hidden></b></button>
+      <button data-screen="reports"><i class="nicon" data-icon="scroll"></i><span>Raporty</span><b class="badge" hidden></b></button>
+      <button data-act="menu"><i class="nicon" data-icon="menu"></i><span>Menu</span></button>
+    </nav>
+
+    <main id="main">
+      <section class="screen" id="screen-village"></section>
+      <section class="screen" id="screen-map" hidden>
+        <div class="map-wrap">
+          <div class="map-viewport" id="mapViewport" aria-label="Mapa świata 15 na 15 pól">
+            <div class="map-world" id="mapWorld"></div>
+            <div class="map-tools map-ui">
+              <button class="mbtn" data-act="zoom-in" aria-label="Przybliż">+</button>
+              <button class="mbtn" data-act="zoom-out" aria-label="Oddal">−</button>
+              <button class="mbtn" data-act="center" aria-label="Pokaż aktywną wioskę"><i class="nicon" data-icon="hq"></i></button>
+              <button class="mbtn grid-btn" data-act="grid-toggle" aria-label="Siatka mapy" aria-pressed="true"><i class="grid-ico"></i></button>
+            </div>
+            <div class="map-coord map-ui" id="mapCoord" aria-hidden="true"></div>
+            <div class="minimap map-ui"><canvas id="minimap" aria-label="Minimapa – kliknij, aby przejść"></canvas></div>
+            <div class="legend map-ui">
+              <span><i class="flag" style="--fc:#2f62c9"></i>Ty</span>
+              <span><i class="flag" style="--fc:#c23a2b"></i>Czerwony Klan</span>
+              <span><i class="flag" style="--fc:#3f8f3a"></i>Kupcy z Doliny</span>
+              <span><i class="flag" style="--fc:#7a4bb0"></i>Strażnicy Grani</span>
+              <span><i class="flag" style="--fc:#d9861c"></i>Wilcza Horda</span>
+              <span><i class="flag" style="--fc:#8a6b4d"></i>Wolne osady</span>
+            </div>
+          </div>
+        </div>
+        <aside class="map-details" id="mapDetails"></aside>
+      </section>
+      <section class="screen" id="screen-overview" hidden></section>
+      <section class="screen" id="screen-army" hidden></section>
+      <section class="screen" id="screen-reports" hidden></section>
+    </main>
+
+    <aside class="aside" id="aside"></aside>
+  </div>
+
+  <div class="modal" id="modal" hidden></div>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script src="config.js"></script>
+  <script src="engine.js"></script>
+  <script src="ai.js"></script>
+  <script src="database.js"></script>
+  <script src="sprites.js"></script>
+  <script src="art.js"></script>
+  <script src="map.js"></script>
+  <script src="ui.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
