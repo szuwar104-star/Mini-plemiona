@@ -57,7 +57,7 @@ Wolną osadę przejmujesz, wygrywając bitwę. Wioskę frakcji AI – wysyłają
 | `map.js` | mapa 15 × 15: warstwy, trasy wojsk, minimapa, przesuwanie, przybliżanie, szczypanie |
 | `ui.js` | ekrany, okna, powiadomienia |
 | `game.js` | start, pętla, autozapis, rejestracja Service Workera |
-| `manifest.json`, `sw.js`, `assets/` | PWA: manifest, tryb offline, ikony, fonty (Manrope, Pirata One – licencja SIL OFL) |
+| `manifest.json`, `sw.js`, `assets/` | PWA: manifest, tryb offline, ikony (generowane przez `tools/make-icons.py`) |
 | `serve.js`, `start.bat`, `start.sh` | lokalny serwer bez zależności |
 | `tests/simulate.js` | test logiki: `node tests/simulate.js` |
 | `tests/power.js` | test liczenia mocy konta: `node tests/power.js` |
