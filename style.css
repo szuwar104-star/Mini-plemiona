@@ -674,3 +674,14 @@ input:disabled { opacity: .4; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------- zbieranie / rozdzielanie surowców ---------- */
+.seg { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: .6rem; }
+.gopts { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem 1rem; align-items: start; }
+.gres { display: flex; flex-wrap: wrap; gap: .3rem .9rem; margin-top: .2rem; }
+.chk { display: inline-flex; align-items: center; gap: .4rem; font-weight: 700; font-size: .85rem; color: var(--text); cursor: pointer; }
+.chk .ico { width: 18px; height: 18px; }
+table.gather tr.skipped td { opacity: .6; }
+table.gather td small { color: var(--muted); margin-left: .35rem; }
+.summary .wide { grid-column: 1 / -1; }
+@media (max-width: 640px) { .gopts { grid-template-columns: 1fr; } }

@@ -38,6 +38,7 @@ Serwer jest potrzebny do działania jako PWA (Service Worker, instalacja, tryb o
 9. **Mur obronny i tarany** – mur dodaje stałą obronę i procentowy bonus (do +70% na poziomie 10). Tarany (Koszary 4) w bitwie obniżają mur o 1 poziom na każde 8 sztuk, a po wygranej ocalałe tarany burzą go na stałe (1 poziom na 4 tarany).
 10. **Szybkie przełączanie wiosek** – dwuklik (na telefonie podwójne stuknięcie) na swojej wiosce na mapie ustawia ją jako aktywną, a na obcej otwiera okno ataku z aktywnej wioski. Z każdego ekranu przełączysz wioski strzałkami ‹ › obok listy w górnym pasku albo klawiszami `[` i `]`.
 11. **Przegląd** – wszystkie wioski w jednej tabeli: surowce z zapełnieniem magazynu, farma, bieżąca budowa i rekrutacja, wojsko i nadciągające ataki.
+12. **Zbieranie i rozdzielanie surowców** – w Przeglądzie przycisk „Zbierz / rozdziel surowce” otwiera okno, w którym jednym kliknięciem wysyłasz kupców z wielu wiosek do jednej (albo z jednej po równo do pozostałych). Wybierasz surowce i ile procent magazynu zostaje w wiosce wysyłającej (domyślnie 20%), a wioski możesz odznaczać. Plan uwzględnia wolnych kupców, miejsce w magazynie celu (także surowce już jadące) i czas drogi; wioski bez Targowiska są pomijane z podaną przyczyną.
 
 Wolną osadę przejmujesz, wygrywając bitwę. Wioskę frakcji AI – wysyłając Dowódcę podboju: każda wygrana z żywym dowódcą obniża poparcie o 25–40%, przy 0% wioska jest Twoja. Przez pierwsze 10 minut AI nie atakuje gracza i nie zabiera osad leżących bliżej Ciebie.
 
@@ -59,6 +60,7 @@ Wolną osadę przejmujesz, wygrywając bitwę. Wioskę frakcji AI – wysyłają
 | `manifest.json`, `sw.js`, `assets/` | PWA: manifest, tryb offline, ikony, fonty (Manrope, Pirata One – licencja SIL OFL) |
 | `serve.js`, `start.bat`, `start.sh` | lokalny serwer bez zależności |
 | `tests/simulate.js` | test logiki: `node tests/simulate.js` |
+| `tests/gather.js` | test zbierania i rozdzielania surowców: `node tests/gather.js` |
 | `tools/make-icons.py` | generator ikon (wymaga Pillow) |
 | `tools/balance.js` | symulacja balansu na wszystkich poziomach trudności |
 | `tools/resources.js` | bilans surowców: wydatki, marnowanie, blokady |

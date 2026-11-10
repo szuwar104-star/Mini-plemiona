@@ -430,6 +430,120 @@
     state.movements.push(m);
     return { ok: true, movement: m };
   }
+  /* ---------- zbieranie i rozdzielanie surowców (wiele wiosek naraz) ---------- */
+  // Surowce już jadące do wioski (transporty w drodze) – liczą się do zajętego miejsca w magazynie.
+  function incomingRes(state, villageId) {
+    const r = { wood: 0, clay: 0, iron: 0 };
+    state.movements.forEach(m => {
+      if (m.type === 'transport' && m.to === villageId) RES.forEach(k => { r[k] += m.res[k] || 0; });
+    });
+    return r;
+  }
+  function gatherReserve(v, pct) { return Math.ceil(storageCap(v) * Math.max(0, Math.min(100, Number(pct) || 0)) / 100); }
+
+  // Plan bez skutków ubocznych (poza naliczeniem produkcji do chwili t).
+  // opts: mode 'gather' (wszystko do celu) | 'spread' (z celu do reszty), res {wood,clay,iron: bool},
+  //       reservePct (zostaje w wiosce wysyłającej), capToRoom (nie wysyłaj ponad wolne miejsce celu),
+  //       off {id: true} – wioski pominięte przez gracza.
+  function planGather(state, targetId, opts, t) {
+    opts = opts || {};
+    const mode = opts.mode === 'spread' ? 'spread' : 'gather';
+    const target = state.villages[targetId];
+    const plan = { mode, targetId, rows: [], total: 0, merchants: 0, lost: false };
+    if (!target) return plan;
+    const want = RES.filter(k => !opts.res || opts.res[k]);
+    const capToRoom = opts.capToRoom !== false;
+    const others = villagesOf(state, target.owner).filter(v => v.id !== target.id)
+      .sort((a, b) => dist(a, target) - dist(b, target) || a.name.localeCompare(b.name, 'pl'));
+    others.forEach(v => tickVillage(state, v, t));
+    tickVillage(state, target, t);
+    const mk = v => ({ villageId: v.id, off: !!(opts.off && opts.off[v.id]), skip: '', res: { wood: 0, clay: 0, iron: 0 },
+      total: 0, merchants: 0, time: merchantTime(v, target) });
+    const cap = C.MERCHANT.capacity;
+    // Ile mieści się w magazynie wioski (z uwzględnieniem transportów w drodze).
+    const roomOf = v => { const inc = incomingRes(state, v.id), c = storageCap(v), r = {};
+      RES.forEach(k => { r[k] = Math.max(0, c - Math.floor(v.res[k]) - inc[k]); }); return r; };
+
+    if (mode === 'gather') {
+      const room = roomOf(target);
+      others.forEach(v => {
+        const row = mk(v); plan.rows.push(row);
+        if (row.off) { row.skip = 'pominięta'; return; }
+        if (merchantsTotal(v) < 1) { row.skip = 'brak Targowiska'; return; }
+        const free = merchantsFree(state, v);
+        if (free < 1) { row.skip = 'brak wolnych kupców'; return; }
+        const avail = {}; let sum = 0;
+        want.forEach(k => { avail[k] = Math.max(0, Math.floor(v.res[k]) - gatherReserve(v, opts.reservePct)); sum += avail[k]; });
+        if (sum < 1) { row.skip = 'nic ponad rezerwę'; return; }
+        const f = Math.min(1, free * cap / sum);                 // limit udźwigu kupców
+        want.forEach(k => {
+          let take = Math.floor(avail[k] * f);
+          if (capToRoom) { take = Math.min(take, room[k]); room[k] -= take; } else room[k] -= take;
+          row.res[k] = take;
+        });
+        row.total = row.res.wood + row.res.clay + row.res.iron;
+        if (row.total < 1) { row.skip = 'magazyn celu pełny'; return; }
+        row.merchants = Math.ceil(row.total / cap);
+      });
+      // Nadwyżka ponad magazyn celu (tylko gdy gracz wyłączył przycinanie).
+      const cap0 = storageCap(target), inc0 = incomingRes(state, target.id);
+      plan.lost = RES.some(k => Math.floor(target.res[k]) + inc0[k] + plan.rows.reduce((a, r) => a + r.res[k], 0) > cap0);
+    } else {
+      // Rozdzielanie: z celu (tu: wioska wysyłająca) po równo do pozostałych.
+      const dests = others.map(v => { const row = mk(v); plan.rows.push(row);
+        if (row.off) row.skip = 'pominięta'; return { v, row, room: roomOf(v) }; });
+      const live = dests.filter(d => !d.row.skip);
+      let left = merchantsFree(state, target);
+      if (merchantsTotal(target) < 1) { live.forEach(d => { d.row.skip = 'brak Targowiska w wiosce źródłowej'; }); }
+      else if (left < 1) { live.forEach(d => { d.row.skip = 'brak wolnych kupców'; }); }
+      else {
+        const share = {};
+        want.forEach(k => {
+          let A = Math.max(0, Math.floor(target.res[k]) - gatherReserve(target, opts.reservePct));
+          let pool = live.slice();
+          share[k] = new Map();
+          while (A >= 1 && pool.length) {                         // wyrównywanie: pełne magazyny odpadają, reszta dzieli po równo
+            const each = Math.floor(A / pool.length);
+            if (each < 1) break;
+            const full = capToRoom ? pool.filter(d => d.room[k] - (share[k].get(d) || 0) <= each) : [];
+            if (!full.length) { pool.forEach(d => share[k].set(d, (share[k].get(d) || 0) + each)); A -= each * pool.length; break; }
+            full.forEach(d => { const g = d.room[k] - (share[k].get(d) || 0); share[k].set(d, (share[k].get(d) || 0) + g); A -= g; });
+            pool = pool.filter(d => !full.includes(d));
+          }
+        });
+        live.forEach(d => {                                       // od najbliższej: kupcy rozdzielani po kolei
+          want.forEach(k => { d.row.res[k] = Math.max(0, share[k].get(d) || 0); });
+          let tot = d.row.res.wood + d.row.res.clay + d.row.res.iron;
+          if (tot < 1) { d.row.skip = 'magazyn pełny'; return; }
+          if (left < 1) { d.row.res = { wood: 0, clay: 0, iron: 0 }; d.row.skip = 'zabrakło kupców'; return; }
+          const f = Math.min(1, left * cap / tot);
+          if (f < 1) want.forEach(k => { d.row.res[k] = Math.floor(d.row.res[k] * f); });
+          d.row.total = d.row.res.wood + d.row.res.clay + d.row.res.iron;
+          if (d.row.total < 1) { d.row.skip = 'zabrakło kupców'; return; }
+          d.row.merchants = Math.ceil(d.row.total / cap); left -= d.row.merchants;
+        });
+      }
+      plan.lost = false;
+    }
+    plan.rows.forEach(r => { plan.total += r.total; plan.merchants += r.merchants; });
+    return plan;
+  }
+
+  // Wysyła cały plan; każdy transport przechodzi zwykłą walidację sendTransport.
+  function sendGather(state, plan, t) {
+    const sent = [], failed = [];
+    plan.rows.forEach(r => {
+      if (r.skip || r.total < 1) return;
+      const from = plan.mode === 'gather' ? r.villageId : plan.targetId;
+      const to = plan.mode === 'gather' ? plan.targetId : r.villageId;
+      const res = sendTransport(state, from, to, r.res, t);
+      if (res.ok) sent.push(res.movement); else failed.push(res.reason);
+    });
+    if (!sent.length) return { ok: false, reason: failed[0] || 'Nic do wysłania', sent, failed };
+    return { ok: true, sent, failed, total: sent.reduce((a, m) => a + m.res.wood + m.res.clay + m.res.iron, 0),
+      first: Math.min.apply(null, sent.map(m => m.arrive)) };
+  }
+
   function resolveTransport(state, m, t) {
     const to = state.villages[m.to], from = state.villages[m.from];
     let back = { wood: 0, clay: 0, iron: 0 };
@@ -774,6 +888,6 @@
     buildInfo, queueBuild, recruitInfo, queueRecruit, recruitPer,
     travelTime, slowest, sendAttack, sendSpy, advance, nextEvent,
     unitsPop, supportRoom, sendSupport, withdrawSupport, defenders, defenseFrom, villageDefense,
-    merchantsTotal, merchantsBusy, merchantsFree, merchantTime, sendTransport, settleCheck, sendSettler
+    merchantsTotal, merchantsBusy, merchantsFree, merchantTime, sendTransport, planGather, sendGather, incomingRes, settleCheck, sendSettler
   };
 })(typeof window !== 'undefined' ? window : globalThis);

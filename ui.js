@@ -14,7 +14,7 @@
 
   const UI = {
     screen: 'village', vid: null, sel: null, filter: 'all',
-    recruit: {}, atk: {}, form: {}, sigs: {}, modal: null, toastQueue: []
+    recruit: {}, atk: {}, form: {}, gather: null, sigs: {}, modal: null, toastQueue: []
   };
 
   /* ---------- formatowanie ---------- */
@@ -396,7 +396,8 @@
         '<td>' + (attacks.length ? '<span class="alert">' + ico('sword') + attacks.length + ' <span class="timer" data-end="' + attacks[0].arrive + '"></span></span>' : '') + '</td></tr>';
     }).join('');
     el.innerHTML = '<section class="ov-head panel"><div><h1>Przegląd wiosek</h1><p class="tags"><span>' + own.length + ' z ' + C.WIN_VILLAGES + ' wiosek</span>' +
-      (inc.length ? '<span class="warn">Nadciągające ataki: ' + inc.length + '</span>' : '') + '</p></div>' +
+      (inc.length ? '<span class="warn">Nadciągające ataki: ' + inc.length + '</span>' : '') + '</p>' +
+      '<div class="actions left"><button class="btn" data-act="gather-open"' + (own.length > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"') + '>' + ico('merchant') + 'Zbierz / rozdziel surowce</button></div></div>' +
       '<div class="army-kpis ov-kpis">' + E.RES.map(r => '<div class="kpi"><small>' + C.RESOURCES[r].name + ' razem</small><b>' + fmt(total[r]) + '</b><small>+' + Math.round(prod[r]) + ' / min</small></div>').join('') +
       '<div class="kpi"><small>Wojsko w wioskach</small><b>' + fmt(army) + '</b></div></div></section>' +
       '<section class="panel"><div class="tablewrap"><table class="units ov">' +
@@ -697,6 +698,54 @@
       '</tbody></table></div><div id="formSummary" class="summary"></div>' +
       '<div class="actions"><button class="btn ghost" data-act="close">Anuluj</button><button class="btn" data-act="send-transport">Wyślij kupców</button></div>';
   }
+  /* ---------- okno: zbieranie / rozdzielanie surowców ---------- */
+  function gatherDefaults(target) {
+    return { target, mode: 'gather', res: { wood: true, clay: true, iron: true }, reserve: 20, capToRoom: true, off: {} };
+  }
+  function gatherArgs(g) { return { mode: g.mode, res: g.res, reservePct: g.reserve, capToRoom: g.capToRoom, off: g.off }; }
+  function gatherModal() {
+    const s = st(), g = UI.gather, own = E.villagesOf(s, 'player').sort((a, b) => a.name.localeCompare(b.name, 'pl'));
+    if (!own.some(o => o.id === g.target)) g.target = own[0].id;
+    const spread = g.mode === 'spread';
+    return '<h2>' + ico('merchant') + (spread ? 'Rozdziel surowce' : 'Zbierz surowce') + '</h2>' +
+      '<div class="seg"><button class="btn' + (spread ? ' ghost' : '') + '" data-act="gather-mode" data-m="gather">Zbierz do jednej wioski</button>' +
+      '<button class="btn' + (spread ? '' : ' ghost') + '" data-act="gather-mode" data-m="spread">Rozdziel z jednej wioski</button></div>' +
+      '<label class="field">' + (spread ? 'Wioska źródłowa' : 'Wioska docelowa') + ' <select data-gtarget>' + own.map(o => '<option value="' + o.id + '"' + (o.id === g.target ? ' selected' : '') + '>' +
+        esc(o.name) + ' ' + xy(o.x, o.y) + '</option>').join('') + '</select></label>' +
+      '<div class="gopts"><div class="field">Surowce<span class="gres">' + E.RES.map(k => '<label class="chk"><input type="checkbox" data-gres="' + k + '"' + (g.res[k] ? ' checked' : '') + '>' + ico(k) + C.RESOURCES[k].name + '</label>').join('') + '</span></div>' +
+      '<label class="field">Zostaw w wiosce wysyłającej (% magazynu)<input type="number" inputmode="numeric" min="0" max="100" step="5" data-greserve value="' + esc(g.reserve) + '"></label></div>' +
+      '<label class="chk"><input type="checkbox" data-gcap' + (g.capToRoom ? ' checked' : '') + '>Nie wysyłaj więcej, niż mieści magazyn ' + (spread ? 'celów' : 'celu') + '</label>' +
+      '<div id="gatherPlan"></div>' +
+      '<div class="actions"><button class="btn ghost" data-act="close">Anuluj</button><button class="btn" data-act="gather-send" id="gatherSend">Wyślij kupców</button></div>';
+  }
+  function updateGatherPlan() {
+    const box = $('#gatherPlan');
+    if (!box || !UI.modal || UI.modal.type !== 'gather') return;
+    const s = st(), g = UI.gather, spread = g.mode === 'spread', T = s.villages[g.target];
+    const plan = E.planGather(s, g.target, gatherArgs(g), s.now);
+    const sendable = plan.rows.filter(r => !r.skip && r.total > 0);
+    let html = '<div class="tablewrap"><table class="units gather"><thead><tr><th></th><th>' + (spread ? 'Do wioski' : 'Z wioski') + '</th><th>Surowce</th><th>Kupcy</th><th>Droga</th></tr></thead><tbody>' +
+      plan.rows.map(r => {
+        const v = s.villages[r.villageId];
+        return '<tr class="' + (r.skip ? 'skipped' : '') + '"><td><input type="checkbox" data-gsrc="' + v.id + '"' + (r.off ? '' : ' checked') + '></td>' +
+          '<td>' + esc(v.name) + '<small>' + E.dist(v, T).toFixed(1) + ' pola</small></td>' +
+          '<td>' + (r.skip ? '<span class="muted">' + esc(r.skip) + '</span>' : resLine(r.res)) + '</td>' +
+          '<td class="num">' + (r.merchants || '') + '</td><td class="num">' + (r.skip ? '' : dur(r.time)) + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+    html += '<div class="summary"><div><span>Razem surowców</span><b>' + fmt(plan.total) + '</b></div>' +
+      '<div><span>Kupców</span><b>' + plan.merchants + '</b></div>' +
+      '<div><span>Transportów</span><b>' + sendable.length + '</b></div>' +
+      (sendable.length ? '<div><span>Pierwsza dostawa za</span><b>' + dur(Math.min.apply(null, sendable.map(r => r.time))) + '</b></div>' : '') +
+      (!spread && sendable.length ? '<div class="wide"><span>Po dostawie w ' + esc(T.name) + '</span><b>' + E.RES.map(k => {
+        const add = plan.rows.reduce((a, r) => a + r.res[k], 0);
+        return ico(k) + fmt(Math.floor(T.res[k]) + E.incomingRes(s, T.id)[k] + add) + ' / ' + fmt(E.storageCap(T));
+      }).join(' ') + '</b></div>' : '') +
+      (plan.lost ? '<p class="why">Część surowców nie zmieści się w magazynie celu i przepadnie.</p>' : '') +
+      (!plan.rows.length ? '<p class="muted">Brak innych wiosek.</p>' : '') +
+      (plan.rows.length && !sendable.length ? '<p class="muted">Nic do wysłania z obecnymi ustawieniami.</p>' : '') + '</div>';
+    box.innerHTML = html;
+    const btn = $('#gatherSend'); if (btn) btn.disabled = !sendable.length;
+  }
   function settleModal() {
     const s = st(), m = UI.modal, tile = { x: m.x, y: m.y };
     const own = E.villagesOf(s, 'player').filter(o => o.units.settler > 0).sort((a, b) => E.dist(a, tile) - E.dist(b, tile));
@@ -846,6 +895,7 @@
     else if (UI.modal.type === 'transport') inner = transportModal();
     else if (UI.modal.type === 'support') inner = supportModal();
     else if (UI.modal.type === 'settle') inner = settleModal();
+    else if (UI.modal.type === 'gather') inner = gatherModal();
     else if (UI.modal.type === 'report') inner = reportModal(s.reports.find(r => r.id === UI.modal.id));
     else if (UI.modal.type === 'menu') inner = menuModal();
     else if (UI.modal.type === 'newgame') inner = newGameModal();
@@ -856,8 +906,9 @@
     box.hidden = false;
     if (UI.modal.type === 'attack') updateAttackSummary();
     updateFormSummary();
+    updateGatherPlan();
     const first = box.querySelector('input:not([disabled]), button');
-    if (first && !['attack', 'spy', 'transport', 'settle', 'support'].includes(UI.modal.type)) first.focus({ preventScroll: true });
+    if (first && !['attack', 'spy', 'transport', 'settle', 'support', 'gather'].includes(UI.modal.type)) first.focus({ preventScroll: true });
   }
   function closeModal() {
     const wasEnd = UI.modal && UI.modal.type === 'end';
@@ -1127,6 +1178,20 @@
         updateFormSummary();
         break;
       case 'transport-open': UI.form = {}; openModal('transport', { target: b.dataset.id, from: UI.vid }); break;
+      case 'gather-open': UI.gather = gatherDefaults(UI.vid || (cur() && cur().id)); openModal('gather'); break;
+      case 'gather-mode': UI.gather.mode = b.dataset.m; renderModal(); break;
+      case 'gather-send': {
+        const g = UI.gather;
+        const r = G.action(s => E.sendGather(s, E.planGather(s, g.target, gatherArgs(g), s.now), s.now));
+        if (r.ok) {
+          const n = r.sent.length;
+          toast('info', 'Wysłano ' + n + ' transport' + (n === 1 ? '' : n < 5 ? 'y' : 'ów') + ' (' + fmt(r.total) + ' surowców). Pierwsza dostawa za ' + dur(r.first - st().now) + '.' +
+            (r.failed.length ? ' Pominięto: ' + r.failed.length + '.' : ''));
+          UI.gather = null;
+          closeModal(); invalidate(); render();
+        } else toast('bad', r.reason);
+        break;
+      }
       case 'settle-open': UI.form = {}; openModal('settle', { x: Number(b.dataset.x), y: Number(b.dataset.y), from: UI.vid }); break;
       case 'fmax': {
         UI.form[b.dataset.k] = b.dataset.v;
@@ -1179,12 +1244,17 @@
     if (t.dataset.rin) UI.recruit[t.dataset.rin] = t.value;
     if (t.dataset.ain) { UI.atk[t.dataset.ain] = t.value; updateAttackSummary(); }
     if (t.dataset.fin) { UI.form[t.dataset.fin] = t.value; updateFormSummary(); }
+    if (t.hasAttribute && t.hasAttribute('data-greserve')) { UI.gather.reserve = Math.max(0, Math.min(100, Number(t.value) || 0)); updateGatherPlan(); }
   }
   function onChange(e) {
     const t = e.target;
     if (t.id === 'villageSelect') { UI.vid = t.value; UI.recruit = {}; invalidate(); render(); }
     else if (t.id === 'atkFrom') { UI.modal.from = t.value; renderModal(); }
     else if (t.hasAttribute && t.hasAttribute('data-from')) { UI.modal.from = t.value; renderModal(); }
+    else if (t.hasAttribute && t.hasAttribute('data-gtarget')) { UI.gather.target = t.value; UI.gather.off = {}; renderModal(); }
+    else if (t.dataset && t.dataset.gres) { UI.gather.res[t.dataset.gres] = t.checked; updateGatherPlan(); }
+    else if (t.dataset && t.dataset.gsrc) { if (t.checked) delete UI.gather.off[t.dataset.gsrc]; else UI.gather.off[t.dataset.gsrc] = true; updateGatherPlan(); }
+    else if (t.hasAttribute && t.hasAttribute('data-gcap')) { UI.gather.capToRoom = t.checked; updateGatherPlan(); }
     else if (t.id === 'importFile' && t.files[0]) {
       const reader = new FileReader();
       reader.onload = () => {
