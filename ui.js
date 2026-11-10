@@ -14,7 +14,7 @@
 
   const UI = {
     screen: 'village', vid: null, sel: null, filter: 'all',
-    recruit: {}, atk: {}, form: {}, gather: null, sigs: {}, modal: null, toastQueue: []
+    recruit: {}, atk: {}, form: {}, gather: null, troops: null, sigs: {}, modal: null, toastQueue: []
   };
 
   /* ---------- formatowanie ---------- */
@@ -398,7 +398,8 @@
     }).join('');
     el.innerHTML = '<section class="ov-head panel"><div><h1>Przegląd wiosek</h1><p class="tags"><span>' + own.length + ' z ' + C.WIN_VILLAGES + ' wiosek</span>' +
       (inc.length ? '<span class="warn">Nadciągające ataki: ' + inc.length + '</span>' : '') + '</p>' +
-      '<div class="actions left"><button class="btn" data-act="gather-open"' + (own.length > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"') + '>' + ico('merchant') + 'Zbierz / rozdziel surowce</button></div></div>' +
+      '<div class="actions left"><button class="btn" data-act="gather-open"' + (own.length > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"') + '>' + ico('merchant') + 'Zbierz / rozdziel surowce</button>' +
+      '<button class="btn" data-act="troops-open"' + (own.length > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"') + '>' + ico('spear') + 'Zbierz / rozdziel wojsko</button></div></div>' +
       '<div class="army-kpis ov-kpis">' + E.RES.map(r => '<div class="kpi"><small>' + C.RESOURCES[r].name + ' razem</small><b>' + fmt(total[r]) + '</b><small>+' + Math.round(prod[r]) + ' / min</small></div>').join('') +
       '<div class="kpi"><small>Wojsko w wioskach</small><b>' + fmt(army) + '</b></div>' +
       '<div class="kpi"><small>Moc konta</small><b>' + fmt(pw.total) + '</b><small>bud. ' + fmt(pw.buildings) + ' + woj. ' + fmt(pw.army) + '</small></div></div></section>' +
@@ -748,6 +749,54 @@
     box.innerHTML = html;
     const btn = $('#gatherSend'); if (btn) btn.disabled = !sendable.length;
   }
+  /* ---------- okno: zbieranie / rozdzielanie wojska ---------- */
+  function troopsDefaults(target) {
+    const units = {}; E.UNITS.forEach(k => { units[k] = k !== 'settler' && k !== 'scout'; });
+    return { target, mode: 'gather', stay: false, units, reserve: 0, capToRoom: true, off: {} };
+  }
+  function troopsArgs(g) { return { mode: g.mode, stay: g.stay, units: g.units, reservePct: g.reserve, capToRoom: g.capToRoom, off: g.off }; }
+  function troopsModal() {
+    const s = st(), g = UI.troops, own = E.villagesOf(s, 'player').sort((a, b) => a.name.localeCompare(b.name, 'pl'));
+    if (!own.some(o => o.id === g.target)) g.target = own[0].id;
+    const spread = g.mode === 'spread';
+    return '<h2>' + ico('spear') + (spread ? 'Rozdziel wojsko' : 'Zbierz wojsko') + '</h2>' +
+      '<div class="seg"><button class="btn' + (spread ? ' ghost' : '') + '" data-act="troops-mode" data-m="gather">Zbierz do jednej wioski</button>' +
+      '<button class="btn' + (spread ? '' : ' ghost') + '" data-act="troops-mode" data-m="spread">Rozdziel z jednej wioski</button></div>' +
+      '<label class="field">' + (spread ? 'Wioska źródłowa' : 'Wioska docelowa') + ' <select data-ttarget>' + own.map(o => '<option value="' + o.id + '"' + (o.id === g.target ? ' selected' : '') + '>' +
+        esc(o.name) + ' ' + xy(o.x, o.y) + '</option>').join('') + '</select></label>' +
+      '<label class="field">Rodzaj wysyłki <select data-tstay>' +
+        '<option value="0"' + (g.stay ? '' : ' selected') + '>Wsparcie – wojsko zostaje Twoje i można je odwołać</option>' +
+        '<option value="1"' + (g.stay ? ' selected' : '') + '>Przeniesienie na stałe – zajmuje farmę celu</option></select></label>' +
+      '<div class="gopts"><div class="field">Jednostki<span class="gres">' + E.UNITS.map(k => '<label class="chk"><input type="checkbox" data-tunit="' + k + '"' + (g.units[k] ? ' checked' : '') + '>' + ico(k) + C.UNITS[k].name + '</label>').join('') + '</span></div>' +
+      '<label class="field">Zostaw w wiosce wysyłającej (% wojska)<input type="number" inputmode="numeric" min="0" max="100" step="5" data-treserve value="' + esc(g.reserve) + '"></label></div>' +
+      (g.stay ? '<label class="chk"><input type="checkbox" data-tcap' + (g.capToRoom ? ' checked' : '') + '>Nie wysyłaj więcej, niż mieści farma ' + (spread ? 'celów' : 'celu') + '</label>' : '') +
+      '<div id="troopsPlan"></div>' +
+      '<div class="actions"><button class="btn ghost" data-act="close">Anuluj</button><button class="btn" data-act="troops-send" id="troopsSend">Wyślij wojsko</button></div>';
+  }
+  function updateTroopsPlan() {
+    const box = $('#troopsPlan');
+    if (!box || !UI.modal || UI.modal.type !== 'troops') return;
+    const s = st(), g = UI.troops, spread = g.mode === 'spread', T = s.villages[g.target];
+    const plan = E.planTroops(s, g.target, troopsArgs(g), s.now);
+    const sendable = plan.rows.filter(r => !r.skip && r.total > 0);
+    let html = '<div class="tablewrap"><table class="units gather"><thead><tr><th></th><th>' + (spread ? 'Do wioski' : 'Z wioski') + '</th><th>Wojsko</th><th>Droga</th></tr></thead><tbody>' +
+      plan.rows.map(r => {
+        const v = s.villages[r.villageId];
+        return '<tr class="' + (r.skip ? 'skipped' : '') + '"><td><input type="checkbox" data-tsrc="' + v.id + '"' + (r.off ? '' : ' checked') + '></td>' +
+          '<td>' + esc(v.name) + '<small>' + E.dist(v, T).toFixed(1) + ' pola</small></td>' +
+          '<td>' + (r.skip ? '<span class="muted">' + esc(r.skip) + '</span>' : unitsLine(r.units)) + '</td>' +
+          '<td class="num">' + (r.skip ? '' : dur(r.time)) + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+    html += '<div class="summary"><div><span>Razem jednostek</span><b>' + fmt(plan.total) + '</b></div>' +
+      '<div><span>Oddziałów</span><b>' + sendable.length + '</b></div>' +
+      (sendable.length ? '<div><span>Pierwsze przybycie za</span><b>' + dur(Math.min.apply(null, sendable.map(r => r.time))) + '</b></div>' +
+        '<div><span>Ostatnie przybycie za</span><b>' + dur(Math.max.apply(null, sendable.map(r => r.time))) + '</b></div>' : '') +
+      (!spread && sendable.length ? '<div class="wide"><span>Farma w ' + esc(T.name) + (g.stay ? ' po przybyciu' : '') + '</span><b>' + ico('pop') + fmt(E.popUsed(s, T) + (g.stay ? plan.pop : 0)) + ' / ' + fmt(E.popCap(T)) + '</b></div>' : '') +
+      (!plan.rows.length ? '<p class="muted">Brak innych wiosek.</p>' : '') +
+      (plan.rows.length && !sendable.length ? '<p class="muted">Nic do wysłania z obecnymi ustawieniami.</p>' : '') + '</div>';
+    box.innerHTML = html;
+    const btn = $('#troopsSend'); if (btn) btn.disabled = !sendable.length;
+  }
   function settleModal() {
     const s = st(), m = UI.modal, tile = { x: m.x, y: m.y };
     const own = E.villagesOf(s, 'player').filter(o => o.units.settler > 0).sort((a, b) => E.dist(a, tile) - E.dist(b, tile));
@@ -910,6 +959,7 @@
     else if (UI.modal.type === 'support') inner = supportModal();
     else if (UI.modal.type === 'settle') inner = settleModal();
     else if (UI.modal.type === 'gather') inner = gatherModal();
+    else if (UI.modal.type === 'troops') inner = troopsModal();
     else if (UI.modal.type === 'report') inner = reportModal(s.reports.find(r => r.id === UI.modal.id));
     else if (UI.modal.type === 'menu') inner = menuModal();
     else if (UI.modal.type === 'newgame') inner = newGameModal();
@@ -921,8 +971,9 @@
     if (UI.modal.type === 'attack') updateAttackSummary();
     updateFormSummary();
     updateGatherPlan();
+    updateTroopsPlan();
     const first = box.querySelector('input:not([disabled]), button');
-    if (first && !['attack', 'spy', 'transport', 'settle', 'support', 'gather'].includes(UI.modal.type)) first.focus({ preventScroll: true });
+    if (first && !['attack', 'spy', 'transport', 'settle', 'support', 'gather', 'troops'].includes(UI.modal.type)) first.focus({ preventScroll: true });
   }
   function closeModal() {
     const wasEnd = UI.modal && UI.modal.type === 'end';
@@ -981,22 +1032,23 @@
   }
 
   /* ---------- powiadomienia ---------- */
+  // Wyskakujące powiadomienia są wyłączone (zasłaniały grę). Zostaje tylko komunikat o błędzie akcji
+  // wewnątrz otwartego okna, żeby nieudana wysyłka nie wyglądała jak brak reakcji.
   function toast(kind, text) {
-    const box = $('#toasts');
-    const el = document.createElement('div');
-    el.className = 'toast ' + kind;
+    if (kind !== 'bad' || !UI.modal) return;
+    const dlg = document.querySelector('#modal .dialog');
+    if (!dlg) return;
+    let el = dlg.querySelector('.modal-err');
+    if (!el) {
+      el = document.createElement('p');
+      el.className = 'why modal-err'; el.setAttribute('role', 'alert');
+      dlg.insertBefore(el, dlg.querySelector('.actions:last-of-type'));
+    }
     el.textContent = text;
-    box.appendChild(el);
-    while (box.children.length > 4) box.firstChild.remove();
-    setTimeout(() => el.classList.add('out'), 4200);
-    setTimeout(() => el.remove(), 4800);
   }
-  function drainNotices(silent) {
+  function drainNotices() {
     const s = st();
-    const list = s.notices.splice(0);
-    if (silent) return list;
-    list.slice(-4).forEach(n => toast(n.kind, n.text));
-    return list;
+    return s.notices.splice(0);
   }
 
   /* ---------- główny render ---------- */
@@ -1208,6 +1260,17 @@
         } else toast('bad', r.reason);
         break;
       }
+      case 'troops-open': UI.troops = troopsDefaults(UI.vid || (cur() && cur().id)); openModal('troops'); break;
+      case 'troops-mode': UI.troops.mode = b.dataset.m; renderModal(); break;
+      case 'troops-send': {
+        const g = UI.troops;
+        const r = G.action(s => E.sendTroops(s, E.planTroops(s, g.target, troopsArgs(g), s.now), s.now));
+        if (r.ok) {
+          UI.troops = null;
+          closeModal(); invalidate(); render();
+        } else toast('bad', r.reason);
+        break;
+      }
       case 'settle-open': UI.form = {}; openModal('settle', { x: Number(b.dataset.x), y: Number(b.dataset.y), from: UI.vid }); break;
       case 'fmax': {
         UI.form[b.dataset.k] = b.dataset.v;
@@ -1260,6 +1323,7 @@
     if (t.dataset.rin) UI.recruit[t.dataset.rin] = t.value;
     if (t.dataset.ain) { UI.atk[t.dataset.ain] = t.value; updateAttackSummary(); }
     if (t.dataset.fin) { UI.form[t.dataset.fin] = t.value; updateFormSummary(); }
+    if (t.hasAttribute && t.hasAttribute('data-treserve')) { UI.troops.reserve = Math.max(0, Math.min(100, Number(t.value) || 0)); updateTroopsPlan(); }
     if (t.hasAttribute && t.hasAttribute('data-greserve')) { UI.gather.reserve = Math.max(0, Math.min(100, Number(t.value) || 0)); updateGatherPlan(); }
   }
   function onChange(e) {
@@ -1267,6 +1331,11 @@
     if (t.id === 'villageSelect') { UI.vid = t.value; UI.recruit = {}; invalidate(); render(); }
     else if (t.id === 'atkFrom') { UI.modal.from = t.value; renderModal(); }
     else if (t.hasAttribute && t.hasAttribute('data-from')) { UI.modal.from = t.value; renderModal(); }
+    else if (t.hasAttribute && t.hasAttribute('data-ttarget')) { UI.troops.target = t.value; UI.troops.off = {}; renderModal(); }
+    else if (t.hasAttribute && t.hasAttribute('data-tstay')) { UI.troops.stay = t.value === '1'; renderModal(); }
+    else if (t.dataset && t.dataset.tunit) { UI.troops.units[t.dataset.tunit] = t.checked; updateTroopsPlan(); }
+    else if (t.dataset && t.dataset.tsrc) { if (t.checked) delete UI.troops.off[t.dataset.tsrc]; else UI.troops.off[t.dataset.tsrc] = true; updateTroopsPlan(); }
+    else if (t.hasAttribute && t.hasAttribute('data-tcap')) { UI.troops.capToRoom = t.checked; updateTroopsPlan(); }
     else if (t.hasAttribute && t.hasAttribute('data-gtarget')) { UI.gather.target = t.value; UI.gather.off = {}; renderModal(); }
     else if (t.dataset && t.dataset.gres) { UI.gather.res[t.dataset.gres] = t.checked; updateGatherPlan(); }
     else if (t.dataset && t.dataset.gsrc) { if (t.checked) delete UI.gather.off[t.dataset.gsrc]; else UI.gather.off[t.dataset.gsrc] = true; updateGatherPlan(); }

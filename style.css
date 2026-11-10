@@ -574,20 +574,6 @@ input:disabled { opacity: .4; }
 .endgame h2 { font-family: var(--logo); font-weight: 400; font-size: 2.6rem; justify-content: center; color: var(--gold-2); }
 .endgame .actions { justify-content: center; }
 
-/* ---------- powiadomienia ---------- */
-.toasts { position: fixed; z-index: 60; right: 1.1rem; top: calc(var(--top-h) + .9rem); display: grid; gap: .45rem; width: min(370px, calc(100vw - 2rem)); pointer-events: none; }
-.toast {
-  padding: .7rem .9rem .7rem 1rem; background: var(--surface-2); color: var(--text); border: 1px solid var(--line-2); border-radius: 12px;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, .45); font-size: .88rem; font-weight: 700; position: relative; overflow: hidden;
-  transition: opacity .5s, transform .5s; animation: slidein .22s ease-out;
-}
-.toast::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--gold); }
-@keyframes slidein { from { transform: translateX(20px); opacity: 0; } }
-.toast.good::before { background: var(--green); }
-.toast.bad::before, .toast.danger::before { background: var(--red); }
-.toast.danger { background: #3a1d1d; }
-.toast.out { opacity: 0; transform: translateX(20px); }
-
 /* ---------- tablet ---------- */
 @media (max-width: 1240px) {
   .layout, body.on-map .layout { grid-template-columns: 190px minmax(0, 1fr); }
@@ -661,7 +647,6 @@ input:disabled { opacity: .4; }
     transform: translateY(110%); transition: transform .22s ease-out; box-shadow: 0 -10px 30px rgba(0, 0, 0, .5);
   }
   .map-details.open { transform: none; }
-  .toasts { top: calc(var(--top-h) + .5rem); right: .5rem; width: calc(100vw - 1rem); }
   .rform { grid-template-columns: 1fr auto; }
   .rform .btn:last-child { grid-column: 1 / -1; }
   .ritem { grid-template-columns: 30px 1fr; }
@@ -701,8 +686,6 @@ table.gather td small { color: var(--muted); margin-left: .35rem; }
     .map-details { max-height: 60dvh; }
   }
 
-  /* powiadomienia nad dolnym paskiem, żeby nie zasłaniały nagłówków */
-  .toasts { top: auto; left: .5rem; right: .5rem; width: auto; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + .6rem); }
 
   /* Przegląd: kafelek mocy na całą szerokość */
   .ov-kpis .kpi:last-child:nth-child(odd) { grid-column: 1 / -1; }

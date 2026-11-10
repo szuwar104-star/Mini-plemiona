@@ -564,6 +564,92 @@
       first: Math.min.apply(null, sent.map(m => m.arrive)) };
   }
 
+  /* ---------- zbieranie i rozdzielanie wojska (wiele wiosek naraz) ---------- */
+  // Jednostki wybierane domyślnie: cała armia poza Osadnikiem i Zwiadowcami.
+  function troopKinds(opts) {
+    return UNITS.filter(k => opts && opts.units ? !!opts.units[k] : (k !== 'settler' && k !== 'scout'));
+  }
+  // Plan bez skutków ubocznych. opts: mode 'gather' (wszyscy do celu) | 'spread' (z celu po równo do reszty),
+  //   units {k: bool}, reservePct (% wojska zostaje w wiosce wysyłającej), stay (przeniesienie na stałe zamiast wsparcia),
+  //   capToRoom (przy stay: nie wysyłaj ponad wolne miejsce na farmie celu), off {id: true} – pominięte wioski.
+  function planTroops(state, targetId, opts, t) {
+    opts = opts || {};
+    const mode = opts.mode === 'spread' ? 'spread' : 'gather';
+    const stay = !!opts.stay, capToRoom = opts.capToRoom !== false;
+    const target = state.villages[targetId];
+    const plan = { mode, targetId, stay, rows: [], total: 0, pop: 0, lost: false };
+    if (!target) return plan;
+    const kinds = troopKinds(opts);
+    const pct = Math.max(0, Math.min(100, Number(opts.reservePct) || 0));
+    const others = villagesOf(state, target.owner).filter(v => v.id !== target.id)
+      .sort((a, b) => dist(a, target) - dist(b, target) || a.name.localeCompare(b.name, 'pl'));
+    others.forEach(v => tickVillage(state, v, t));
+    tickVillage(state, target, t);
+    const mk = v => ({ villageId: v.id, off: !!(opts.off && opts.off[v.id]), skip: '', units: emptyUnits(), total: 0, pop: 0, time: 0 });
+    // Przycina oddział do wolnego miejsca na farmie (po równo ze wszystkich typów), zwraca zużyte miejsce.
+    const fit = (u, room) => {
+      const pop = unitsPop(u);
+      if (pop <= room) return pop;
+      const f = Math.max(0, room) / pop;
+      kinds.forEach(k => { u[k] = Math.floor(u[k] * f); });
+      return unitsPop(u);
+    };
+    if (!kinds.length) { others.forEach(v => { const r = mk(v); r.skip = 'wybierz jednostki'; plan.rows.push(r); }); return plan; }
+
+    if (mode === 'gather') {
+      let room = stay && capToRoom ? supportRoom(state, target) : Infinity;
+      others.forEach(v => {
+        const row = mk(v); plan.rows.push(row);
+        if (row.off) { row.skip = 'pominięta'; return; }
+        kinds.forEach(k => { row.units[k] = Math.max(0, v.units[k] - Math.ceil(v.units[k] * pct / 100)); });
+        if (sumUnits(row.units) < 1) { row.skip = 'brak wojska'; return; }
+        if (room <= 0) { row.units = emptyUnits(); row.skip = 'brak miejsca na farmie celu'; return; }
+        room -= fit(row.units, room);
+        row.total = sumUnits(row.units);
+        if (row.total < 1) { row.skip = 'brak miejsca na farmie celu'; return; }
+        row.pop = unitsPop(row.units); row.time = travelTime(v, target, row.units);
+      });
+    } else {
+      // Rozdzielanie: z celu (tu: wioska wysyłająca) po równo do pozostałych; reszta z dzielenia trafia do najbliższych.
+      const live = others.map(v => { const row = mk(v); plan.rows.push(row); if (row.off) row.skip = 'pominięta'; return { v, row }; })
+        .filter(d => !d.row.skip);
+      kinds.forEach(k => {
+        const avail = Math.max(0, target.units[k] - Math.ceil(target.units[k] * pct / 100));
+        if (!live.length) return;
+        const each = Math.floor(avail / live.length);
+        let rest = avail - each * live.length;
+        live.forEach(d => { d.row.units[k] = each + (rest-- > 0 ? 1 : 0); });
+      });
+      live.forEach(d => {
+        if (sumUnits(d.row.units) < 1) { d.row.skip = 'za mało wojska do podziału'; return; }
+        if (stay && capToRoom) {
+          if (supportRoom(state, d.v) <= 0) { d.row.units = emptyUnits(); d.row.skip = 'brak miejsca na farmie'; return; }
+          fit(d.row.units, supportRoom(state, d.v));
+        }
+        d.row.total = sumUnits(d.row.units);
+        if (d.row.total < 1) { d.row.skip = 'brak miejsca na farmie'; return; }
+        d.row.pop = unitsPop(d.row.units); d.row.time = travelTime(target, d.v, d.row.units);
+      });
+    }
+    plan.rows.forEach(r => { plan.total += r.total; plan.pop += r.pop; });
+    return plan;
+  }
+
+  // Wysyła cały plan; każdy oddział przechodzi zwykłą walidację sendSupport.
+  function sendTroops(state, plan, t) {
+    const sent = [], failed = [];
+    plan.rows.forEach(r => {
+      if (r.skip || r.total < 1) return;
+      const from = plan.mode === 'gather' ? r.villageId : plan.targetId;
+      const to = plan.mode === 'gather' ? plan.targetId : r.villageId;
+      const res = sendSupport(state, from, to, r.units, t, plan.stay ? 'stay' : 'support');
+      if (res.ok) sent.push(res.movement); else failed.push(res.reason);
+    });
+    if (!sent.length) return { ok: false, reason: failed[0] || 'Nic do wysłania', sent, failed };
+    return { ok: true, sent, failed, total: sent.reduce((a, m) => a + sumUnits(m.units), 0),
+      first: Math.min.apply(null, sent.map(m => m.arrive)) };
+  }
+
   function resolveTransport(state, m, t) {
     const to = state.villages[m.to], from = state.villages[m.from];
     let back = { wood: 0, clay: 0, iron: 0 };
@@ -908,6 +994,6 @@
     buildInfo, queueBuild, recruitInfo, queueRecruit, recruitPer,
     travelTime, slowest, sendAttack, sendSpy, advance, nextEvent,
     unitsPop, supportRoom, sendSupport, withdrawSupport, defenders, defenseFrom, villageDefense,
-    merchantsTotal, merchantsBusy, merchantsFree, merchantTime, sendTransport, planGather, sendGather, incomingRes, settleCheck, sendSettler
+    merchantsTotal, merchantsBusy, merchantsFree, merchantTime, sendTransport, planGather, sendGather, planTroops, sendTroops, incomingRes, settleCheck, sendSettler
   };
 })(typeof window !== 'undefined' ? window : globalThis);
