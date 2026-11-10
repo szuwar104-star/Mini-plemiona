@@ -60,6 +60,7 @@ Wolną osadę przejmujesz, wygrywając bitwę. Wioskę frakcji AI – wysyłają
 | `manifest.json`, `sw.js`, `assets/` | PWA: manifest, tryb offline, ikony, fonty (Manrope, Pirata One – licencja SIL OFL) |
 | `serve.js`, `start.bat`, `start.sh` | lokalny serwer bez zależności |
 | `tests/simulate.js` | test logiki: `node tests/simulate.js` |
+| `tests/power.js` | test liczenia mocy konta: `node tests/power.js` |
 | `tests/gather.js` | test zbierania i rozdzielania surowców: `node tests/gather.js` |
 | `tools/make-icons.py` | generator ikon (wymaga Pillow) |
 | `tools/balance.js` | symulacja balansu na wszystkich poziomach trudności |
@@ -72,6 +73,10 @@ Gra nie liczy niczego „co sekundę”. Każda wioska ma znacznik ostatniej akt
 Surowce są naliczane w liczbach całkowitych (ułamki jednostek czekają w osobnym liczniku), dlatego wynik jest identyczny co do sztuki bez względu na liczbę kroków.
 
 Nadrabianie nieobecności trwa ok. 1–2 s na dobę gry (tydzień ok. 9 s).
+
+## Moc konta
+
+Menu → „Moc konta” (skrót: panel „Imperium” z boku i kafelek na ekranie Przegląd) pokazuje: punkty budynków (1 pkt za poziom), punkty wojska, siłę ataku i obrony całej armii oraz sumę. Wojsko liczy się razem z oddziałami w marszu i na wsparciu w innych wioskach. Punkty jednostki to jej koszt podzielony przez `SCORE.costDivisor` w `config.js` (Pikinier ≈ 1, Lekka kawaleria ≈ 3,6, Dowódca ≈ 31). Moc frakcji AI nie jest pokazywana – ich armię trzeba rozpoznać zwiadem.
 
 ## Zapis
 

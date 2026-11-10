@@ -372,6 +372,7 @@
     UI.sigs.overview = sig;
     if (!own.length) { el.innerHTML = noVillages(); return; }
     const inc = incomingAttacks(s);
+    const pw = E.accountPower(s, 'player');
     const total = { wood: 0, clay: 0, iron: 0 }, prod = { wood: 0, clay: 0, iron: 0 };
     let army = 0;
     const rows = own.map(v => {
@@ -399,7 +400,8 @@
       (inc.length ? '<span class="warn">Nadciągające ataki: ' + inc.length + '</span>' : '') + '</p>' +
       '<div class="actions left"><button class="btn" data-act="gather-open"' + (own.length > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"') + '>' + ico('merchant') + 'Zbierz / rozdziel surowce</button></div></div>' +
       '<div class="army-kpis ov-kpis">' + E.RES.map(r => '<div class="kpi"><small>' + C.RESOURCES[r].name + ' razem</small><b>' + fmt(total[r]) + '</b><small>+' + Math.round(prod[r]) + ' / min</small></div>').join('') +
-      '<div class="kpi"><small>Wojsko w wioskach</small><b>' + fmt(army) + '</b></div></div></section>' +
+      '<div class="kpi"><small>Wojsko w wioskach</small><b>' + fmt(army) + '</b></div>' +
+      '<div class="kpi"><small>Moc konta</small><b>' + fmt(pw.total) + '</b><small>bud. ' + fmt(pw.buildings) + ' + woj. ' + fmt(pw.army) + '</small></div></div></section>' +
       '<section class="panel"><div class="tablewrap"><table class="units ov">' +
       '<thead><tr><th>Wioska</th><th>' + ico('wood') + 'Drewno</th><th>' + ico('clay') + 'Glina</th><th>' + ico('iron') + 'Żelazo</th><th>' + ico('pop') + 'Farma</th><th>Budowa</th><th>Rekrutacja</th><th>Wojsko</th><th>Ataki</th></tr></thead>' +
       '<tbody>' + rows + '</tbody></table></div></section>';
@@ -833,6 +835,7 @@
     return '<h2>Menu</h2>' +
       '<section><h3>Cel gry</h3><p>Zdobądź ' + C.WIN_VILLAGES + ' wiosek. Masz ' + own + '.</p>' +
       '<div class="goal"><i style="width:' + Math.min(100, own / C.WIN_VILLAGES * 100) + '%"></i></div></section>' +
+      powerSection(s) +
       '<section><h3>Ranking</h3><div class="tablewrap"><table class="units"><thead><tr><th>Frakcja</th><th>Wioski</th><th>Punkty</th></tr></thead><tbody>' +
       rows.map(r => '<tr' + (r.f.id === 'player' ? ' class="me"' : '') + '><td><span class="flag" style="--fc:' + r.f.color + '"></span>' + esc(r.f.name) +
         (r.f.ai ? ' <span class="muted">' + C.AI.personalities[r.f.personality].label + '</span>' : '') + (r.n ? '' : ' <span class="muted">(pokonana)</span>') +
@@ -856,6 +859,17 @@
       '<li>Przez pierwsze ' + E.diff(s).graceMinutes + ' minut frakcje AI Cię nie atakują. ' + Math.round(E.diff(s).lootProtect * 100) + '% pojemności magazynu jest ukryte przed łupieżcami.</li></ul></section>' +
       '<section><h3>Nowa gra</h3><div class="actions left"><button class="btn danger" data-act="new-game">Zacznij od nowa</button></div></section>' +
       '<div class="actions"><button class="btn" data-act="close">Wróć do gry</button></div>';
+  }
+
+  // Moc konta gracza: punkty budynków + wojska oraz siła ataku i obrony całej armii.
+  function powerSection(s) {
+    const p = E.accountPower(s, 'player');
+    const row = (a, b) => '<tr><td>' + a + '</td><td class="num">' + b + '</td></tr>';
+    return '<section><h3>Moc konta</h3><div class="tablewrap"><table class="units"><tbody>' +
+      row('Wioski', p.villages) + row('Punkty budynków', fmt(p.buildings)) + row('Punkty wojska (' + fmt(p.units) + ' jedn.)', fmt(p.army)) +
+      row('Siła ataku', fmt(p.attack)) + row('Siła obrony (bez muru)', fmt(p.defense)) +
+      '<tr class="me"><td><b>Razem</b></td><td class="num"><b>' + fmt(p.total) + '</b></td></tr></tbody></table></div>' +
+      '<p class="muted seg-note">Wojsko liczy się razem z oddziałami w marszu i na wsparciu. Punkty jednostki = koszt / ' + C.SCORE.costDivisor + '.</p></section>';
   }
 
   function diffPicker(current, act) {
@@ -923,11 +937,13 @@
     if (!el || getComputedStyle(el).display === 'none') return;
     const own = E.villagesOf(s, 'player');
     const mv = playerMovements(s);
-    const sig = JSON.stringify([own.map(v => v.id + E.points(v)), mv.map(m => m.id), Object.values(s.factions).map(f => E.villagesOf(s, f.id).length)]);
+    const pw = E.accountPower(s, 'player');
+    const sig = JSON.stringify([own.map(v => v.id + E.points(v)), pw.total, mv.map(m => m.id), Object.values(s.factions).map(f => E.villagesOf(s, f.id).length)]);
     if (UI.sigs.aside === sig) return;
     UI.sigs.aside = sig;
     let html = '<section class="panel"><h2>Imperium</h2><p>' + own.length + ' z ' + C.WIN_VILLAGES + ' wiosek</p>' +
       '<div class="goal"><i style="width:' + Math.min(100, own.length / C.WIN_VILLAGES * 100) + '%"></i></div>' +
+      '<p class="tags"><span>Moc: ' + fmt(pw.total) + ' pkt</span><span>Atak ' + fmt(pw.attack) + '</span><span>Obrona ' + fmt(pw.defense) + '</span></p>' +
       '<ul class="vlist">' + own.map(v => '<li><button class="link" data-act="goto" data-id="' + v.id + '">' + esc(v.name) + '</button> <span class="muted">' + xy(v.x, v.y) + ', ' + E.points(v) + ' pkt</span></li>').join('') + '</ul></section>';
     html += '<section class="panel"><h2>Ruchy wojsk</h2>' + (mv.length ? '<ul class="mvlist compact">' + mv.slice(0, 8).map(m => movementItem(s, m)).join('') + '</ul>'
       : '<p class="muted">Brak ruchów wojsk.</p>') + '</section>';

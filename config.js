@@ -193,6 +193,10 @@
       }
     },
 
+    // Moc konta: punkty za budynki (1 pkt za poziom) + punkty za wojsko.
+    // Punkty jednostki = suma jej kosztu / costDivisor (np. Pikinier ~1, Lekka kaw. ~3,6, Dowódca ~31).
+    SCORE: { costDivisor: 100 },
+
     SPY: { lossExponent: 1.5 },
 
     COMBAT: {

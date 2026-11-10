@@ -44,6 +44,26 @@
   function tileAt(state, x, y) { return state.map.tiles[y * state.map.size + x]; }
   function villagesOf(state, owner) { return Object.values(state.villages).filter(v => v.owner === owner); }
   function points(v) { return BUILDINGS.reduce((s, k) => s + v.buildings[k], 0); }
+  // Punkty jednostek = koszt / SCORE.costDivisor (liczone z konfiguracji, więc zmiana balansu sama je koryguje).
+  function unitPoints(u) {
+    return UNITS.reduce((s, k) => { const c = C.UNITS[k].cost; return s + (u[k] || 0) * (c.wood + c.clay + c.iron) / C.SCORE.costDivisor; }, 0);
+  }
+  // Całe wojsko właściciela: w wioskach, na wsparciu u siebie, w marszu (atak, powrót, wsparcie, osadnik).
+  function armyOf(state, owner) {
+    const u = emptyUnits();
+    const add = x => { if (x) UNITS.forEach(k => { u[k] += x[k] || 0; }); };
+    villagesOf(state, owner).forEach(v => { add(v.units); Object.values(v.support || {}).forEach(add); });
+    state.movements.forEach(m => { if (m.owner === owner) add(m.units); });
+    return u;
+  }
+  // Moc konta: punkty budynków + punkty wojska, a do tego siła ataku i obrony całej armii.
+  function accountPower(state, owner) {
+    const vs = villagesOf(state, owner), army = armyOf(state, owner);
+    const buildings = vs.reduce((a, v) => a + points(v), 0);
+    const armyPts = Math.round(unitPoints(army));
+    return { villages: vs.length, buildings, army: armyPts, total: buildings + armyPts,
+      units: sumUnits(army), attack: attackPower(army), defense: defensePower(army) };
+  }
   function ownerName(state, owner) { return owner === null ? C.NEUTRAL.name : (state.factions[owner] ? state.factions[owner].name : '?'); }
   function ownerColor(state, owner) { return owner === null ? C.NEUTRAL.color : (state.factions[owner] ? state.factions[owner].color : '#888'); }
 
@@ -883,7 +903,7 @@
   MP.Engine = {
     RES, UNITS, BUILDINGS, diff, useDifficulty, hiddenRes,
     rand, randInt, dist, emptyUnits, cleanUnits, sumUnits, attackPower, defensePower,
-    tileAt, villagesOf, points, ownerName, ownerColor,
+    tileAt, villagesOf, points, unitPoints, armyOf, accountPower, ownerName, ownerColor,
     newGame, productionPerMin, storageCap, popCap, popUsed, tickVillage,
     buildInfo, queueBuild, recruitInfo, queueRecruit, recruitPer,
     travelTime, slowest, sendAttack, sendSpy, advance, nextEvent,
