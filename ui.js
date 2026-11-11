@@ -781,10 +781,10 @@
     let html = '<div class="tablewrap"><table class="units gather"><thead><tr><th></th><th>' + (spread ? 'Do wioski' : 'Z wioski') + '</th><th>Surowce</th><th>Kupcy</th><th>Droga</th></tr></thead><tbody>' +
       plan.rows.map(r => {
         const v = s.villages[r.villageId];
-        return '<tr class="' + (r.skip ? 'skipped' : '') + '"><td><input type="checkbox" data-gsrc="' + v.id + '"' + (r.off ? '' : ' checked') + '></td>' +
-          '<td>' + esc(v.name) + '<small>' + E.dist(v, T).toFixed(1) + ' pola</small></td>' +
-          '<td>' + (r.skip ? '<span class="muted">' + esc(r.skip) + '</span>' : resLine(r.res)) + '</td>' +
-          '<td class="num">' + (r.merchants || '') + '</td><td class="num">' + (r.skip ? '' : dur(r.time)) + '</td></tr>';
+        return '<tr class="' + (r.skip ? 'skipped' : '') + '"><td class="g-chk"><input type="checkbox" data-gsrc="' + v.id + '"' + (r.off ? '' : ' checked') + '></td>' +
+          '<td class="g-name">' + esc(v.name) + '<small>' + E.dist(v, T).toFixed(1) + ' pola</small></td>' +
+          '<td class="g-res">' + (r.skip ? '<span class="muted">' + esc(r.skip) + '</span>' : resLine(r.res)) + '</td>' +
+          '<td class="num g-merch" data-l="Kupcy">' + (r.merchants || '') + '</td><td class="num g-time" data-l="Droga">' + (r.skip ? '' : dur(r.time)) + '</td></tr>';
       }).join('') + '</tbody></table></div>';
     html += '<div class="summary"><div><span>Razem surowców</span><b>' + fmt(plan.total) + '</b></div>' +
       '<div><span>Kupców</span><b>' + plan.merchants + '</b></div>' +
@@ -833,10 +833,10 @@
     let html = '<div class="tablewrap"><table class="units gather"><thead><tr><th></th><th>' + (spread ? 'Do wioski' : 'Z wioski') + '</th><th>Wojsko</th><th>Droga</th></tr></thead><tbody>' +
       plan.rows.map(r => {
         const v = s.villages[r.villageId];
-        return '<tr class="' + (r.skip ? 'skipped' : '') + '"><td><input type="checkbox" data-tsrc="' + v.id + '"' + (r.off ? '' : ' checked') + '></td>' +
-          '<td>' + esc(v.name) + '<small>' + E.dist(v, T).toFixed(1) + ' pola</small></td>' +
-          '<td>' + (r.skip ? '<span class="muted">' + esc(r.skip) + '</span>' : unitsLine(r.units)) + '</td>' +
-          '<td class="num">' + (r.skip ? '' : dur(r.time)) + '</td></tr>';
+        return '<tr class="' + (r.skip ? 'skipped' : '') + '"><td class="g-chk"><input type="checkbox" data-tsrc="' + v.id + '"' + (r.off ? '' : ' checked') + '></td>' +
+          '<td class="g-name">' + esc(v.name) + '<small>' + E.dist(v, T).toFixed(1) + ' pola</small></td>' +
+          '<td class="g-res">' + (r.skip ? '<span class="muted">' + esc(r.skip) + '</span>' : unitsLine(r.units)) + '</td>' +
+          '<td class="num g-time" data-l="Droga">' + (r.skip ? '' : dur(r.time)) + '</td></tr>';
       }).join('') + '</tbody></table></div>';
     html += '<div class="summary"><div><span>Razem jednostek</span><b>' + fmt(plan.total) + '</b></div>' +
       '<div><span>Oddziałów</span><b>' + sendable.length + '</b></div>' +
@@ -873,9 +873,9 @@
     box.innerHTML = '<div class="tablewrap"><table class="units gather"><thead><tr><th></th><th>Wioska</th><th>Zrekrutuje</th></tr></thead><tbody>' +
       plan.rows.map(r => {
         const v = s.villages[r.villageId];
-        return '<tr class="' + (r.skip && !r.off ? 'skipped' : '') + '"><td><input type="checkbox" data-msrc="' + v.id + '"' + (r.off ? '' : ' checked') + '></td>' +
-          '<td>' + esc(v.name) + '<small>' + xy(v.x, v.y) + '</small></td>' +
-          '<td>' + (r.n > 0 ? '<b>' + fmt(r.n) + '</b> × ' + U.name + (r.short ? ' <small class="muted">(tyle możesz)</small>' : '') : '<span class="muted">' + esc(r.skip) + '</span>') + '</td></tr>';
+        return '<tr class="' + (r.skip && !r.off ? 'skipped' : '') + '"><td class="g-chk"><input type="checkbox" data-msrc="' + v.id + '"' + (r.off ? '' : ' checked') + '></td>' +
+          '<td class="g-name">' + esc(v.name) + '<small>' + xy(v.x, v.y) + '</small></td>' +
+          '<td class="g-res">' + (r.n > 0 ? '<b>' + fmt(r.n) + '</b> × ' + U.name + (r.short ? ' <small class="muted">(tyle możesz)</small>' : '') : '<span class="muted">' + esc(r.skip) + '</span>') + '</td></tr>';
       }).join('') + '</tbody></table></div>' +
       '<div class="summary"><div><span>Razem jednostek</span><b>' + fmt(plan.total) + '</b></div><div><span>Wiosek</span><b>' + active.length + '</b></div>' +
       (plan.total ? '<div class="wide"><span>Koszt</span><b>' + E.RES.map(r => ico(r) + fmt(plan.cost[r])).join(' ') + '</b></div>' : '') + '</div>';
