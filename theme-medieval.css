@@ -588,3 +588,41 @@ input[type=checkbox], input[type=radio] { accent-color: var(--gold); width: 1.05
 #baPlan table.units td.g-res, #baPlan table.units th:last-child { white-space: normal; text-align: left; }
 #baPlan .uchip { font-size: .78rem; margin: .1rem .15rem .1rem 0; }
 #baPlan td.g-name { white-space: nowrap; }
+
+/* =========================================================================
+   Okno ataku – zagęszczony układ: lista jednostek, podsumowanie i przycisk
+   „Wyślij atak” mieszczą się na jednym ekranie telefonu bez przewijania.
+   Przycisk wysyłki jest dodatkowo przyklejony do dołu okna (zabezpieczenie
+   na bardzo niskich ekranach).
+   ========================================================================= */
+#modal .dialog.atk { padding: .65rem .8rem 0; }
+#modal .dialog.atk > h2:first-child { font-size: 1.05rem; padding-bottom: .3rem; margin-bottom: .35rem; }
+#modal .dialog.atk > h2:first-child .ico { width: 1.1em; height: 1.1em; }
+#modal .dialog.atk > h2:first-child + p { margin: 0 0 .35rem; font-size: .85rem; }
+#modal .dialog.atk .seg.amode { margin: .1rem 0 .35rem; padding: .15rem; }
+#modal .dialog.atk .seg.amode .btn { min-height: 34px; padding: .2rem .5rem; }
+#modal .dialog.atk .field { margin: .25rem 0; gap: .15rem; font-size: .7rem; }
+#modal .dialog.atk .field select { min-height: 36px; padding-top: .15rem; padding-bottom: .15rem; }
+#modal .dialog.atk table.units th { padding: .2rem .4rem; font-size: .72rem; }
+#modal .dialog.atk table.units td { padding: .15rem .4rem; font-size: .9rem; }
+#modal .dialog.atk table.units td .ico { width: 20px; height: 20px; }
+#modal .dialog.atk table.units input[type=number] { min-height: 32px; width: 5.2rem; padding: .1rem .5rem; }
+#modal .dialog.atk .actions.left { margin: .35rem 0 0; padding-top: 0; border-top: 0; gap: .4rem; }
+#modal .dialog.atk .actions .btn { min-height: 32px; padding: .2rem .7rem; font-size: .82rem; }
+#modal .dialog.atk .summary { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .25rem .5rem; margin: .4rem 0; padding: .4rem .6rem; }
+#modal .dialog.atk .summary span { font-size: .6rem; line-height: 1.15; }
+#modal .dialog.atk .summary b { font-size: .95rem; }
+#modal .dialog.atk .summary p { font-size: .8rem; }
+#modal .dialog.atk > p.muted { margin: .3rem 0; font-size: .72rem; line-height: 1.25; }
+/* przycisk wysyłki zawsze widoczny */
+#modal .dialog.atk > .actions:last-child {
+  position: sticky; bottom: 0; z-index: 3; margin: .4rem -.8rem 0; padding: .5rem .8rem; width: calc(100% + 1.6rem); max-width: none;
+  background: #1d1813; border-top: 1px solid var(--line-2); box-shadow: 0 -6px 10px rgba(0, 0, 0, .35);
+}
+#modal .dialog.atk > .actions:last-child .btn { flex: 1; min-height: 42px; }
+/* niskie ekrany: jeszcze ciaśniej, a pouczenie pod listą chowa się (te same informacje są w panelu mapy) */
+@media (max-height: 880px) {
+  #modal .dialog.atk table.units td { padding-top: .1rem; padding-bottom: .1rem; }
+  #modal .dialog.atk table.units input[type=number] { min-height: 30px; }
+  #modal .dialog.atk > p.muted { display: none; }
+}

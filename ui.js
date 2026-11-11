@@ -1433,7 +1433,7 @@
     else if (UI.modal.type === 'end') inner = endModal();
     else if (UI.modal.type === 'confirm') inner = '<h2>' + UI.modal.title + '</h2><p>' + UI.modal.text + '</p><div class="actions">' +
       '<button class="btn ghost" data-act="close">Anuluj</button><button class="btn danger" data-act="' + UI.modal.ok + '">' + UI.modal.okLabel + '</button></div>';
-    box.innerHTML = '<div class="dialog' + (UI.modal.type === 'report' ? ' chron' : '') + '" role="dialog" aria-modal="true">' + inner + '</div>';
+    box.innerHTML = '<div class="dialog' + (UI.modal.type === 'report' ? ' chron' : UI.modal.type === 'attack' ? ' atk' : '') + '" role="dialog" aria-modal="true">' + inner + '</div>';
     box.hidden = false;
     document.body.classList.add('modal-open');
     fitModal();
