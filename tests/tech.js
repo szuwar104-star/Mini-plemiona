@@ -152,6 +152,51 @@ ok(ra.ok && all.factions.player.coins === ra.coins && ra.villages === 1, 'maks. 
 ok(av.res.clay < 9000 && av.res.wood === 2000 && av.res.iron === 3000, 'płaci najobfitszym surowcem (gliną)');
 ok(!E.buyCoinsAll(all, 0).ok, 'po wyczerpaniu limitu: brak zakupu');
 
+/* ---------- nowe węzły: produkcja, łupy, skrytki, Taran ---------- */
+const nt = E.newGame(0, 4242, 'normal', 'small');
+const nf = nt.factions.player, nv = E.villagesOf(nt, 'player')[0];
+E.useDifficulty(nt);
+nf.coins = 1e6;
+ok(['tools', 'p_wood', 'p_clay', 'p_iron', 'u_ram', 'plunder', 'hide'].every(id => E.techNode(id)), 'nowe węzły istnieją w drzewku');
+ok(T.branches.every(b => T.nodes.some(n => n.branch === b.id && !n.req)), 'każda gałąź ma korzeń');
+ok(E.techInfo(nt, 'p_wood').code === 'req', 'Drwalnictwo wymaga Narzędzi poz. 2');
+const p0 = E.productionPerMin(nv);
+E.researchTech(nt, 'tools', 0); E.researchTech(nt, 'tools', 0);
+const p1 = E.productionPerMin(nv);
+ok(E.RES.every(k => Math.abs(p1[k] - p0[k] * 1.04) < 1e-9), 'Narzędzia poz. 2: +4% produkcji każdego surowca');
+for (let i = 0; i < 3; i++) E.researchTech(nt, 'p_clay', 0);
+const p2 = E.productionPerMin(nv);
+ok(Math.abs(p2.clay - p0.clay * 1.04 * 1.09) < 1e-9 && Math.abs(p2.wood - p1.wood) < 1e-9, 'Garncarstwo poz. 3: +9% tylko gliny');
+const aiv = Object.values(nt.villages).find(x => x.owner && x.owner !== 'player');
+ok(E.productionPerMin(aiv).wood === C.BUILDINGS.wood.prod[aiv.buildings.wood] * E.diff(nt).aiProd, 'AI nie dostaje bonusu do produkcji');
+// łupy i skrytki
+const h0 = E.hiddenRes(nt, nv);
+['drill', 'drill', 'u_spear', 'u_spear', 'u_spear', 'u_guard', 'u_guard', 'u_guard'].forEach(id => E.researchTech(nt, id, 0));
+ok(E.techInfo(nt, 'hide').ok, 'Skrytki dostępne po Tarczowniku poz. 3');
+E.researchTech(nt, 'hide', 0); E.researchTech(nt, 'hide', 0);
+ok(E.hiddenRes(nt, nv) > h0 && Math.abs(E.hiddenRes(nt, nv) - Math.floor(E.storageCap(nv) * (E.diff(nt).lootProtect + 0.06))) <= 1, 'Skrytki poz. 2: +6 p.p. ukrytego magazynu');
+ok(E.techInfo(nt, 'plunder').code === 'req' && E.techInfo(nt, 'u_ram').code === 'req', 'Grabież i Taran wymagają wcześniejszych badań');
+['u_axe', 'u_axe', 'u_axe', 'u_axe', 'u_light', 'u_light', 'u_light'].forEach(id => E.researchTech(nt, id, 0));
+ok(E.techInfo(nt, 'u_ram').ok && E.techInfo(nt, 'plunder').ok, 'Taran (Topornik 4) i Grabież (Lekka kaw. 3) odblokowane');
+E.researchTech(nt, 'u_ram', 0);
+ok(nf.upgrades.ram === 1, 'badanie Tarana zapisuje poziom w ulepszeniach plemienia');
+// udźwig łupu: wygrany atak na wioskę z surowcami
+function raid(plunderLvl) {
+  const g = E.newGame(0, 555, 'normal', 'small');
+  const pl = g.factions.player, home = E.villagesOf(g, 'player')[0];
+  pl.tech.plunder = plunderLvl; E.useDifficulty(g);
+  const tgt = Object.values(g.villages).find(x => x.owner === null);
+  tgt.units = E.emptyUnits(); tgt.res = { wood: 9000, clay: 9000, iron: 9000 }; tgt.buildings.wall = 0;
+  home.units = E.emptyUnits(); home.units.light = 100; home.res = { wood: 0, clay: 0, iron: 0 };
+  const r = E.sendAttack(g, home.id, tgt.id, Object.assign(E.emptyUnits(), { light: 100 }), g.now);
+  if (!r.ok) return null;
+  E.advance(g, r.movement.arrive);
+  const rep = (g.reports || []).find(x => x.attacker === 'player' && x.kind === 'battle' && x.lootCapacity != null) || (g.reports || []).find(x => x.attacker === 'player' && x.lootCapacity != null);
+  return rep ? rep.lootCapacity : null;
+}
+const cap0r = raid(0), cap5r = raid(10);
+ok(cap0r > 0 && cap5r === Math.floor(cap0r * 1.5), 'Grabież poz. 10: udźwig łupu +50% (' + cap0r + ' → ' + cap5r + ')');
+
 /* ---------- symulacja bez NaN ---------- */
 const sim = E.newGame(0, 31337, 'normal', 'small');
 const sv = E.villagesOf(sim, 'player')[0];

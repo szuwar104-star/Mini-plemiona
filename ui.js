@@ -487,7 +487,7 @@
   }
 
   /* ---------- ekran: TECHNOLOGIA ---------- */
-  const TECH_ICON = { drill: 'barracks', trade: 'market', store: 'hq', mint: 'coin', build: 'pick' };
+  const TECH_ICON = { drill: 'barracks', trade: 'market', store: 'hq', mint: 'coin', build: 'pick', tools: 'pick', p_wood: 'wood', p_clay: 'clay', p_iron: 'iron', plunder: 'merchant', hide: 'wall' };
   function techEffectText(n, lvl, next) {
     const e = n.effect, pc = x => Math.round(x * 1000) / 10;
     const cur = lvl, nxt = next;
@@ -498,6 +498,10 @@
       case 'build': return 'Czas budowy ' + line(l => '−' + pc(-e.per * l) + '%');
       case 'storage': return 'Pojemność magazynów ' + line(l => '+' + pc(e.per * l) + '%');
       case 'exchange': return 'Kurs wymiany ' + line(l => pc(C.MARKET.exchangeRate + e.per * l) + '%');
+      case 'prod': return 'Produkcja wszystkich surowców ' + line(l => '+' + pc(e.per * l) + '%');
+      case 'prodWood': case 'prodClay': case 'prodIron': return 'Produkcja surowca ' + line(l => '+' + pc(e.per * l) + '%');
+      case 'carry': return 'Udźwig łupu ' + line(l => '+' + pc(e.per * l) + '%');
+      case 'hide': return 'Ukryta część magazynu ' + line(l => '+' + pc(e.per * l) + ' p.p.');
       case 'mint': return 'Limit zakupu monet ' + line(l => '+' + (e.per * l) + '/h na wioskę');
     }
     return '';

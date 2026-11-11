@@ -227,7 +227,7 @@
   // Mnożniki trudności ustawia advance()/newGame – produkcja nie potrzebuje wtedy dostępu do stanu.
   let D = C.DIFFICULTY[C.DEFAULT_DIFFICULTY];
   // Efekty badań gracza (AI nie ma technologii) liczone przy każdym tiku świata – tak samo jak poziom trudności (D).
-  let FX = { storage: 1, exchange: C.MARKET.exchangeRate, build: 1, recruit: 1, mint: 0 };
+  let FX = { storage: 1, exchange: C.MARKET.exchangeRate, build: 1, recruit: 1, mint: 0, prod: 1, prodWood: 1, prodClay: 1, prodIron: 1, carry: 1, hide: 0 };
   function techNode(id) { return C.TECH.nodes.find(n => n.id === id) || null; }
   function techLevel(f, node) {
     if (!f) return 0;
@@ -235,7 +235,7 @@
   }
   function techCost(node, level) { return Math.max(1, Math.round(node.base * Math.pow(node.factor, level - 1))); }
   function techEffects(f) {
-    const fx = { storage: 1, exchange: C.MARKET.exchangeRate, build: 1, recruit: 1, mint: 0 };
+    const fx = { storage: 1, exchange: C.MARKET.exchangeRate, build: 1, recruit: 1, mint: 0, prod: 1, prodWood: 1, prodClay: 1, prodIron: 1, carry: 1, hide: 0 };
     C.TECH.nodes.forEach(n => {
       const lvl = techLevel(f, n);
       if (lvl && n.effect.type !== 'unit') fx[n.effect.type] += n.effect.per * lvl;
@@ -243,17 +243,19 @@
     fx.build = Math.max(0.3, fx.build); fx.recruit = Math.max(0.3, fx.recruit);
     return fx;
   }
+  // Część magazynu ukryta przed łupieżcami: ochrona z poziomu trudności + badanie Skrytki (maks. 90%).
+  function hideShare(state) { return Math.min(0.9, diff(state).lootProtect + FX.hide); }
   function useDifficulty(state) { D = diff(state); FX = techEffects(state.factions && state.factions.player); }
   function prodFactor(v) {
     if (v.owner === null) return C.NEUTRAL.prodFactor;
     return v.owner === 'player' ? D.playerProd : D.aiProd;
   }
   function productionPerMin(v) {
-    const f = prodFactor(v);
+    const f = prodFactor(v), me = v.owner === 'player';
     return {
-      wood: C.BUILDINGS.wood.prod[v.buildings.wood] * f,
-      clay: C.BUILDINGS.clay.prod[v.buildings.clay] * f,
-      iron: C.BUILDINGS.iron.prod[v.buildings.iron] * f
+      wood: C.BUILDINGS.wood.prod[v.buildings.wood] * f * (me ? FX.prod * FX.prodWood : 1),
+      clay: C.BUILDINGS.clay.prod[v.buildings.clay] * f * (me ? FX.prod * FX.prodClay : 1),
+      iron: C.BUILDINGS.iron.prod[v.buildings.iron] * f * (me ? FX.prod * FX.prodIron : 1)
     };
   }
   function storageCap(v) {
@@ -1024,10 +1026,10 @@
     const loot = { wood: 0, clay: 0, iron: 0 };
     let lootCapacity = 0, lootHidden = 0;
     if (attackerWon && anyAlive) {
-      const capacity = UNITS.reduce((s, k) => s + survivors[k] * C.UNITS[k].carry, 0);
+      const capacity = Math.floor(UNITS.reduce((s, k) => s + survivors[k] * C.UNITS[k].carry, 0) * (m.owner === 'player' ? FX.carry : 1));
       lootCapacity = capacity;
       const avail = {}; let total = 0;
-      const hidden = defOwner === 'player' ? Math.floor(storageCap(target) * diff(state).lootProtect) : 0;
+      const hidden = defOwner === 'player' ? Math.floor(storageCap(target) * hideShare(state)) : 0;
       lootHidden = hidden;
       RES.forEach(r => { avail[r] = Math.max(0, Math.floor(target.res[r]) - hidden); total += avail[r]; });
       if (total > 0 && capacity > 0) {
@@ -1220,7 +1222,7 @@
     return true;
   }
 
-  function hiddenRes(state, v) { return v.owner === 'player' ? Math.floor(storageCap(v) * diff(state).lootProtect) : 0; }
+  function hiddenRes(state, v) { return v.owner === 'player' ? Math.floor(storageCap(v) * hideShare(state)) : 0; }
 
   MP.Engine = {
     RES, UNITS, BUILDINGS, ramCount, diff, useDifficulty, hiddenRes,
