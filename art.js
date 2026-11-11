@@ -142,12 +142,17 @@
     return { x: x - 1, y: by - h - rh, w: w + 2, h: h + rh };
   }
   function flag(p, x, top, color) {
-    p.rect(x, top, 1, 12, C.out);                         // maszt
-    p.rect(x + 1, top, 7, 5, C.out);                      // obrys proporca
-    p.rect(x + 1, top + 1, 6, 3, color);
-    p.rect(x + 1, top + 1, 6, 1, shade(color, 1.35));
-    p.rect(x + 1, top + 3, 6, 1, shade(color, 0.7));
-    p.px(x + 7, top + 2, 'rgba(0,0,0,0)');
+    p.rect(x, top - 1, 1, 13, C.out);                     // maszt
+    p.px(x, top - 2, '#d9b45a');                          // złota gałka
+    // proporzec z jaskółczym ogonem: obrys rysowany kawałkami, żeby wcięcie zostało puste
+    p.rect(x + 1, top, 9, 1, C.out); p.rect(x + 1, top + 5, 9, 1, C.out);
+    p.px(x + 9, top + 1, C.out); p.px(x + 9, top + 4, C.out);
+    p.px(x + 8, top + 2, C.out); p.px(x + 8, top + 3, C.out);
+    p.rect(x + 1, top + 1, 8, 4, color);
+    p.rect(x + 1, top + 1, 8, 1, shade(color, 1.35));
+    p.rect(x + 1, top + 4, 8, 1, shade(color, 0.7));
+    p.px(x + 8, top + 1, color); p.px(x + 8, top + 4, shade(color, 0.7));
+    p.px(x + 8, top + 2, C.out); p.px(x + 8, top + 3, C.out);
   }
   function tower(p, x, by, w, h, roof, withFlag) {
     p.rect(x, by - h, w, h, C.stone);
@@ -348,10 +353,12 @@
         const o = ownerIdx[y * W + x];
         if (o < 0) continue;
         const i = (y * W + x) * 4, c = colors[o];
-        const edge = (x > 0 && ownerIdx[y * W + x - 1] !== o) || (x < W - 1 && ownerIdx[y * W + x + 1] !== o) ||
-          (y > 0 && ownerIdx[(y - 1) * W + x] !== o) || (y < W - 1 && ownerIdx[(y + 1) * W + x] !== o);
-        d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2];
-        d[i + 3] = edge ? ((x + y) % 4 < 2 ? 235 : 0) : 46;
+        const diff = k => (x - k < 0 || ownerIdx[y * W + x - k] !== o) || (x + k > W - 1 || ownerIdx[y * W + x + k] !== o) ||
+          (y - k < 0 || ownerIdx[(y - k) * W + x] !== o) || (y + k > W - 1 || ownerIdx[(y + k) * W + x] !== o);
+        const edge = diff(1), band = !edge && diff(2);
+        // granica: ciągła linia w kolorze frakcji, pod nią pas przejściowy, wnętrze lekko podbarwione
+        if (edge) { d[i] = c[0] * .8; d[i + 1] = c[1] * .8; d[i + 2] = c[2] * .8; d[i + 3] = 225; }
+        else { d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = band ? 105 : 40; }
       }
     }
     ctx.clearRect(0, 0, W, W);

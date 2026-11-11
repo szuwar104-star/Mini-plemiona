@@ -1,0 +1,559 @@
+/* =========================================================================
+   Mini Plemiona – MOTYW ŚREDNIOWIECZNY (warstwa nadpisująca style.css)
+   Wczytywany PO style.css. Zmienia tylko wygląd; nie dotyka logiki ani DOM.
+   ========================================================================= */
+
+/* Font nagłówków: Alegreya 700 (SIL OFL, assets/fonts/OFL-Alegreya.txt) – lokalnie, działa offline */
+@font-face {
+  font-family: "Alegreya"; font-style: normal; font-weight: 700; font-display: swap;
+  src: url(assets/fonts/alegreya-latin-ext-700-normal.woff2) format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Alegreya"; font-style: normal; font-weight: 700; font-display: swap;
+  src: url(assets/fonts/alegreya-latin-700-normal.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* --- 1. Paleta: ciemne drewno, kamień, stal, postarzana miedź, stonowane złoto --- */
+:root {
+  --bg: #15110d;            /* ciemny dąb */
+  --bg-2: #1b1611;
+  --surface: #221c16;       /* deska */
+  --surface-2: #2a231b;
+  --surface-3: #3a3126;
+  --line: rgba(214, 178, 120, .12);
+  --line-2: rgba(214, 178, 120, .24);
+  --text: #efe4cf;          /* pergamin */
+  --muted: #b3a185;
+  --faint: #7a6b56;
+  --gold: #c9a043;          /* stonowane złoto – akcje główne */
+  --gold-2: #e2bd62;
+  --gold-ink: #1d1507;
+  --copper: #b0703f;        /* postarzana miedź – akcenty */
+  --steel: #8c96a0;
+  --red: #c2463c;
+  --green: #6f9a4a;
+  --blue: #4f78b8;
+  --r: 6px;                 /* mniejsze zaokrąglenia = mniej „SaaS” */
+  --r-sm: 4px;
+  --serif: "Alegreya", "Palatino Linotype", "Book Antiqua", Palatino, "URW Palladio L", Georgia, serif;
+  --logo: "Alegreya", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+  --shadow: 0 1px 0 rgba(255, 230, 180, .05) inset, 0 2px 0 rgba(0, 0, 0, .35), 0 8px 18px rgba(0, 0, 0, .35);
+  /* faktura słojów drewna – sam CSS, zero plików */
+  --grain: repeating-linear-gradient(92deg, rgba(255, 220, 160, .018) 0 2px, transparent 2px 7px, rgba(0, 0, 0, .05) 7px 8px, transparent 8px 15px);
+}
+
+body {
+  background:
+    radial-gradient(1100px 600px at 50% -15%, rgba(201, 160, 67, .07), transparent 60%),
+    var(--grain),
+    var(--bg);
+  background-attachment: fixed;
+}
+
+/* --- 2. Typografia: szeryfowe nagłówki, bezszeryfowe dane (czytelność liczb) --- */
+h1, h2, h3, .brand span, .splash h1 { font-family: var(--serif); letter-spacing: .01em; }
+h1 { font-weight: 700; color: #f4e6c8; }
+h2, h3 { font-weight: 700; }
+.brand span { font-weight: 700; font-size: 1.45rem; color: var(--gold-2); text-shadow: 0 1px 0 #000, 0 0 12px rgba(201, 160, 67, .25); }
+
+/* --- 3. Powierzchnie: deski z okuciem --- */
+.panel, .ucard, .vhero, .army-head {
+  background: var(--grain), linear-gradient(180deg, var(--surface-2), var(--surface));
+  border: 1px solid #0b0806;
+  box-shadow: inset 0 0 0 1px var(--line), var(--shadow);
+}
+.panel > h2, .panel > h3 {
+  padding-bottom: .5rem; margin-bottom: .8rem;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(90deg, var(--copper) 0 18px, transparent 18px) bottom left / 100% 1px no-repeat;
+}
+.vhero {
+  background:
+    radial-gradient(520px 220px at 0% 0%, rgba(176, 112, 63, .22), transparent 70%),
+    var(--grain), linear-gradient(180deg, #31281e, var(--surface));
+  border-top: 2px solid var(--copper);
+}
+.army-head { border-top: 2px solid var(--red); }
+.vh-crest { background: rgba(79, 120, 184, .2); box-shadow: inset 0 0 0 1px rgba(79, 120, 184, .55), 0 0 0 3px #0e0b08; border-radius: 4px; }
+.bicon, .u-ico, .rhead > .pix { border-radius: 4px; background: #120e0a; box-shadow: inset 0 0 0 1px var(--line-2), inset 0 2px 6px rgba(0, 0, 0, .6); }
+
+/* --- 4. Górny pasek: belka z żelaznymi okuciami --- */
+.topbar {
+  background: linear-gradient(180deg, #2b2219, #1a140f);
+  border-bottom: 2px solid #0b0806;
+  box-shadow: 0 1px 0 var(--copper), 0 6px 16px rgba(0, 0, 0, .45);
+}
+.res {
+  background: linear-gradient(180deg, #1c1611, #120e0a);
+  border: 1px solid var(--line-2); border-radius: var(--r-sm);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, .6);
+}
+.res .ico { width: 26px; height: 26px; filter: drop-shadow(0 1px 0 #000); }
+.rv b { color: #f4e6c8; }
+.rv small { color: #9fc27c; }                     /* produkcja = zieleń, łatwa do odczytania */
+.rv .cap { height: 4px; background: #0b0806; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .04); }
+.rv .cap i { background: linear-gradient(90deg, #8a6a2a, var(--gold-2)); }
+.res.full { border-color: var(--red); box-shadow: inset 0 1px 3px rgba(0, 0, 0, .6), 0 0 0 1px rgba(194, 70, 60, .35); }
+.res.full .rv .cap i { background: repeating-linear-gradient(45deg, var(--red) 0 5px, #8e2f28 5px 10px); }
+.vsel select, .vnav { background-color: #120e0a; border-color: var(--line-2); border-radius: var(--r-sm); }
+
+/* --- 5. Nawigacja --- */
+.nav { background: linear-gradient(90deg, #17120e, #1b1511); border-right: 1px solid #0b0806; box-shadow: inset -1px 0 0 var(--line); }
+.nav button { border-radius: var(--r-sm); font-family: var(--serif); font-size: 1rem; letter-spacing: .02em; }
+.nav .nicon { border-radius: 4px; background: #120e0a; box-shadow: inset 0 0 0 1px var(--line); }
+.nav button:hover { background: rgba(201, 160, 67, .06); color: var(--text); }
+.nav button.active { background: linear-gradient(90deg, rgba(201, 160, 67, .16), transparent); color: var(--gold-2); }
+.nav button.active .nicon { box-shadow: inset 0 0 0 1px var(--gold); background: rgba(201, 160, 67, .12); }
+.badge { border-color: #17120e; }
+
+/* --- 6. Przyciski: hierarchia (główny = złoto, pomocniczy = stal, niebezpieczny = czerwień) --- */
+.btn {
+  border-radius: var(--r-sm);
+  background: linear-gradient(180deg, var(--gold-2), var(--gold) 55%, #a8832f);
+  box-shadow: inset 0 1px 0 rgba(255, 245, 210, .45), inset 0 -2px 0 rgba(0, 0, 0, .25), 0 1px 0 #000;
+  text-shadow: 0 1px 0 rgba(255, 235, 180, .35);
+  letter-spacing: .01em;
+}
+.btn:hover:not(:disabled) { background: linear-gradient(180deg, #f0cf7c, var(--gold-2) 55%, #b88f35); }
+.btn:active:not(:disabled) { transform: translateY(1px); box-shadow: inset 0 2px 3px rgba(0, 0, 0, .35); }
+.btn:disabled {
+  background: repeating-linear-gradient(135deg, #2a231b 0 6px, #251f18 6px 12px);
+  color: var(--faint); box-shadow: inset 0 0 0 1px var(--line); text-shadow: none;
+}
+.btn.ghost { background: linear-gradient(180deg, #3b4148, #2b3036); color: #e6e9ec; box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 1px 0 #000; text-shadow: none; }
+.btn.ghost:hover:not(:disabled) { background: linear-gradient(180deg, #474e56, #333940); }
+.btn.danger { background: linear-gradient(180deg, #d4574c, var(--red) 55%, #962f27); color: #fff; text-shadow: 0 1px 0 rgba(0,0,0,.3); }
+.btn.tab { background: transparent; box-shadow: none; text-shadow: none; }
+.btn.tab.on { background: var(--surface-3); box-shadow: inset 0 -2px 0 var(--gold); }
+
+/* --- 7. Budynki: poziom jako pieczęć, braki surowców wyraźne --- */
+.lvl { border-radius: 3px; background: #120e0a; border: 1px solid var(--gold); color: var(--gold-2); font-family: var(--serif); }
+.pips i { border-radius: 0; background: #120e0a; }
+.pips i.on { background: linear-gradient(180deg, var(--gold-2), #8a6a2a); }
+.chip { border-radius: 3px; background: rgba(0, 0, 0, .28); box-shadow: inset 0 0 0 1px var(--line); }
+.chip.lack { color: #ffb0a6; background: rgba(194, 70, 60, .18); box-shadow: inset 0 0 0 1px rgba(194, 70, 60, .55); }
+.bcard:has(.chip.lack) .bicon { filter: grayscale(.5) brightness(.8); }
+.bcard:hover, .ucard:hover { box-shadow: inset 0 0 0 1px var(--line-2), var(--shadow); }
+.bar { background: #0b0806; border-radius: 2px; }
+.bar i { background: linear-gradient(90deg, #4d7a32, #8fbf5a); border-radius: 2px; }
+
+/* --- 8. Wojsko i ruchy: kolor = kierunek --- */
+.u-stats li, .kpi { background: rgba(0, 0, 0, .25); border-radius: 3px; box-shadow: inset 0 0 0 1px var(--line); }
+.mv, .sup-row, .queue li { border-radius: var(--r-sm); background: rgba(0, 0, 0, .22); }
+.stepper { border-radius: var(--r-sm); }
+input[type=number], select { background: #120e0a; border-radius: var(--r-sm); }
+.lockmsg { border-radius: 3px; }
+
+/* --- 9. Mapa: rama i panel szczegółów --- */
+.map-viewport { border-radius: 4px; box-shadow: 0 0 0 2px #0b0806, 0 0 0 4px #4a3a28, 0 0 0 5px #0b0806, 0 12px 30px rgba(0, 0, 0, .55); }
+.mbtn { border-radius: 4px !important; }
+.legend, .minimap { border-radius: 4px !important; box-shadow: 0 0 0 1px #0b0806, 0 0 0 2px #4a3a28 !important; }
+
+/* --- 10. Okna modalne: pergamin na desce --- */
+.dialog { border-radius: 6px; border-top: 3px solid var(--copper); background: var(--grain), linear-gradient(180deg, #2a231b, #1d1813); }
+
+/* --- POPRAWKA BŁĘDU: .ugrid z okna „Zbierz wojsko” nadpisywał siatkę ekranu Wojsko
+       (karty jednostek ~150 px, ucięte statystyki i formularz rekrutacji).
+       Docelowo w style.css zmienić selektor z linii ~891 na .gres.ugrid. --- */
+#screen-army .ugrid { grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 1rem; }
+@media (max-width: 760px) { #screen-army .ugrid { grid-template-columns: 1fr; gap: .7rem; } }
+
+/* --- Mapa: tło poza światem w tonacji ziemi zamiast granatu --- */
+.map-viewport { background: radial-gradient(circle at 50% 40%, #2b2419, #120e0a 75%) !important; }
+
+/* --- Telefon: etykiety dolnej nawigacji bezszeryfowe, żeby się mieściły --- */
+@media (max-width: 760px) {
+  .nav { background: linear-gradient(180deg, #2b2219, #17120e); border-top: 1px solid var(--copper); }
+  .nav button { font-family: var(--font); font-size: .66rem; letter-spacing: 0; }
+}
+
+/* =========================================================================
+   ETAP 2 – WOJSKO
+   ========================================================================= */
+/* Nagłówek: tytuł nad paskiem wskaźników (zamiast zawijania kafelków w 2 rzędy) */
+.army-head { grid-template-columns: 1fr; gap: .8rem; }
+.army-kpis { grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(0, 1.4fr); }
+.kpi { position: relative; padding: .6rem .75rem .55rem; border-top: 2px solid var(--line-2); }
+.kpi small { text-transform: uppercase; letter-spacing: .05em; font-size: .66rem; }
+.kpi b { font-size: 1.3rem; color: #f4e6c8; }
+.army-kpis .kpi:nth-child(1) { border-top-color: var(--green); }
+.army-kpis .kpi:nth-child(2) { border-top-color: var(--blue); }
+.army-kpis .kpi:nth-child(3) { border-top-color: var(--red); }
+.army-kpis .kpi:nth-child(4) { border-top-color: var(--steel); }
+.army-kpis .kpi:nth-child(5) { border-top-color: var(--copper); }
+.army-kpis .kpi.wide { border-top-color: var(--gold); }
+.kpi .meter { height: 5px; background: #0b0806; border-radius: 0; }
+.kpi .meter i { background: linear-gradient(90deg, #8a6a2a, var(--gold-2)); }
+@media (max-width: 980px) { .army-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Karta jednostki: liczba jak licznik na tarczy, „w drodze” jako niebieski znacznik */
+.ucard { border-left: 3px solid var(--green); }
+.ucard.locked { border-left-color: var(--line-2); }
+.u-count b { font-family: var(--serif); font-size: 1.9rem; color: #f4e6c8; }
+.u-count small { text-transform: uppercase; letter-spacing: .05em; font-size: .62rem; }
+.u-count .away { display: inline-block; margin-top: .25rem; padding: .05rem .35rem; border-radius: 3px; background: rgba(79, 120, 184, .2); color: #a9c3ee; box-shadow: inset 0 0 0 1px rgba(79, 120, 184, .5); }
+.u-stats li:nth-child(1) b { color: #f0a197; }   /* atak */
+.u-stats li:nth-child(2) b { color: #b8c4cf; }   /* obrona */
+.u-name h3 { font-size: 1.08rem; }
+
+/* Ruchy wojsk: kolor + etykieta stanu (stacjonujące / w drodze / wsparcie / powrót) */
+.mv { grid-template-columns: 34px 1fr auto; border-left-width: 4px; }
+.mv > .ico { box-shadow: inset 0 0 0 1px var(--line-2); border-radius: 4px; }
+.mvbody b::before {
+  display: inline-block; margin-right: .45rem; padding: .02rem .4rem; border-radius: 3px; vertical-align: .08em;
+  font-size: .62rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  background: rgba(255, 255, 255, .08); color: var(--muted);
+}
+.mv.out  .mvbody b::before { content: "W drodze · atak"; background: rgba(79, 120, 184, .22); color: #a9c3ee; }
+.mv.sup  .mvbody b::before { content: "W drodze · wsparcie"; background: rgba(47, 181, 162, .2); color: #8fe0d3; }
+.mv.ret  .mvbody b::before { content: "Wraca"; background: rgba(111, 154, 74, .25); color: #b7da92; }
+.mv.inc  .mvbody b::before { content: "Nadciąga!"; background: var(--red); color: #fff; }
+.mv.spy  .mvbody b::before { content: "Zwiad"; background: rgba(167, 123, 243, .22); color: #cfb6fa; }
+.mv.trade .mvbody b::before { content: "Kupcy"; background: rgba(201, 160, 67, .22); color: var(--gold-2); }
+.mv.settle .mvbody b::before { content: "Osadnicy"; background: rgba(201, 179, 138, .2); color: #e3d3b0; }
+.mv.inc { box-shadow: inset 0 0 0 1px rgba(194, 70, 60, .45); }
+.mv.inc .mvtime .timer { color: #ff9a8f; }
+.mvlist.compact .mvbody b::before { font-size: .56rem; padding: 0 .3rem; }
+.sup-row { border-left-width: 4px; }
+.sup-row b::before { content: "Wsparcie"; display: inline-block; margin-right: .45rem; padding: .02rem .4rem; border-radius: 3px; font-size: .62rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; background: rgba(47, 181, 162, .2); color: #8fe0d3; vertical-align: .08em; }
+.mvtime .timer { font-family: var(--serif); }
+
+/* =========================================================================
+   ETAP 2 – RAPORTY: lista
+   ========================================================================= */
+.rlist { gap: .3rem; }
+.ritem { border-left: 4px solid var(--faint); border-radius: var(--r-sm); background: rgba(0, 0, 0, .22); box-shadow: inset 0 0 0 1px var(--line); }
+.ritem:hover { background: rgba(201, 160, 67, .07); }
+.ritem.win  { border-left-color: var(--green); }
+.ritem.loss { border-left-color: var(--red); }
+.ritem.news { border-left-color: var(--copper); }
+.ritem.conq { border-left-color: var(--gold-2); background: linear-gradient(90deg, rgba(201, 160, 67, .14), rgba(0, 0, 0, .22) 40%); }
+.ritem .ico { border-radius: 50%; box-shadow: inset 0 0 0 2px var(--line-2); }
+.ritem.win .ico  { background: rgba(111, 154, 74, .22); box-shadow: inset 0 0 0 2px rgba(111, 154, 74, .7); }
+.ritem.loss .ico { background: rgba(194, 70, 60, .22); box-shadow: inset 0 0 0 2px rgba(194, 70, 60, .7); }
+.ritem.news .ico { background: rgba(176, 112, 63, .2); box-shadow: inset 0 0 0 2px rgba(176, 112, 63, .7); }
+.ritem.conq .ico { background: rgba(201, 160, 67, .25); box-shadow: inset 0 0 0 2px var(--gold-2); }
+.ritem.unread .rtitle::before { border-radius: 1px; transform: rotate(45deg); background: var(--gold-2); }
+.rtime { font-family: var(--serif); font-style: italic; }
+
+/* =========================================================================
+   ETAP 2 – RAPORTY: okno jako karta kroniki (pergamin, ciemny atrament)
+   ========================================================================= */
+.dialog.chron {
+  --ink: #2b1f12; --ink-2: #5c4730; --ink-3: #8a7458; --vellum: #e8d9b8;
+  color: var(--ink);
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(255, 250, 235, .55), transparent 60%),
+    radial-gradient(140% 120% at 50% 50%, transparent 55%, rgba(120, 85, 40, .35)),
+    repeating-linear-gradient(0deg, rgba(110, 80, 40, .035) 0 1px, transparent 1px 4px),
+    var(--vellum);
+  border: 1px solid #6b4f2c; border-top: 3px solid #7a2e22; border-radius: 4px;
+  box-shadow: 0 0 0 4px #1b140d, 0 0 0 5px #6b4f2c, 0 30px 80px rgba(0, 0, 0, .7);
+}
+.dialog.chron h2 { font-family: var(--serif); color: #3a2513; font-size: 1.15rem; }
+.dialog.chron .muted, .dialog.chron .rnav .muted { color: var(--ink-3); }
+.dialog.chron b { color: #24180c; }
+.dialog.chron .sides, .dialog.chron .intel {
+  background: rgba(255, 248, 228, .45); border: 1px solid rgba(107, 79, 44, .35); border-radius: 3px; color: var(--ink);
+}
+.dialog.chron .intel h3 { color: #3a2513; font-family: var(--serif); }
+.dialog.chron .uchip, .dialog.chron .chip { background: rgba(107, 79, 44, .12); box-shadow: inset 0 0 0 1px rgba(107, 79, 44, .3); color: var(--ink); }
+.dialog.chron .ok { color: #3f6b1f; }
+.dialog.chron .big { color: #7a2e22; font-family: var(--serif); text-align: center; padding: .5rem; border-top: 1px solid rgba(107, 79, 44, .35); border-bottom: 1px solid rgba(107, 79, 44, .35); }
+.dialog.chron .ico { filter: drop-shadow(0 1px 0 rgba(0, 0, 0, .25)); }
+.dialog.chron .btn.ghost { background: rgba(107, 79, 44, .14); color: var(--ink); box-shadow: inset 0 0 0 1px rgba(107, 79, 44, .5); }
+.dialog.chron .btn.ghost:hover:not(:disabled) { background: rgba(107, 79, 44, .24); }
+.dialog.chron .btn.ghost:disabled { background: transparent; color: rgba(107, 79, 44, .45); box-shadow: inset 0 0 0 1px rgba(107, 79, 44, .2); }
+/* tabela bitwy na pergaminie */
+.dialog.chron table.units th { color: var(--ink-2); border-bottom-color: rgba(107, 79, 44, .4); }
+.dialog.chron table.units td { border-bottom-color: rgba(107, 79, 44, .2); color: var(--ink); }
+.dialog.chron table.units thead tr:first-child th { font-family: var(--serif); font-size: .82rem; color: #3a2513; }
+.dialog.chron table.units tbody tr:hover td { background: rgba(107, 79, 44, .08); }
+.dialog.chron table.units .loss { color: #a3271c; }
+.dialog.chron table.units td.zero { color: var(--ink-3); }
+.dialog.chron table.units.rep td:nth-child(2), .dialog.chron table.units.rep td:nth-child(3),
+.dialog.chron table.units.rep th:nth-child(2), .dialog.chron table.units.rep th:nth-child(3) { background: rgba(122, 46, 34, .05); }
+
+/* Pieczęć z werdyktem */
+.verdict { display: flex; align-items: center; gap: .8rem; margin: 0 0 .7rem; padding: .55rem .8rem; border-radius: 3px;
+  background: rgba(107, 79, 44, .1); border: 1px solid rgba(107, 79, 44, .35); }
+.verdict small { display: block; font-size: .66rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3, var(--muted)); }
+.verdict strong { display: block; font-family: var(--serif); font-size: 1.45rem; line-height: 1.1; color: #3a2513; }
+.verdict .seal { flex: none; width: 40px; height: 40px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #c45a4b, #8e2a20 60%, #5e1912);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, .35), inset 0 0 0 3px rgba(0, 0, 0, .15), inset 0 0 0 6px rgba(255, 255, 255, .08); position: relative; }
+.verdict .seal::after { content: ""; position: absolute; inset: 11px; border: 2px solid rgba(255, 220, 200, .55); border-radius: 50%; }
+.verdict.win  { border-left: 5px solid #4f7a2c; }
+.verdict.win strong { color: #34561a; }
+.verdict.win .seal { background: radial-gradient(circle at 35% 30%, #86ac55, #4f7a2c 60%, #2f4d17); }
+.verdict.loss { border-left: 5px solid #a3271c; }
+.verdict.loss strong { color: #8e2a20; }
+.verdict.conq, .verdict.news { border-left: 5px solid #a8832f; }
+.verdict.conq strong, .verdict.news strong { color: #7a5a14; }
+.verdict.conq .seal, .verdict.news .seal { background: radial-gradient(circle at 35% 30%, #f0cf7c, #b88f35 60%, #7a5a14); }
+.verdict.spy .seal::after { inset: 13px 8px; border-radius: 50% / 70%; }   /* „oko” zwiadu */
+
+/* Pasek podsumowania bitwy */
+.rsum { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 1px; margin: 0 0 .7rem;
+  background: rgba(107, 79, 44, .35); border: 1px solid rgba(107, 79, 44, .35); border-radius: 3px; overflow: hidden; }
+.rsum > div { padding: .45rem .6rem; background: rgba(255, 248, 228, .55); }
+.rsum span { display: block; font-size: .64rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3, var(--muted)); }
+.rsum b { font-size: 1.15rem; font-family: var(--serif); }
+.rsum b small { font-size: .78rem; font-family: var(--font); color: var(--ink-3, var(--muted)); font-weight: 700; }
+.rsum .bad b { color: #a3271c; }
+.rsum .gold b { color: #7a5a14; }
+
+@media (max-width: 760px) {
+  .dialog.chron { border-radius: 6px 6px 0 0; box-shadow: 0 0 0 3px #1b140d, 0 -10px 40px rgba(0, 0, 0, .6); }
+  .verdict strong { font-size: 1.25rem; }
+  .rsum { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* --- Raporty: drobne poprawki układu --- */
+table.units.rep td.uname .ico { width: 22px; height: 22px; margin: 0 .35rem 0 0; vertical-align: middle; }
+.rsum b { white-space: nowrap; }
+.rsum > div:last-child:nth-child(odd) { grid-column: span 1; }
+@media (max-width: 760px) {
+  .rsum > div:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  #screen-reports .toolbar .btn.ghost { min-height: 34px; padding: .3rem .7rem; font-size: .8rem; }
+}
+
+/* =========================================================================
+   ETAP 3 – MAPA
+   ========================================================================= */
+/* Rama i linijki współrzędnych w drewnie */
+.map-viewport::after { box-shadow: inset 0 0 50px rgba(0, 0, 0, .6); border-radius: 4px; }
+.ruler { background: linear-gradient(180deg, #2b2219, #1a140f); color: var(--muted); font-family: var(--serif); }
+.ruler.top { box-shadow: inset 0 -1px 0 var(--copper); }
+.ruler.left { box-shadow: inset -1px 0 0 var(--copper); }
+.board { border-radius: 0; box-shadow: 0 0 0 2px #0b0806, 0 0 0 3px #6b4f2c, 0 20px 50px rgba(0, 0, 0, .6); }
+
+/* Etykiety osad: pergaminowa wstęga, punkty w kolorze frakcji */
+.vlabel {
+  font-family: var(--serif); font-size: 11px; font-weight: 700; letter-spacing: .01em;
+  background: linear-gradient(180deg, #efe1bf, #d9c495); color: #2b1d10;
+  border-radius: 2px; box-shadow: 0 0 0 1px #3a2a17, 0 2px 4px rgba(0, 0, 0, .5);
+}
+.vlabel i { font-family: var(--font); font-weight: 800; border-radius: 1px 0 0 1px; text-shadow: 0 1px 0 rgba(0, 0, 0, .4); box-shadow: inset -1px 0 0 rgba(0, 0, 0, .35); }
+.tile.neutral .vlabel { background: linear-gradient(180deg, #cdbf9f, #b3a37f); color: #3a2a17; }
+.tile.own .vlabel { box-shadow: 0 0 0 1px #3a2a17, 0 0 0 2.5px var(--fc), 0 2px 4px rgba(0, 0, 0, .5); }
+.map-world.far .vlabel i { border-radius: 2px; }
+
+/* Aktywna wioska: złota korona + pulsujący pierścień na ziemi */
+.tile.current { background: radial-gradient(closest-side, rgba(242, 205, 110, .32), rgba(242, 205, 110, .08) 70%, transparent); }
+.tile.current::before {
+  top: -10px; width: 18px; height: 12px;
+  background: linear-gradient(180deg, #ffe39a, #c9a043); filter: drop-shadow(0 1px 0 #2b1d10) drop-shadow(0 0 4px rgba(255, 215, 120, .7));
+}
+.tile.current .vlabel { animation: curglow 2.4s ease-in-out infinite; }
+@keyframes curglow { 50% { box-shadow: 0 0 0 1px #3a2a17, 0 0 0 2.5px var(--fc), 0 0 12px 2px rgba(242, 205, 110, .75); } }
+.tile.selected { border-radius: 2px; background: rgba(242, 205, 110, .12); box-shadow: inset 0 0 0 2px #f2cd6e, inset 0 0 0 4px rgba(43, 29, 16, .6), 0 0 16px rgba(242, 205, 110, .45); }
+.tile:hover { background: rgba(255, 240, 200, .12); }
+
+/* Znaczniki ataku i celu: tarcze zamiast kółek */
+.tile.under-attack::after, .tile.targeted::after {
+  width: 20px; height: 22px; border-radius: 0; line-height: 20px;
+  clip-path: polygon(0 0, 100% 0, 100% 55%, 50% 100%, 0 55%);
+  box-shadow: none; filter: drop-shadow(0 1px 1px #000);
+}
+.tile.under-attack::after { background: linear-gradient(180deg, #e0574b, #8e2a20); }
+.tile.targeted::after { background: linear-gradient(180deg, #6f97d6, #2f548f); }
+
+/* Trasy przemarszu: grubsze, z ciemnym obrysem, znacznik jak żeton */
+.route .trail { stroke-width: 9; stroke-opacity: .5; }
+.route .path { stroke-width: 4; }
+.route .marker { r: 10; stroke: #2b1d10; stroke-width: 3; }
+.route .dest { stroke-width: 3; }
+.route.inc .path { stroke-width: 5; }
+
+/* Narzędzia mapy: skrzynka z okuciami, mniejsza, przy krawędzi */
+.map-tools { right: 10px; top: 10px; gap: 4px; padding: 4px; border-radius: 4px; background: linear-gradient(180deg, #2b2219, #1a140f); border: 1px solid #0b0806; box-shadow: inset 0 0 0 1px var(--line-2), 0 4px 12px rgba(0, 0, 0, .5); }
+.mbtn { width: 36px; height: 36px; border-radius: 3px; background: rgba(0, 0, 0, .25); box-shadow: inset 0 0 0 1px var(--line); color: var(--gold-2); font-family: var(--serif); }
+.mbtn:hover { background: rgba(201, 160, 67, .18); }
+.grid-btn[aria-pressed="true"] { background: rgba(201, 160, 67, .22); box-shadow: inset 0 0 0 1px var(--gold); }
+.map-coord { border-radius: 3px; background: #1a140f; border-color: var(--copper); font-family: var(--serif); }
+
+/* Minimapa mniejsza (mniej zasłania osad) */
+.minimap { right: 10px; bottom: 10px; padding: 4px; border-radius: 4px; background: #1a140f; border: 1px solid #0b0806; }
+.minimap canvas { width: 120px; height: 120px; border-radius: 2px; }
+
+/* Legenda zwijana – domyślnie tylko przycisk „Legenda” */
+.legend { left: 10px; bottom: 10px; padding: 0; border-radius: 4px; background: #1a140f; border: 1px solid #0b0806; box-shadow: inset 0 0 0 1px var(--line-2), 0 4px 12px rgba(0, 0, 0, .5); max-height: none; overflow: visible; }
+.legend.many { display: block; }
+.legend summary { list-style: none; cursor: pointer; padding: .4rem .75rem; font-family: var(--serif); font-size: .85rem; color: var(--gold-2); user-select: none; }
+.legend summary::-webkit-details-marker { display: none; }
+.legend summary::before { content: "▸"; display: inline-block; margin-right: .4rem; transition: transform .15s; }
+.legend details[open] summary::before { transform: rotate(90deg); }
+.legend-body { display: grid; gap: .15rem; padding: 0 .8rem .55rem; }
+.legend.many .legend-body { grid-template-columns: repeat(2, auto); column-gap: 1rem; max-height: 40vh; overflow: auto; }
+.flag { border-radius: 1px; clip-path: polygon(0 0, 100% 0, 78% 50%, 100% 100%, 0 100%); width: .9em; }
+
+/* Panel szczegółów */
+.map-details { background: var(--grain), linear-gradient(180deg, var(--surface-2), var(--surface)); border: 1px solid #0b0806; border-top: 2px solid var(--copper); border-radius: var(--r); box-shadow: inset 0 0 0 1px var(--line), var(--shadow); }
+.map-details h2 { font-family: var(--serif); }
+.facts { padding: .55rem .7rem; background: rgba(0, 0, 0, .22); border-radius: 3px; box-shadow: inset 0 0 0 1px var(--line); }
+.facts dt { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
+.sheet-close { border-radius: 3px; background: rgba(0, 0, 0, .3); }
+.hint-box { border-radius: 3px; background: rgba(79, 120, 184, .12); border-color: rgba(79, 120, 184, .35); }
+.md-cur { display: grid; grid-template-columns: 44px 1fr; gap: .2rem .7rem; align-items: center; padding: .7rem; margin-bottom: .8rem; border-radius: 3px; background: rgba(201, 160, 67, .08); box-shadow: inset 0 0 0 1px rgba(201, 160, 67, .35); }
+.md-crest { width: 44px; height: 44px; padding: 7px; border-radius: 3px; background: #120e0a; box-shadow: inset 0 0 0 1px var(--gold); }
+.md-cur small { display: block; font-size: .66rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.md-cur b { display: block; font-family: var(--serif); font-size: 1.1rem; }
+.md-cur .muted { font-size: .82rem; }
+.md-act { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; margin-top: .4rem; }
+.md-key { list-style: none; margin: .8rem 0 0; padding: .6rem 0 0; border-top: 1px solid var(--line); display: grid; grid-template-columns: 1fr 1fr; gap: .3rem .8rem; font-size: .82rem; color: var(--muted); }
+.md-key li::before { content: ""; display: inline-block; width: 18px; height: 0; margin-right: .45rem; vertical-align: .25em; border-top: 3px dashed currentColor; }
+.md-key .out::before { color: #8fb6ff; } .md-key .inc::before { color: #ff9a92; } .md-key .sup::before { color: #8fe6d6; }
+.md-key .ret::before { color: #9fe0ae; } .md-key .spy::before { color: #d6c0ff; } .md-key .trade::before { color: #ffe08a; }
+
+/* =========================================================================
+   ETAP 3 – TECHNOLOGIE: drzewo rozwoju królestwa
+   ========================================================================= */
+.tech-head { border-top: 2px solid var(--gold); }
+.tech-coins .chip.big { font-family: var(--serif); color: var(--gold-2); box-shadow: inset 0 0 0 1px var(--gold); }
+.tech-branch { --bc: var(--copper); border-top: 3px solid var(--bc); }
+.tech-branch.tb-war { --bc: #a8443a; }
+.tech-branch.tb-eco  { --bc: #c9a043; }
+.tech-branch.tb-prod { --bc: #6f9a4a; }
+.tech-branch > h2 { font-size: 1.2rem; background: none; }
+.tech-branch > h2::before { content: ""; width: 10px; height: 14px; margin-right: .55rem; align-self: center; background: var(--bc); clip-path: polygon(0 0, 100% 0, 100% 70%, 50% 100%, 0 70%); }
+.tech-branch > h2 small { margin-left: auto; font-family: var(--font); }
+.tech-scroll { padding: .2rem .1rem .4rem; background: radial-gradient(120% 100% at 0% 50%, rgba(0, 0, 0, .18), transparent 70%); }
+
+/* Łączniki: grube, złote po spełnieniu wymagania, przerywane gdy nie */
+.tl span { background: none; }
+.tl .a, .tl .b { height: 0; border-top: 3px dashed rgba(214, 178, 120, .28); margin-top: -1.5px; }
+.tl .v { width: 0; border-left: 3px dashed rgba(214, 178, 120, .28); left: calc(50% - 1.5px); }
+.tl.on .a, .tl.on .b { border-top: 3px solid var(--gold); filter: drop-shadow(0 0 3px rgba(242, 205, 110, .45)); }
+.tl.on .v { border-left: 3px solid var(--gold); filter: drop-shadow(0 0 3px rgba(242, 205, 110, .45)); }
+.tl .b::after { content: ""; position: absolute; right: -2px; top: -6.5px; border: 5px solid transparent; border-left: 6px solid rgba(214, 178, 120, .35); }
+.tl.on .b::after { border-left-color: var(--gold); }
+
+/* Węzły: tabliczki ze stanem */
+.tt { border-radius: 3px; border: 1px solid #0b0806; border-left: 4px solid var(--gold); background: var(--grain), linear-gradient(180deg, #2c241c, #1e1813); box-shadow: inset 0 0 0 1px var(--line), 0 2px 6px rgba(0, 0, 0, .35); }
+.tt:hover { border-color: #0b0806; box-shadow: inset 0 0 0 1px var(--line-2), 0 2px 6px rgba(0, 0, 0, .35); }
+.tt.s-ok { border-left-color: var(--gold); box-shadow: inset 0 0 0 1px rgba(201, 160, 67, .45), 0 0 10px rgba(201, 160, 67, .18); }
+.tt.s-coins { border-left-color: var(--steel); }
+.tt.s-max { border-left-color: var(--green); background: var(--grain), linear-gradient(180deg, #27301c, #1c2215); }
+.tt.s-max .tt-main .bicon { box-shadow: inset 0 0 0 1px var(--green), inset 0 2px 6px rgba(0, 0, 0, .6); }
+.tt.s-locked { opacity: 1; border-left-color: #4a3f33; background: repeating-linear-gradient(135deg, #1b1611 0 8px, #19140f 8px 16px); }
+.tt.s-locked .tt-main { opacity: .55; filter: grayscale(.7); }
+.tt.sel { box-shadow: 0 0 0 2px var(--gold-2), 0 0 14px rgba(242, 205, 110, .35); }
+.tt-top b { font-family: var(--serif); font-size: .95rem; }
+.tt-st.lock { color: var(--faint); }
+.tt-st.done { color: #9fc27c; }
+.tt-st.done::before { content: "✦ "; color: var(--gold-2); }
+.tech-detail { border-top: 2px solid var(--gold); }
+.tech-detail h2 { font-family: var(--serif); }
+
+/* --- Resztki starej, niebieskiej palety --- */
+.units tr.me td { background: rgba(201, 160, 67, .1); }
+table.ov tr.cur .vname { background: #2c2519; }
+table.ov .vname { background: var(--surface); }
+
+/* =========================================================================
+   ETAP 4 – PRZEGLĄD IMPERIUM
+   ========================================================================= */
+.ov-head { border-top: 2px solid var(--gold); background: radial-gradient(520px 220px at 0% 0%, rgba(201, 160, 67, .14), transparent 70%), var(--grain), linear-gradient(180deg, #31281e, var(--surface)); }
+.ov-head .actions .btn { background: linear-gradient(180deg, #3b4148, #2b3036); color: #e6e9ec; text-shadow: none; box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 1px 0 #000; }
+.ov-head .actions .btn:hover:not(:disabled) { background: linear-gradient(180deg, #474e56, #333940); }
+.ov-head .actions .btn:disabled { background: repeating-linear-gradient(135deg, #2a231b 0 6px, #251f18 6px 12px); color: var(--faint); }
+.ov-kpis .kpi:nth-child(1) { border-top-color: #a8703a; }
+.ov-kpis .kpi:nth-child(2) { border-top-color: #d2694a; }
+.ov-kpis .kpi:nth-child(3) { border-top-color: var(--steel); }
+.ov-kpis .kpi:nth-child(4) { border-top-color: var(--red); }
+.ov-kpis .kpi:nth-child(5) { border-top-color: var(--gold); }
+.ov-kpis .kpi small:last-child { color: #9fc27c; text-transform: none; letter-spacing: 0; }
+
+table.ov { border-collapse: separate; border-spacing: 0; }
+table.ov thead th {
+  position: sticky; top: 0; z-index: 2; padding: .55rem .6rem; white-space: nowrap;
+  background: linear-gradient(180deg, #2b2219, #1f1913); color: var(--gold-2);
+  font-family: var(--serif); font-size: .9rem; font-weight: 700; letter-spacing: .01em;
+  border-bottom: 2px solid var(--copper);
+}
+table.ov thead th:first-child { left: 0; z-index: 3; }
+table.ov thead th .ico { width: 20px; height: 20px; }
+table.ov tbody td { padding: .6rem .6rem; border-bottom: 1px solid var(--line); }
+table.ov tbody tr:nth-child(even) td { background: rgba(0, 0, 0, .14); }
+table.ov tbody tr:nth-child(even) .vname { background: #1f1913; }
+table.ov tbody tr:hover td { background: rgba(201, 160, 67, .06); }
+table.ov tr.cur td { background: rgba(201, 160, 67, .1); }
+table.ov tr.cur .vname { background: #2e261b; box-shadow: inset 4px 0 0 var(--gold); }
+table.ov .vname { box-shadow: inset -1px 0 0 var(--line-2); }
+table.ov .vname .link { font-family: var(--serif); font-size: 1rem; color: var(--gold-2); }
+table.ov .num b { font-size: .95rem; }
+table.ov .mini { width: 72px; height: 5px; border-radius: 0; background: #0b0806; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .04); }
+table.ov .mini i { background: linear-gradient(90deg, #8a6a2a, var(--gold-2)); }
+table.ov .near .mini i { background: linear-gradient(90deg, #b0703f, #e09a5a); }
+table.ov .full .mini i { background: repeating-linear-gradient(45deg, var(--red) 0 4px, #8e2f28 4px 8px); }
+table.ov .near b { color: #e9b07a; }
+table.ov .idle { font-style: italic; font-weight: 600; }
+table.ov .alert { border-radius: 3px; background: rgba(194, 70, 60, .25); box-shadow: inset 0 0 0 1px rgba(194, 70, 60, .6); }
+#screen-overview .tablewrap { max-height: calc(100vh - var(--top-h) - 2rem); overflow: auto; border-radius: 3px; box-shadow: inset 0 0 0 1px var(--line); }
+
+/* =========================================================================
+   ETAP 4 – OKNA MODALNE I FORMULARZE (atak, zwiad, transport, wymiana,
+   zbieranie wojska i surowców, nowa gra, menu)
+   ========================================================================= */
+.modal { background: rgba(10, 7, 4, .72); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+.dialog:not(.chron) { border: 1px solid #0b0806; box-shadow: inset 0 0 0 1px var(--line-2), 0 0 0 3px #0b0806, 0 0 0 4px #4a3a28, 0 30px 80px rgba(0, 0, 0, .7); }
+.dialog:not(.chron) > h2:first-child, .dialog:not(.chron) > .sheet-close + h2 {
+  font-family: var(--serif); font-size: 1.35rem; color: #f4e6c8;
+  padding-bottom: .55rem; margin-bottom: .9rem; border-bottom: 1px solid var(--line-2);
+  background: linear-gradient(90deg, var(--copper) 0 26px, transparent 26px) bottom left / 100% 2px no-repeat;
+}
+.dialog h3 { font-family: var(--serif); color: var(--gold-2); }
+.field { color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
+.field select, .field input { text-transform: none; letter-spacing: 0; font-size: .95rem; }
+input[type=number], input[type=text], select { background: #120e0a; border: 1px solid var(--line-2); box-shadow: inset 0 2px 4px rgba(0, 0, 0, .5); }
+input[type=number]:focus, input[type=text]:focus, select:focus { border-color: var(--gold); outline: none; box-shadow: inset 0 2px 4px rgba(0, 0, 0, .5), 0 0 0 3px rgba(201, 160, 67, .22); }
+input[type=checkbox], input[type=radio] { accent-color: var(--gold); width: 1.05rem; height: 1.05rem; }
+.chk { border-radius: 3px; }
+.summary { border-radius: 3px; background: rgba(0, 0, 0, .28); border: 1px solid var(--line-2); border-left: 3px solid var(--gold); }
+.summary span { text-transform: uppercase; letter-spacing: .04em; font-size: .66rem; }
+.summary b { font-family: var(--serif); font-size: 1.15rem; color: #f4e6c8; }
+.dialog .why, .dialog .err, .dialog .error { display: block; padding: .5rem .7rem; border-radius: 3px; background: rgba(194, 70, 60, .14); box-shadow: inset 3px 0 0 var(--red); }
+.seg { border-radius: 3px; background: rgba(0, 0, 0, .3); box-shadow: inset 0 0 0 1px var(--line); }
+.seg button { border-radius: 2px; }
+.seg button.on { background: linear-gradient(180deg, #3a3126, #2a231b); color: var(--gold-2); box-shadow: inset 0 0 0 1px var(--gold), 0 1px 0 #000; }
+.dialog table.units th { color: var(--gold-2); font-family: var(--serif); font-size: .82rem; }
+.dialog table.units td { border-bottom-color: var(--line); }
+.dialog .actions { padding-top: .8rem; border-top: 1px solid var(--line); }
+.goal { border-radius: 0; background: #0b0806; height: 8px; }
+.goal i { border-radius: 0; background: linear-gradient(90deg, #8a6a2a, var(--gold-2)); }
+.sheet-close { color: var(--muted); }
+
+/* =========================================================================
+   ETAP 4 – TELEFON
+   ========================================================================= */
+@media (max-width: 760px) {
+  /* nazwy osad zostają przy oddaleniu (skrócone), zamiast samych punktów */
+  .map-world.far .vlabel { font-size: 9px; padding: 0 4px 0 0; gap: 3px; max-width: 64px; overflow: hidden; text-overflow: ellipsis; }
+  .map-world.far .vlabel i { font-size: 9px; line-height: 14px; }
+  /* drzewko technologii: węzły jeden pod drugim zamiast przewijania w bok */
+  .tech-scroll { overflow: visible; }
+  .tech-tree { display: flex !important; flex-direction: column; gap: .45rem; min-width: 0; }
+  .tech-tree .tl { display: none; }
+  .tech-tree .tcell { padding: 0; }
+  .tech-tree .tt { margin-left: calc(var(--d, 0) * 14px); }
+  /* przegląd: węższe kolumny, nazwa przyklejona */
+  table.ov thead th, table.ov tbody td { padding: .45rem .4rem; }
+  table.ov .mini { width: 52px; }
+  .ov-head .actions { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; }
+  .ov-head .actions .btn { font-size: .8rem; padding: .45rem .5rem; }
+  .dialog:not(.chron) > h2:first-child { font-size: 1.2rem; }
+}
+
+/* --- poprawki etapu 4 --- */
+.field .chk, .field .btn, .field .selbar { text-transform: none; letter-spacing: 0; }
+.field .chk { font-size: .9rem; color: var(--text); }
+.ov-head { grid-template-columns: 1fr; }
+.ov-kpis { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; }
+@media (max-width: 980px) { .ov-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
+/* przełącznik trybu w oknach zbierania: aktywny = złoty, nieaktywny = przygaszony */
+.seg .btn:not(.ghost) { background: linear-gradient(180deg, var(--gold-2), var(--gold) 55%, #a8832f); color: var(--gold-ink); box-shadow: inset 0 1px 0 rgba(255,245,210,.45), 0 1px 0 #000; }
+.seg .btn.ghost { background: transparent; color: var(--muted); box-shadow: none; }
+.seg .btn.ghost:hover { background: rgba(201, 160, 67, .08); color: var(--text); }

@@ -31,9 +31,10 @@
   }
 
   const ART = {
+    // drewno: stos trzech kłód widzianych od czoła (słoje) – inny kształt niż cegły gliny
     wood: [
-      '............', '............', '.kkkkkkkkkk.', 'kbbBbbbBbklk', 'kbbbbBbbbkwk', 'kbBbbbbBbklk',
-      '.kkkkkkkkkk.', 'kbBbbbbBbklk', 'kbbbbBbbbkwk', 'kbbBbbbBbklk', '.kkkkkkkkkk.', '............'],
+      '............', '....kkkk....', '...kBllBk...', '...klbblk...', '...kBllBk...', '.kkkkkkkkkk.',
+      'kBllBkkBllBk', 'klbblkklbblk', 'klbblkklbblk', 'kBllBkkBllBk', '.kkkk..kkkk.', '............'],
     clay: [
       '............', '............', '............', 'kkkkkkkkkkkk', 'kRrrrkRrrrrk', 'krrrrkrrrrrk',
       'kkkkkkkkkkkk', 'kRrkRrrrrkRk', 'krrkrrrrrkrk', 'kkkkkkkkkkkk', '............', '............'],

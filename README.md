@@ -131,3 +131,18 @@ Edytuj `config.js` i odśwież stronę. Po zmianie plików gry podnieś wersję 
 
 
 Zapisy z poprzedniej wersji są automatycznie uzupełniane o Targowisko i nowe jednostki (migracje zapisu v1 → … → v8; stare gry dostają poziom Normalny).
+
+## Zachowanie AI (wersja 2)
+
+Każda frakcja co turę (`C.AI.thinkInterval`):
+
+1. **Rozbudowa bez przestojów** – kolejka budowy jest zawsze zajęta. Pierwszeństwo mają pilne potrzeby: Farma przy zajętości powyżej 85%, Ratusz (magazyn), gdy surowce zbliżają się do limitu albo budynek nie mieści się w magazynie. Na następny budynek odkładana jest rezerwa – wojsko rekrutowane jest tylko z nadwyżki.
+2. **Wojsko z głową** – najpierw obrona domu do progu `punkty wioski × homeDef` (osobowość), potem armia według wag. Przy pełnym magazynie albo nadciągającym ataku AI wydaje wszystko.
+3. **Posiłki** – wioska z nadciągającym atakiem dostaje obrońców z sąsiednich wiosek, jeśli zdążą dojść.
+4. **Zbiórka wojsk** – frakcje ofensywne co jakiś czas ściągają jednostki ataku z zaplecza do wioski frontowej, żeby móc uderzyć na silniej bronione cele.
+5. **Ataki** – armia zbiera się do sensownej wielkości (`minPower + punkty × powerPerPoint`) zamiast wysyłać garstki co turę; agresywna i ekspansywna frakcja prowadzą do dwóch wypraw naraz. Cel wybierany według odległości, przewagi, łupu i obniżonego poparcia (dobijanie podboju). AI nie wysyła wojska, gdy samo jest atakowane.
+6. **Rozrost** – osadnicy częściej (także frakcja obronna), dowódcy podboju tylko przy bezpiecznej obronie domu.
+
+Poziomy trudności działają jak wcześniej (produkcja, agresja, ostrożność, strefa wokół gracza). Parametry: `C.AI.tactics` i `C.AI.personalities` w `config.js`. Raport bez gracza: `node tools/ai-report.js normal 8 1`.
+
+Porównanie (świat Mały, Normalny, 8 h bez gracza, średnia z 6 gier na frakcję): suma poziomów budynków 323 → 548, zrekrutowane jednostki 5 404 → 8 798, liczba wypraw 840 → 179 (zamiast garstek – pełne armie).

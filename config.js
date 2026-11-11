@@ -297,6 +297,22 @@
       prodFactor: 1.1,           // mnożnik produkcji AI (poziom trudności)
       graceMinutes: 10,          // przez tyle minut AI nie atakuje gracza
       maxOrder: 40,              // maks. liczba jednostek w jednym zleceniu AI
+      // Taktyka wspólna dla wszystkich frakcji (ai.js)
+      tactics: {
+        buildQueue: 2,           // ile budów AI trzyma w kolejce
+        recruitQueue: 3,         // ile zleceń rekrutacji AI trzyma w kolejce
+        farmUrgent: 0.85,        // zajętość farmy, od której Farma ma pierwszeństwo
+        storeUrgent: 0.8,        // zapełnienie magazynu, od którego Ratusz (magazyn) ma pierwszeństwo
+        storeSpend: 0.75,        // od tego zapełnienia AI wydaje na wojsko wszystko (nic się nie marnuje)
+        settleChance: 0.8,       // szansa na turę, że wolna wioska zacznie szkolić osadnika
+        settleRange: 5,          // maks. odległość nowej osady od wioski macierzystej
+        supportRange: 6,         // z jak daleka AI wysyła posiłki do atakowanej wioski
+        supportShare: 0.5,       // maks. część obrońców wysyłana jako posiłki
+        lootScale: 3000,         // ile surowców w celu podwaja jego atrakcyjność
+        gatherRange: 7,          // z jak daleka frakcja ściąga jednostki ataku do wioski frontowej
+        powerPerPoint: 30,       // min. siła wyprawy = minPower osobowości + punkty wioski × ta wartość
+        scoutCap: 6, siegeCap: 20
+      },
       startBuildings: { hq: 3, wood: 3, clay: 3, iron: 2, farm: 2, barracks: 2 },
       startUnits: { spear: 20, axe: 10 },
       secondBuildings: { hq: 1, wood: 1, clay: 1, iron: 1, farm: 1, barracks: 1 },
@@ -326,7 +342,8 @@
           unitWeights: { spear: 1, axe: 4, scout: 0.3, light: 3, ram: 0.5, archer: 0.5, guard: 0.4 },
           recruitShare: 0.7, attackChance: 0.6, attackRatio: 1.3, keepHome: 0.2,
           minPower: 250, range: 8, targets: 'any', anyAfterMin: 0,
-          neutralBias: 1, playerBias: 1.6, nobles: true, maxVillages: 10, settle: false, spyChance: 0.15
+          neutralBias: 1, playerBias: 1.6, nobles: true, maxVillages: 12, settle: false, spyChance: 0.15,
+          homeDef: 28, waves: 2, gatherChance: 0.08
         },
         economic: {
           label: 'gospodarcza',
@@ -334,7 +351,8 @@
           unitWeights: { spear: 2, axe: 1, scout: 0.2, light: 1, ram: 0.1, archer: 2, guard: 1.5 },
           recruitShare: 0.35, attackChance: 0.25, attackRatio: 2.0, keepHome: 0.5,
           minPower: 300, range: 6, targets: 'neutral', anyAfterMin: 30,
-          neutralBias: 2, playerBias: 0.8, nobles: true, maxVillages: 7, settleMax: 11, settle: true, spyChance: 0.05
+          neutralBias: 2, playerBias: 0.8, nobles: true, maxVillages: 8, settleMax: 12, settle: true, spyChance: 0.05,
+          homeDef: 30, waves: 1, gatherChance: 0.04
         },
         defensive: {
           label: 'obronna',
@@ -342,7 +360,8 @@
           unitWeights: { spear: 5, axe: 1, scout: 0.5, light: 0.5, ram: 0, archer: 4, guard: 5 },
           recruitShare: 0.5, attackChance: 0.2, attackRatio: 2.5, keepHome: 0.8,
           minPower: 300, range: 5, targets: 'neutral', anyAfterMin: 45,
-          neutralBias: 2, playerBias: 0.6, nobles: false, maxVillages: 5, settle: false, spyChance: 0
+          neutralBias: 2, playerBias: 0.6, nobles: false, maxVillages: 6, settleMax: 7, settle: true, spyChance: 0.05,
+          homeDef: 45, waves: 1, gatherChance: 0
         },
         expansionist: {
           label: 'ekspansywna',
@@ -350,7 +369,8 @@
           unitWeights: { spear: 1, axe: 3, scout: 0.3, light: 2, ram: 0.3, archer: 0.5, guard: 0.4 },
           recruitShare: 0.55, attackChance: 0.5, attackRatio: 1.5, keepHome: 0.3,
           minPower: 200, range: 9, targets: 'any', anyAfterMin: 0,
-          neutralBias: 2.5, playerBias: 1, nobles: true, maxVillages: 12, settleMax: 16, settle: true, spyChance: 0.1
+          neutralBias: 2.5, playerBias: 1, nobles: true, maxVillages: 13, settleMax: 17, settle: true, spyChance: 0.1,
+          homeDef: 25, waves: 2, gatherChance: 0.06
         }
       }
     },

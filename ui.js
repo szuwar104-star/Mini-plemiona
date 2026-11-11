@@ -526,7 +526,7 @@
     else if (state === 'locked') foot = '<span class="tt-st lock">' + info.reason.replace('Wymaga: ', '🔒 ') + '</span>';
     else foot = '<span class="chip' + (coins < info.cost ? ' lack' : '') + '">' + ico('coin') + fmt(info.cost) + '</span>' +
       (state === 'ok' ? '<button class="btn tt-buy" data-act="tech-buy" data-id="' + n.id + '" title="Badaj poz. ' + info.target + ' za ' + fmt(info.cost) + ' monet">Badaj</button>' : '');
-    return '<div class="tcell" style="grid-row:' + (pos.row + 1) + ';grid-column:' + (pos.depth * 2 + 1) + '">' +
+    return '<div class="tcell" style="grid-row:' + (pos.row + 1) + ';grid-column:' + (pos.depth * 2 + 1) + ';--d:' + pos.depth + ';order:' + (pos.row * 10 + pos.depth) + '">' +
       '<div class="tt s-' + state + (sel ? ' sel' : '') + '">' +
       '<button class="tt-main" data-act="tech-sel" data-id="' + n.id + '" aria-pressed="' + sel + '"><span class="bicon">' + S.icon(techIcon(n)) + '</span>' +
       '<span class="tt-txt"><span class="tt-top"><b>' + n.name + '</b><span class="lvl">' + info.level + '<small>/' + n.max + '</small></span></span>' + techPips(n, info.level) + '</span></button>' +
@@ -557,7 +557,7 @@
     const cols = new Array(L.depths).fill('minmax(168px,1fr)').join(' 30px ');
     const infos = {}; nodes.forEach(n => { infos[n.id] = E.techInfo(s, n.id); });
     const done = nodes.reduce((a, n) => a + infos[n.id].level, 0), all = nodes.reduce((a, n) => a + n.max, 0);
-    return '<section class="panel tech-branch"><h2>' + branch.name + '<small>' + done + '/' + all + ' poziomów</small></h2>' +
+    return '<section class="panel tech-branch tb-' + branch.id + '"><h2>' + branch.name + '<small>' + done + '/' + all + ' poziomów</small></h2>' +
       '<div class="tech-scroll"><div class="tech-tree" style="grid-template-columns:' + cols + ';grid-template-rows:repeat(' + L.rows + ',1fr)">' +
       nodes.filter(n => n.req).map(n => techLink(n, L.pos, infos[n.id])).join('') +
       nodes.map(n => techTile(n, L.pos[n.id], infos[n.id], coins, UI.techSel === n.id)).join('') + '</div></div></section>';
@@ -620,6 +620,28 @@
     return playerWon ? 'win' : 'loss';
   }
 
+  // Wygląd kroniki: pieczęć z werdyktem (tylko prezentacja, dane bez zmian).
+  function reportVerdict(r) {
+    const tone = reportTone(r);
+    if (r.kind === 'news') return { cls: 'news', label: r.settled ? 'Nowa osada' : r.eliminated ? 'Upadek frakcji' : 'Podbój', sub: 'Kronika świata' };
+    if (r.kind === 'spy') return { cls: tone + ' spy', label: r.success ? 'Zwiad udany' : 'Zwiad przepadł', sub: 'Raport zwiadu' };
+    if (r.kind === 'spydef') return { cls: tone + ' spy', label: r.success ? 'Wróg przejrzał wioskę' : 'Szpiedzy zatrzymani', sub: 'Wrogi zwiad' };
+    if (r.kind === 'attack') return { cls: tone + (r.conquered ? ' conq' : ''), label: r.conquered ? 'Podbój' : r.attackerWon ? 'Zwycięstwo' : 'Porażka', sub: 'Raport z ataku' };
+    return { cls: tone + (r.conquered ? ' conq' : ''), label: r.conquered ? 'Wioska utracona' : r.attackerWon ? 'Obrona przegrana' : 'Obrona udana', sub: 'Raport z obrony' };
+  }
+  function reportSummary(r, hideDef) {
+    const sent = E.sumUnits(r.attUnits), aLoss = E.sumUnits(r.attLoss);
+    const dHad = E.sumUnits(r.defUnits), dLoss = E.sumUnits(r.defLoss);
+    const loot = r.loot ? r.loot.wood + r.loot.clay + r.loot.iron : 0;
+    const cell = (label, val, cls) => '<div class="' + (cls || '') + '"><span>' + label + '</span><b>' + val + '</b></div>';
+    let h = '<div class="rsum">' +
+      cell('Atakujący – straty', fmt(aLoss) + ' <small>/ ' + fmt(sent) + '</small>', aLoss ? 'bad' : '') +
+      cell('Obrońca – straty', hideDef ? '?' : fmt(dLoss) + ' <small>/ ' + fmt(dHad) + '</small>', !hideDef && dLoss ? 'bad' : '') +
+      cell(r.kind === 'defense' ? 'Zrabowano' : 'Łup', fmt(loot), loot ? 'gold' : '');
+    if (r.loyaltyBefore != null) h += cell('Poparcie', r.loyaltyBefore + '% → ' + (r.loyaltyAfter != null ? r.loyaltyAfter : r.loyaltyBefore) + '%', 'gold');
+    return h + '</div>';
+  }
+
   function filteredReports(s) {
     return s.reports.filter(r => UI.filter === 'all' || r.kind === UI.filter || (UI.filter === 'spy' && r.kind === 'spydef'));
   }
@@ -649,7 +671,7 @@
       html += '<p class="muted">Brak raportów. Raport pojawi się po pierwszej bitwie.</p>';
     } else {
       html += '<ul class="rlist">' + list.map(r =>
-        '<li><button class="ritem ' + reportTone(r) + (r.read ? '' : ' unread') + '" data-act="report" data-id="' + r.id + '">' +
+        '<li><button class="ritem ' + reportTone(r) + ' k-' + r.kind + (r.conquered ? ' conq' : '') + (r.read ? '' : ' unread') + '" data-act="report" data-id="' + r.id + '">' +
         ico(r.kind === 'news' ? (r.settled ? 'settler' : 'noble') : r.kind === 'attack' ? 'sword' : r.kind === 'spy' || r.kind === 'spydef' ? 'scout' : 'barracks') +
         '<span class="rtitle">' + reportTitle(s, r) + '</span><span class="rtime">' + dayClock(r.time) + '</span></button></li>').join('') + '</ul>';
     }
@@ -681,7 +703,9 @@
   }
   function reportModal(r) {
     const s = st();
-    let html = '<h2>' + reportTitle(s, r) + '</h2><p class="muted">' + new Date(wall(r.time)).toLocaleString('pl-PL') + '</p>';
+    const vd = reportVerdict(r);
+    let html = '<div class="verdict ' + vd.cls + '"><span class="seal" aria-hidden="true"></span><div><small>' + vd.sub + '</small><strong>' + vd.label + '</strong></div></div>' +
+      '<h2>' + reportTitle(s, r) + '</h2><p class="muted">' + new Date(wall(r.time)).toLocaleString('pl-PL') + '</p>';
     if (r.kind === 'spy' || r.kind === 'spydef') {
       html += '<div class="sides"><p><b>Zwiadowcy:</b> ' + flag(s, r.attacker) + ', ' + esc(r.fromName) + ' ' + xy(r.fromX, r.fromY) + '</p>' +
         '<p><b>Cel:</b> ' + flag(s, r.defender) + ', ' + esc(r.toName) + ' ' + xy(r.toX, r.toY) + '</p></div>' +
@@ -695,7 +719,7 @@
       const hideDef = r.kind === 'attack' && !r.attackerWon;
       html += '<div class="sides"><p><b>Atakujący:</b> ' + flag(s, r.attacker) + ', ' + esc(r.fromName) + ' ' + xy(r.fromX, r.fromY) + '</p>' +
         '<p><b>Obrońca:</b> ' + flag(s, r.defender) + ', ' + esc(r.toName) + ' ' + xy(r.toX, r.toY) + '</p></div>' +
-        reportUnitsTable(r, hideDef);
+        reportSummary(r, hideDef) + reportUnitsTable(r, hideDef);
       if (hideDef) html += '<p class="muted">Nikt nie wrócił z bitwy – brak informacji o obrońcach.</p>';
       html += '<p>Szczęście atakującego: ' + (r.luck > 0 ? '+' : '') + r.luck + '%</p>';
       if (r.killPts) {
@@ -761,15 +785,16 @@
     el.dataset.key = key;
     const fs = Object.values(s.factions);
     el.classList.toggle('many', fs.length > 7);
-    el.innerHTML = fs.map(f => '<span><i class="flag" style="--fc:' + f.color + '"></i>' + (f.id === 'player' ? 'Ty' : esc(f.name)) + '</span>').join('') +
-      '<span><i class="flag" style="--fc:#8a6b4d"></i>Wolne osady</span>';
+    el.innerHTML = '<details><summary>Legenda</summary><div class="legend-body">' +
+      fs.map(f => '<span><i class="flag" style="--fc:' + f.color + '"></i>' + (f.id === 'player' ? 'Ty' : esc(f.name)) + '</span>').join('') +
+      '<span><i class="flag" style="--fc:#8a6b4d"></i>Wolne osady</span></div></details>';
   }
 
   function renderDetails() {
     const s = st(), el = $('#mapDetails');
     const sel = UI.sel;
     const v0 = cur();
-    let sig = 'none';
+    let sig = 'none:' + (v0 ? v0.id + ':' + E.points(v0) : '');
     let tile = null, v = null;
     if (sel) {
       tile = E.tileAt(s, sel.x, sel.y);
@@ -782,7 +807,10 @@
     UI.sigs.details = sig;
     el.classList.toggle('open', !!sel);
     if (!sel) {
-      el.innerHTML = '<p class="muted hint">Kliknij pole, aby zobaczyć szczegóły. Dwuklik na swojej wiosce ustawia ją jako aktywną, a na obcej otwiera okno ataku. Przeciągaj, aby przesuwać mapę.</p>';
+      el.innerHTML = (v0 ? '<div class="md-cur"><span class="md-crest">' + S.icon('hq') + '</span><div><small>Aktywna wioska</small><b>' + esc(v0.name) + ' ' + xy(v0.x, v0.y) + '</b><span class="muted">' + E.points(v0) + ' pkt</span></div>' +
+        '<div class="md-act"><button class="btn ghost" data-act="center">Pokaż</button><button class="btn" data-act="select-cur">Szczegóły</button></div></div>' : '') +
+        '<p class="muted hint">Kliknij pole, aby zobaczyć szczegóły. Dwuklik na swojej wiosce ustawia ją jako aktywną, a na obcej otwiera okno ataku. Przeciągaj, aby przesuwać mapę.</p>' +
+        '<ul class="md-key"><li class="out">Twój atak</li><li class="inc">Wrogi atak</li><li class="sup">Wsparcie</li><li class="ret">Powrót</li><li class="spy">Zwiad</li><li class="trade">Kupcy</li></ul>';
       return;
     }
     let html = '<button class="sheet-close" data-act="deselect" aria-label="Zamknij szczegóły">×</button>';
@@ -996,14 +1024,14 @@
     const s = st(), g = UI.gather, spread = g.mode === 'spread', T = s.villages[g.target];
     const plan = E.planGather(s, g.target, gatherArgs(g), s.now);
     const sendable = plan.rows.filter(r => !r.skip && r.total > 0);
-    let html = '<div class="tablewrap"><table class="units gather"><thead><tr><th></th><th>' + (spread ? 'Do wioski' : 'Z wioski') + '</th><th>Surowce</th><th>Kupcy</th><th>Droga</th></tr></thead><tbody>' +
+    let html = '<div class="selbar"><button class="btn ghost" data-act="sel-all" data-w="g" data-on="1">Zaznacz wszystkie</button><button class="btn ghost" data-act="sel-all" data-w="g" data-on="0">Odznacz wszystkie</button></div>' + '<div class="tablewrap"><table class="units gather"><thead><tr><th></th><th>' + (spread ? 'Do wioski' : 'Z wioski') + '</th><th>Surowce</th><th>Kupcy</th><th>Droga</th></tr></thead><tbody>' +
       plan.rows.map(r => {
         const v = s.villages[r.villageId];
         return '<tr class="' + (r.skip ? 'skipped' : '') + '"><td class="g-chk"><input type="checkbox" data-gsrc="' + v.id + '"' + (r.off ? '' : ' checked') + '></td>' +
           '<td class="g-name">' + esc(v.name) + '<small>' + E.dist(v, T).toFixed(1) + ' pola</small></td>' +
           '<td class="g-res">' + (r.skip ? '<span class="muted">' + esc(r.skip) + '</span>' : resLine(r.res)) + '</td>' +
           '<td class="num g-merch" data-l="Kupcy">' + (r.merchants || '') + '</td><td class="num g-time" data-l="Droga">' + (r.skip ? '' : dur(r.time)) + '</td></tr>';
-      }).join('') + '</tbody></table></div>' + '<div class="selbar"><button type="button" class="btn ghost" data-act="sel-all" data-w="g" data-on="1">Zaznacz wszystkie wioski</button><button type="button" class="btn ghost" data-act="sel-all" data-w="g" data-on="0">Odznacz wszystkie wioski</button></div>';
+      }).join('') + '</tbody></table></div>';
     html += '<div class="summary"><div><span>Razem surowców</span><b>' + fmt(plan.total) + '</b></div>' +
       '<div><span>Kupców</span><b>' + plan.merchants + '</b></div>' +
       '<div><span>Transportów</span><b>' + sendable.length + '</b></div>' +
@@ -1036,7 +1064,7 @@
       '<label class="field">Rodzaj wysyłki <select data-tstay>' +
         '<option value="0"' + (g.stay ? '' : ' selected') + '>Wsparcie (można odwołać)</option>' +
         '<option value="1"' + (g.stay ? ' selected' : '') + '>Przeniesienie na stałe (zajmuje farmę)</option></select></label>' +
-      '<div class="gopts"><div class="field">Jednostki<span class="selbar"><button type="button" class="btn ghost" data-act="tunits-all" data-on="1">Zaznacz wszystkie jednostki</button><button type="button" class="btn ghost" data-act="tunits-all" data-on="0">Odznacz wszystkie jednostki</button></span><span class="gres ugrid">' + E.UNITS.map(k => '<label class="chk"><input type="checkbox" data-tunit="' + k + '"' + (g.units[k] ? ' checked' : '') + '>' + ico(k) + C.UNITS[k].name + '</label>').join('') + '</span></div>' +
+      '<div class="gopts"><div class="field">Jednostki<span class="selbar"><button type="button" class="btn ghost" data-act="tunits-all" data-on="1">Zaznacz wszystkie</button><button type="button" class="btn ghost" data-act="tunits-all" data-on="0">Odznacz wszystkie</button></span><span class="gres ugrid">' + E.UNITS.map(k => '<label class="chk"><input type="checkbox" data-tunit="' + k + '"' + (g.units[k] ? ' checked' : '') + '>' + ico(k) + C.UNITS[k].name + '</label>').join('') + '</span></div>' +
       '<label class="field">Zostaw w wiosce wysyłającej (% wojska)<input type="number" inputmode="numeric" min="0" max="100" step="5" data-treserve value="' + esc(g.reserve) + '"></label></div>' +
       (g.stay ? '<label class="chk"><input type="checkbox" data-tcap' + (g.capToRoom ? ' checked' : '') + '>Nie wysyłaj więcej, niż mieści farma ' + (spread ? 'celów' : 'celu') + '</label>' : '') +
       '<div id="troopsPlan"></div>' +
@@ -1048,14 +1076,14 @@
     const s = st(), g = UI.troops, spread = g.mode === 'spread', T = s.villages[g.target];
     const plan = E.planTroops(s, g.target, troopsArgs(g), s.now);
     const sendable = plan.rows.filter(r => !r.skip && r.total > 0);
-    let html = '<div class="tablewrap"><table class="units gather"><thead><tr><th></th><th>' + (spread ? 'Do wioski' : 'Z wioski') + '</th><th>Wojsko</th><th>Droga</th></tr></thead><tbody>' +
+    let html = '<div class="selbar"><button class="btn ghost" data-act="sel-all" data-w="t" data-on="1">Zaznacz wszystkie</button><button class="btn ghost" data-act="sel-all" data-w="t" data-on="0">Odznacz wszystkie</button></div>' + '<div class="tablewrap"><table class="units gather"><thead><tr><th></th><th>' + (spread ? 'Do wioski' : 'Z wioski') + '</th><th>Wojsko</th><th>Droga</th></tr></thead><tbody>' +
       plan.rows.map(r => {
         const v = s.villages[r.villageId];
         return '<tr class="' + (r.skip ? 'skipped' : '') + '"><td class="g-chk"><input type="checkbox" data-tsrc="' + v.id + '"' + (r.off ? '' : ' checked') + '></td>' +
           '<td class="g-name">' + esc(v.name) + '<small>' + E.dist(v, T).toFixed(1) + ' pola</small></td>' +
           '<td class="g-res">' + (r.skip ? '<span class="muted">' + esc(r.skip) + '</span>' : unitsLine(r.units)) + '</td>' +
           '<td class="num g-time" data-l="Droga">' + (r.skip ? '' : dur(r.time)) + '</td></tr>';
-      }).join('') + '</tbody></table></div>' + '<div class="selbar"><button type="button" class="btn ghost" data-act="sel-all" data-w="t" data-on="1">Zaznacz wszystkie wioski</button><button type="button" class="btn ghost" data-act="sel-all" data-w="t" data-on="0">Odznacz wszystkie wioski</button></div>';
+      }).join('') + '</tbody></table></div>';
     html += '<div class="summary"><div><span>Razem jednostek</span><b>' + fmt(plan.total) + '</b></div>' +
       '<div><span>Oddziałów</span><b>' + sendable.length + '</b></div>' +
       (sendable.length ? '<div><span>Pierwsze przybycie za</span><b>' + dur(Math.min.apply(null, sendable.map(r => r.time))) + '</b></div>' +
@@ -1088,13 +1116,13 @@
     const s = st(), g = UI.mass, U = C.UNITS[g.unit];
     const plan = E.planRecruitAll(s, g.unit, { count: g.count, max: g.max, off: g.off }, s.now);
     const active = plan.rows.filter(r => r.n > 0);
-    box.innerHTML = '<div class="tablewrap"><table class="units gather"><thead><tr><th></th><th>Wioska</th><th>Zrekrutuje</th></tr></thead><tbody>' +
+    box.innerHTML = '<div class="selbar"><button class="btn ghost" data-act="sel-all" data-w="m" data-on="1">Zaznacz wszystkie</button><button class="btn ghost" data-act="sel-all" data-w="m" data-on="0">Odznacz wszystkie</button></div>' + '<div class="tablewrap"><table class="units gather"><thead><tr><th></th><th>Wioska</th><th>Zrekrutuje</th></tr></thead><tbody>' +
       plan.rows.map(r => {
         const v = s.villages[r.villageId];
         return '<tr class="' + (r.skip && !r.off ? 'skipped' : '') + '"><td class="g-chk"><input type="checkbox" data-msrc="' + v.id + '"' + (r.off ? '' : ' checked') + '></td>' +
           '<td class="g-name">' + esc(v.name) + '<small>' + xy(v.x, v.y) + '</small></td>' +
           '<td class="g-res">' + (r.n > 0 ? '<b>' + fmt(r.n) + '</b> × ' + U.name + (r.short ? ' <small class="muted">(tyle możesz)</small>' : '') : '<span class="muted">' + esc(r.skip) + '</span>') + '</td></tr>';
-      }).join('') + '</tbody></table></div>' + '<div class="selbar"><button type="button" class="btn ghost" data-act="sel-all" data-w="m" data-on="1">Zaznacz wszystkie wioski</button><button type="button" class="btn ghost" data-act="sel-all" data-w="m" data-on="0">Odznacz wszystkie wioski</button></div>' +
+      }).join('') + '</tbody></table></div>' +
       '<div class="summary"><div><span>Razem jednostek</span><b>' + fmt(plan.total) + '</b></div><div><span>Wiosek</span><b>' + active.length + '</b></div>' +
       (plan.total ? '<div class="wide"><span>Koszt</span><b>' + E.RES.map(r => ico(r) + fmt(plan.cost[r])).join(' ') + '</b></div>' : '') + '</div>';
     const btn = $('#massGo'); if (btn) btn.disabled = !active.length;
@@ -1306,7 +1334,7 @@
     else if (UI.modal.type === 'end') inner = endModal();
     else if (UI.modal.type === 'confirm') inner = '<h2>' + UI.modal.title + '</h2><p>' + UI.modal.text + '</p><div class="actions">' +
       '<button class="btn ghost" data-act="close">Anuluj</button><button class="btn danger" data-act="' + UI.modal.ok + '">' + UI.modal.okLabel + '</button></div>';
-    box.innerHTML = '<div class="dialog" role="dialog" aria-modal="true">' + inner + '</div>';
+    box.innerHTML = '<div class="dialog' + (UI.modal.type === 'report' ? ' chron' : '') + '" role="dialog" aria-modal="true">' + inner + '</div>';
     box.hidden = false;
     document.body.classList.add('modal-open');
     fitModal();
@@ -1555,6 +1583,7 @@
       case 'grid-toggle': MP.Map.toggleGrid(); break;
       case 'zoom-out': MP.Map.zoomBy(0.8); break;
       case 'center': { const v = cur(); if (v) MP.Map.centerOn(v.x, v.y); break; }
+      case 'select-cur': { const v = cur(); if (v) { UI.sel = { x: v.x, y: v.y }; MP.Map.setSelected(UI.sel); MP.Map.centerOn(v.x, v.y); renderDetails(); } break; }
       case 'attack-open':
         UI.atk = {};
         openModal('attack', { target: b.dataset.id, from: UI.vid });

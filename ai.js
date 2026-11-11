@@ -2,14 +2,27 @@
    Mini Plemiona – PRZECIWNICY AI
    Lokalny skrypt decyzyjny (bez zewnętrznych API). Wywoływany przez
    centralny procesor zdarzeń co C.AI.thinkInterval sekund czasu gry –
-   także wstecznie, gdy gra była zamknięta.
-   Każda frakcja: rozbudowuje, rekrutuje, atakuje i zdobywa wioski.
+   także wstecznie, gdy gra była zamknięta. Deterministyczny (E.rand).
+
+   Każda tura frakcji:
+   1. Gospodarka – kolejka budowy nigdy nie stoi: pilne potrzeby (farma,
+      magazyn) mają pierwszeństwo, na następny budynek odkładana jest rezerwa.
+   2. Wojsko – rekrutacja z nadwyżki ponad rezerwę; najpierw obrona domu do
+      progu zależnego od osobowości i wielkości wioski, potem armia.
+      Pełny magazyn = wydawanie wszystkiego, żeby nic się nie marnowało.
+   3. Obrona – wioska z nadciągającym atakiem dostaje posiłki z sąsiednich.
+   4. Rozrost – osadnicy, dowódcy podboju, dobijanie wiosek z obniżonym
+      poparciem.
+   5. Ataki – jedna lub dwie wyprawy naraz (osobowość), cele wybierane
+      według siły obrony, odległości, łupu i poparcia.
+   Wszystkie liczby: C.AI w config.js.
    ========================================================================= */
 (function (root) {
   'use strict';
   const MP = root.MP;
   const C = MP.CONFIG;
   const E = MP.Engine;
+  const T = () => C.AI.tactics;
 
   function pickWeighted(state, pairs) {
     const total = pairs.reduce((s, p) => s + p[1], 0);
@@ -18,38 +31,162 @@
     return pairs[pairs.length - 1][0];
   }
 
-  function noblesOf(state, v) {
-    let n = v.units.noble;
-    v.recruitQueue.forEach(e => { if (e.unit === 'noble') n += e.count - e.done; });
-    state.movements.forEach(m => { if (m.from === v.id && m.owner === v.owner) n += m.units.noble; });
+  function inProgress(state, v, unit) {
+    let n = v.units[unit] || 0;
+    v.recruitQueue.forEach(e => { if (e.unit === unit) n += e.count - e.done; });
+    state.movements.forEach(m => { if (m.from === v.id && m.owner === v.owner) n += m.units[unit] || 0; });
     return n;
   }
+  const noblesOf = (state, v) => inProgress(state, v, 'noble');
+  const settlersOf = (state, v) => inProgress(state, v, 'settler');
 
-  function settlersOf(state, v) {
-    let n = v.units.settler;
-    v.recruitQueue.forEach(e => { if (e.unit === 'settler') n += e.count - e.done; });
-    state.movements.forEach(m => { if (m.from === v.id && m.owner === v.owner) n += m.units.settler || 0; });
-    return n;
+  const storeRatio = v => { const cap = E.storageCap(v); return Math.max.apply(null, E.RES.map(r => v.res[r] / cap)); };
+  const popRatio = (state, v) => E.popUsed(state, v) / Math.max(1, E.popCap(v));
+  // Docelowa obrona domu: rośnie z rozbudową wioski (punkty) i zależy od osobowości.
+  const homeDefTarget = (v, P) => E.points(v) * P.homeDef;
+  const incomingOn = (state, v) => state.movements.filter(m => m.type === 'attack' && m.to === v.id && m.owner !== v.owner);
+
+  /* ---------- 1. gospodarka ---------- */
+  // Zwraca koszt budynku, na który wioska oszczędza (albo null, gdy coś zakolejkowała / nie ma czego budować).
+  function manageBuild(state, v, P, t) {
+    if (v.buildQueue.length >= T().buildQueue) return null;
+    const urgent = [];
+    if (popRatio(state, v) > T().farmUrgent) urgent.push('farm');
+    if (storeRatio(v) > T().storeUrgent) urgent.push('hq');
+    const weighted = Object.keys(P.buildWeights).map(k => {
+      const queued = v.buildQueue.filter(e => e.building === k).length;
+      return { k, score: (v.buildings[k] + queued) / P.buildWeights[k] + E.rand(state) * 0.15 };
+    }).sort((a, b) => a.score - b.score).map(o => o.k);
+    const order = urgent.concat(weighted.filter(k => urgent.indexOf(k) < 0));
+    for (let i = 0; i < order.length; i++) {
+      const k = order[i];
+      const info = E.buildInfo(state, v, k);
+      if (info.ok) { E.queueBuild(state, v, k, t); return null; }
+      // Blokuje Ratusz (limit poziomu albo za mały magazyn) – Ratusz wskakuje na następną pozycję.
+      if ((info.code === 'hq' || info.code === 'storage') && order.indexOf('hq', i + 1) !== i + 1) order.splice(i + 1, 0, 'hq');
+      if (info.code === 'resources') return info.cost;
+    }
+    return null;
   }
 
+  /* ---------- 2. wojsko ---------- */
+  function manageRecruit(state, v, P, t, reserve, owned) {
+    if (v.recruitQueue.length >= T().recruitQueue) return;
+    const X = E.diff(state).aiExpand;
+    const full = storeRatio(v) > T().storeSpend;
+
+    // dowódca podboju
+    if (P.nobles && v.buildings.barracks >= C.UNITS.noble.barracks && noblesOf(state, v) === 0 && owned < Math.ceil(P.maxVillages * X) &&
+        E.villageDefense(v) >= homeDefTarget(v, P) * 0.6) {
+      const ri = E.recruitInfo(state, v, 'noble');
+      if (ri.ok && ri.max >= 1) { E.queueRecruit(state, v, 'noble', 1, t); return; }
+      if (ri.code === 'resources' && !full && E.rand(state) < 0.5) return; // odkłada surowce na dowódcę
+    }
+    // osadnik: rozrost na wolne ziemie
+    if (P.settle && v.buildings.hq >= C.UNITS.settler.hq && owned < Math.ceil((P.settleMax || P.maxVillages) * X) && settlersOf(state, v) === 0 &&
+        !state.movements.some(m => m.type === 'settle' && m.owner === v.owner) && E.rand(state) < T().settleChance) {
+      const si = E.recruitInfo(state, v, 'settler');
+      if (si.ok && si.max >= 1) { E.queueRecruit(state, v, 'settler', 1, t); return; }
+      if (si.code === 'resources' && !full) return; // odkłada surowce na osadnika
+    }
+
+    const def = E.villageDefense(v);
+    const threatened = incomingOn(state, v).length > 0;
+    const needDef = def < homeDefTarget(v, P) * (threatened ? 1.5 : 1);
+    const pool = Object.keys(C.UNITS).filter(u => {
+      const U = C.UNITS[u];
+      if (U.conquer || U.settler || v.buildings.barracks < U.barracks) return false;
+      if (u === 'scout' && inProgress(state, v, 'scout') >= T().scoutCap) return false;
+      if (U.wallPower && E.ramCount(v.units) >= T().siegeCap) return false;
+      return needDef ? U.role === 'def' : (P.unitWeights[u] || 0) > 0;
+    });
+    if (!pool.length) return;
+    const unit = pickWeighted(state, pool.map(k => [k, needDef ? (P.unitWeights[k] || 0) + 1 : P.unitWeights[k]]));
+    const U = C.UNITS[unit];
+    const ri = E.recruitInfo(state, v, unit);
+    if (!ri.ok) return;
+    // budżet: nadwyżka ponad rezerwę na budynek; przy pełnym magazynie albo zagrożeniu – wszystko
+    const share = full || threatened ? 1 : P.recruitShare;
+    const byBudget = Math.min.apply(null, E.RES.map(r => Math.floor(Math.max(0, v.res[r] - (reserve && !full && !threatened ? reserve[r] : 0)) * share / Math.max(1, U.cost[r]))));
+    const n = Math.min(ri.max, byBudget, unit === 'scout' ? 3 : U.wallPower ? 5 : C.AI.maxOrder);
+    if (n >= 1) E.queueRecruit(state, v, unit, n, t);
+  }
+
+  /* ---------- 3. obrona: posiłki dla zagrożonej wioski ---------- */
+  function sendReinforcements(state, fid, vs, P, t) {
+    if (vs.length < 2) return;
+    for (const v of vs) {
+      const inc = incomingOn(state, v);
+      if (!inc.length) continue;
+      if (state.movements.some(m => m.type === 'support' && m.owner === fid && m.to === v.id)) continue; // już ktoś idzie
+      const first = Math.min.apply(null, inc.map(m => m.arrive));
+      const helpers = vs.filter(o => o.id !== v.id && E.dist(o, v) <= T().supportRange && !incomingOn(state, o).length)
+        .sort((a, b) => E.dist(a, v) - E.dist(b, v));
+      for (const h of helpers) {
+        const spare = E.emptyUnits();
+        let any = 0;
+        // oddaje część obrońców ponad własne minimum
+        const keep = homeDefTarget(h, P) * 0.7, hdef = E.villageDefense(h);
+        if (hdef <= keep) continue;
+        const frac = Math.min(T().supportShare, (hdef - keep) / hdef);
+        Object.keys(C.UNITS).forEach(k => { if (C.UNITS[k].role === 'def') { spare[k] = Math.floor(h.units[k] * frac); any += spare[k]; } });
+        if (any < 5) continue;
+        if (t + E.travelTime(h, v, spare) > first) continue; // nie zdąży
+        const room = E.supportRoom(state, v);
+        if (E.unitsPop(spare) > room) {
+          const scale = room / Math.max(1, E.unitsPop(spare));
+          Object.keys(spare).forEach(k => { spare[k] = Math.floor(spare[k] * scale); });
+          if (E.sumUnits(spare) < 5) continue;
+        }
+        if (E.sendSupport(state, h.id, v.id, spare, t, 'stay').ok) break;
+      }
+    }
+  }
+
+  /* ---------- 3b. zbiórka: jednostki ataku z zaplecza ściągane do wioski frontowej ---------- */
+  // Rozproszona armia nie zdobędzie silnie bronionej wioski – frakcja co jakiś czas skupia ją w jednym miejscu.
+  function gatherArmy(state, fid, vs, P, t) {
+    if (!P.gatherChance || vs.length < 3 || E.rand(state) >= P.gatherChance) return;
+    const front = vs.slice().sort((a, b) => E.attackPower(b.units) - E.attackPower(a.units))[0];
+    if (incomingOn(state, front).length) return;
+    let room = E.supportRoom(state, front);
+    for (const o of vs) {
+      if (o.id === front.id || room < 20 || E.dist(o, front) > T().gatherRange || incomingOn(state, o).length) continue;
+      if (state.movements.some(m => m.from === o.id && m.owner === fid && m.type === 'attack')) continue;
+      const u = E.emptyUnits();
+      Object.keys(C.UNITS).forEach(k => { const U = C.UNITS[k]; if (U.role !== 'def' && !U.conquer && !U.settler && !U.scout) u[k] = o.units[k]; });
+      if (E.attackPower(u) < P.minPower) continue;
+      const pop = E.unitsPop(u);
+      if (pop > room) { const sc = room / pop; Object.keys(u).forEach(k => { u[k] = Math.floor(u[k] * sc); }); }
+      if (E.sumUnits(u) < 10) continue;
+      if (E.sendSupport(state, o.id, front.id, u, t, 'stay').ok) room -= E.unitsPop(u);
+    }
+  }
+
+  /* ---------- 4. rozrost ---------- */
   function trySettle(state, v, t) {
     if (v.units.settler < 1) return;
     const N = state.map.size;
     const zone = E.diff(state).playerZone, players = E.villagesOf(state, 'player');
+    const R = Math.ceil(T().settleRange); // tylko okno wokół wioski – nie cała mapa (wydajność na dużych światach)
+    // wioski w pobliżu liczone raz, zamiast przeglądać wszystkie dla każdego pola
+    const near = Object.values(state.villages).filter(o => Math.abs(o.x - v.x) <= R + 3 && Math.abs(o.y - v.y) <= R + 3);
     let best = null;
-    for (let y = 0; y < N; y++) {
-      for (let x = 0; x < N; x++) {
-        const d = E.dist(v, { x, y });
-        if (d < 1.5 || d > 4.5) continue;
-        if (E.settleCheck(state, x, y)) continue;
-        if (zone && players.some(pv => E.dist(pv, { x, y }) <= zone)) continue;
+    for (let y = Math.max(0, v.y - R); y <= Math.min(N - 1, v.y + R); y++) {
+      for (let x = Math.max(0, v.x - R); x <= Math.min(N - 1, v.x + R); x++) {
+        const p = { x, y }, d = E.dist(v, p);
+        if (d < 1.5 || d > T().settleRange) continue;
+        const tile = E.tileAt(state, x, y);
+        if (tile.village || tile.terrain !== 'plain') continue;
+        if (near.some(o => E.dist(o, p) < C.SETTLE.minDistance)) continue;
+        if (zone && players.some(pv => E.dist(pv, p) <= zone)) continue;
         if (state.movements.some(m => m.type === 'settle' && m.x === x && m.y === y)) continue;
-        const crowd = Object.values(state.villages).filter(o => E.dist(o, { x, y }) < 2.5).length;
+        const crowd = near.filter(o => E.dist(o, p) < 2.5).length;
         const score = d + crowd * 1.5 + E.rand(state);
         if (!best || score < best.score) best = { x, y, score };
       }
     }
-    if (best) E.sendSettler(state, v.id, best.x, best.y, t);
+    if (best && !E.settleCheck(state, best.x, best.y)) E.sendSettler(state, v.id, best.x, best.y, t);
   }
 
   function trySpy(state, v, P, t) {
@@ -61,94 +198,64 @@
     E.sendSpy(state, v.id, target.id, Math.min(v.units.scout, 3), t);
   }
 
-  // Buduje to, czego ma najmniej względem wag osobowości.
-  function manageBuild(state, v, P, t) {
-    if (v.buildQueue.length >= 2) return;
-    const order = Object.keys(P.buildWeights).map(k => {
-      const queued = v.buildQueue.filter(e => e.building === k).length;
-      return { k, score: (v.buildings[k] + queued) / P.buildWeights[k] };
-    }).sort((a, b) => a.score - b.score);
-    for (const o of order) {
-      const info = E.buildInfo(state, v, o.k);
-      if (info.ok) { E.queueBuild(state, v, o.k, t); return; }
-      if (info.code === 'resources') return; // oszczędza na najważniejszy budynek
-    }
-  }
-
-  function manageRecruit(state, v, P, t) {
-    if (v.recruitQueue.length >= 2) return;
-    const owned = E.villagesOf(state, v.owner).length;
-    const X = E.diff(state).aiExpand;
-    if (P.nobles && v.buildings.barracks >= C.UNITS.noble.barracks && noblesOf(state, v) === 0 && owned < Math.ceil(P.maxVillages * X)) {
-      const ri = E.recruitInfo(state, v, 'noble');
-      if (ri.ok && ri.max >= 1) { E.queueRecruit(state, v, 'noble', 1, t); return; }
-      if (E.rand(state) < 0.6) return; // odkłada surowce na dowódcę
-    }
-    // osadnik: rozrost na wolne ziemie
-    if (P.settle && v.buildings.hq >= C.UNITS.settler.hq && owned < Math.ceil((P.settleMax || P.maxVillages) * X) && settlersOf(state, v) === 0 &&
-        state.movements.filter(m => m.type === 'settle' && m.owner === v.owner).length === 0 && E.rand(state) < 0.5) {
-      const si = E.recruitInfo(state, v, 'settler');
-      if (si.ok && si.max >= 1) { E.queueRecruit(state, v, 'settler', 1, t); return; }
-      if (si.code === 'resources') return; // odkłada surowce na osadnika
-    }
-    // zwiadowców wystarczy kilku
-    const scoutCap = 6;
-    const siegeCap = 20;
-    const unlocked = Object.keys(C.UNITS).filter(u => !C.UNITS[u].conquer && !C.UNITS[u].settler &&
-      v.buildings.barracks >= C.UNITS[u].barracks && (P.unitWeights[u] || 0) > 0 &&
-      !(u === 'scout' && v.units.scout >= scoutCap) && !(C.UNITS[u].wallPower && E.ramCount(v.units) >= siegeCap));
-    if (!unlocked.length) return;
-    const unit = pickWeighted(state, unlocked.map(k => [k, P.unitWeights[k]]));
-    const U = C.UNITS[unit];
-    const ri = E.recruitInfo(state, v, unit);
-    if (!ri.ok) return;
-    const byBudget = Math.min.apply(null, E.RES.map(r => Math.floor(v.res[r] * P.recruitShare / U.cost[r])));
-    const n = Math.min(ri.max, byBudget, unit === 'scout' ? 3 : U.wallPower ? 5 : C.AI.maxOrder);
-    if (n >= 1) E.queueRecruit(state, v, unit, n, t);
-  }
-
-  function tryAttack(state, v, P, t) {
-    if (state.movements.some(m => m.from === v.id && m.type === 'attack')) return; // jedna wyprawa naraz
+  /* ---------- 5. ataki ---------- */
+  function tryAttack(state, v, P, t, owned, playerAll) {
+    const out = state.movements.filter(m => m.from === v.id && m.type === 'attack' && m.owner === v.owner).length;
+    if (out >= (P.waves || 1)) return;
+    if (incomingOn(state, v).length) return; // nie wysyła wojska, gdy samo jest atakowane
+    // obrońców zostawia tyle, żeby dom nie został pusty
     const send = E.emptyUnits();
+    const target0 = homeDefTarget(v, P);
     Object.keys(C.UNITS).forEach(k => {
       const U = C.UNITS[k];
       if (U.conquer || U.settler || U.scout) return;
       send[k] = U.role === 'def' ? Math.floor(v.units[k] * (1 - P.keepHome)) : v.units[k];
     });
+    const left = E.emptyUnits();
+    Object.keys(C.UNITS).forEach(k => { left[k] = v.units[k] - send[k]; });
+    if (E.defenseFrom(left, v.buildings.wall, E.upgradesOf(state, v.owner)) < target0 * 0.5) {
+      Object.keys(C.UNITS).forEach(k => { if (C.UNITS[k].role === 'def') send[k] = 0; }); // tylko jednostki ataku
+    }
     const A = E.attackPower(send);
-    if (A < P.minPower) return;
+    // armia zbiera się do sensownej wielkości (rośnie z rozbudową wioski) – zamiast wysyłać garstki co turę
+    if (A < P.minPower + E.points(v) * T().powerPerPoint) return;
 
     const D = E.diff(state);
     const minutes = (t - state.created) / 60000;
     const grace = minutes < D.graceMinutes;
     const cooldown = D.hitCooldownMin * 60000;
-    const owned = E.villagesOf(state, v.owner).length;
+    const cap = Math.ceil(P.maxVillages * D.aiExpand);
     const canTakeAny = P.targets === 'any' || minutes >= P.anyAfterMin;
-    const playerAll = E.villagesOf(state, 'player');
-    const playerVs = grace ? playerAll : [];
+    const busy = new Set(state.movements.filter(m => m.type === 'attack' && m.owner === v.owner).map(m => m.to));
     let best = null;
     for (const id in state.villages) {
       const target = state.villages[id];
-      if (target.owner === v.owner) continue;
+      if (target.owner === v.owner || busy.has(id)) continue;
       if (target.owner !== null && !canTakeAny) continue;
-      if (target.owner === null && owned >= Math.ceil(P.maxVillages * D.aiExpand)) continue;
+      if (target.owner === null && owned >= cap) continue;
       if (target.owner === null && D.playerZone && playerAll.some(pv => E.dist(pv, target) <= D.playerZone)) continue;
       if (target.owner === 'player' && (grace || (state.lastHit && t - (state.lastHit[target.id] || -1e15) < cooldown))) continue;
       const d = E.dist(v, target);
       if (d > P.range) continue;
       // okres ochronny: osady bliższe graczowi zostają dla niego
-      if (grace && target.owner === null && playerVs.some(pv => E.dist(pv, target) < d)) continue;
+      if (grace && target.owner === null && playerAll.some(pv => E.dist(pv, target) < d)) continue;
       E.tickVillage(state, target, t);
       const wall = Math.max(0, target.buildings.wall - Math.floor(E.ramCount(send) / C.RAM.fightPerLevel));
       const Dv = E.villageDefense(target, wall, E.upgradesOf(state, target.owner));
       if (A < Dv * P.attackRatio * (target.owner === 'player' ? D.aiCaution : 1)) continue;
       let w = 1 / (1 + d);
+      w *= 1 + Math.min(2, (target.res.wood + target.res.clay + target.res.iron) / T().lootScale); // łup
+      w *= 1 + Math.min(1, A / Math.max(1, Dv) / 6);                                              // łatwy cel
       if (target.owner === null) w *= P.neutralBias;
-      else if (target.owner === 'player') w *= P.playerBias * D.playerBias;
+      else {
+        if (target.owner === 'player') w *= P.playerBias * D.playerBias;
+        if (P.nobles && target.loyalty != null && target.loyalty < 100) w *= 1 + (100 - target.loyalty) / 25; // dobijanie podboju
+        if (P.nobles && v.units.noble > 0 && owned < cap) w *= 1.5;
+      }
       if (!best || w > best.w) best = { target, w };
     }
     if (!best) return;
-    if (best.target.owner !== null && P.nobles && v.units.noble > 0) send.noble = 1;
+    if (best.target.owner !== null && P.nobles && v.units.noble > 0 && owned < cap) send.noble = 1;
     E.sendAttack(state, v.id, best.target.id, send, t);
   }
 
@@ -158,13 +265,16 @@
     const vs = E.villagesOf(state, fid);
     for (const v of vs) {
       E.tickVillage(state, v, t);
-      manageBuild(state, v, P, t);
-      manageRecruit(state, v, P, t);
+      const reserve = manageBuild(state, v, P, t);
+      manageRecruit(state, v, P, t, reserve, vs.length);
     }
+    sendReinforcements(state, fid, vs, P, t);
+    gatherArmy(state, fid, vs, P, t);
+    const playerAll = E.villagesOf(state, 'player');
     for (const v of vs) {
       if (P.settle) trySettle(state, v, t);
       trySpy(state, v, P, t);
-      if (E.rand(state) < P.attackChance * E.diff(state).aiAggro) tryAttack(state, v, P, t);
+      if (E.rand(state) < P.attackChance * E.diff(state).aiAggro) tryAttack(state, v, P, t, vs.length, playerAll);
     }
   }
 
