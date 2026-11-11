@@ -623,7 +623,7 @@
     if (!UI.modal || UI.modal.type !== 'report') return;
     const list = filteredReports(st()), i = list.findIndex(r => r.id === UI.modal.id), n = list[i + d];
     if (!n) return;
-    G.action(s => { const r = s.reports.find(x => x.id === n.id); if (r) r.read = true; }, { allowPaused: true });
+    MP.Game.action(s => { const r = s.reports.find(x => x.id === n.id); if (r) r.read = true; }, { allowPaused: true });
     openModal('report', { id: n.id });
     const dlg = document.querySelector('#modal .dialog');
     if (dlg) dlg.scrollTop = 0;

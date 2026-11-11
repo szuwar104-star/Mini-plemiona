@@ -1,5 +1,5 @@
 /* Service Worker Mini Plemiona: tryb offline. Po zmianie plików gry podnieś wersję CACHE. */
-const CACHE = 'mini-plemiona-v15';
+const CACHE = 'mini-plemiona-v16';
 const FILES = ['./', 'index.html', 'style.css', 'manifest.json', 'config.js', 'engine.js', 'ai.js', 'database.js',
   'sprites.js', 'art.js', 'map.js', 'ui.js', 'game.js',
   'assets/icon-192.png', 'assets/icon-512.png', 'assets/icon-maskable-512.png', 'assets/favicon.png'];
