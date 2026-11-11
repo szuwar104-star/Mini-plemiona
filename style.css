@@ -706,6 +706,7 @@ table.units.rep td.zero { color: var(--muted); opacity: .5; }
 
 /* ---------- zbieranie / rozdzielanie surowców ---------- */
 .seg { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: .6rem; }
+.seg button { flex: 1 1 11rem; }
 .gopts { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem 1rem; align-items: start; }
 .gres { display: flex; flex-wrap: wrap; gap: .3rem .9rem; margin-top: .2rem; }
 .chk { display: inline-flex; align-items: center; gap: .4rem; font-weight: 700; font-size: .85rem; color: var(--text); cursor: pointer; }
@@ -714,6 +715,30 @@ table.gather tr.skipped td { opacity: .6; }
 table.gather td small { color: var(--muted); margin-left: .35rem; }
 .summary .wide { grid-column: 1 / -1; }
 @media (max-width: 640px) { .gopts { grid-template-columns: 1fr; } }
+
+/* Tabele planu (zbieranie surowców/wojska, szkolenie zbiorcze): na telefonie wiersz = karta */
+@media (max-width: 760px) {
+  .tablewrap:has(table.gather) { overflow: visible; }
+  table.gather, table.gather tbody, table.gather tr, table.gather td { display: block; }
+  table.gather thead { display: none; }
+  table.gather tr {
+    display: grid; grid-template-columns: 2rem 1fr auto auto; align-items: center; gap: .3rem .6rem;
+    padding: .65rem .2rem; border-bottom: 1px solid var(--line);
+  }
+  table.gather td { padding: 0 !important; border: 0 !important; background: transparent !important; white-space: normal; text-align: left; }
+  table.gather td.g-chk { grid-column: 1; }
+  table.gather td.g-name { grid-column: 2; font-weight: 700; }
+  table.gather td.g-name small { display: inline; }
+  table.gather td.g-res { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: .25rem 0; }
+  table.gather td.g-res .uchip { margin-right: .3rem; }
+  table.gather td.g-merch, table.gather td.g-time { text-align: right; font-size: .85rem; color: var(--muted); }
+  table.gather td.g-merch { grid-column: 3; grid-row: 1; }
+  table.gather td.g-time { grid-column: 4; grid-row: 1; }
+  table.gather td.g-merch:empty, table.gather td.g-time:empty { display: none; }
+  table.gather td[data-l]:not(:empty)::before { content: attr(data-l) ": "; font-weight: 400; }
+  /* gdy brak kupców (wiersz pominięty) nazwa może zająć całą szerokość */
+  table.gather tr.skipped td.g-res { opacity: .8; }
+}
 
 /* ---------- telefon: czytelność i wygoda dotyku ---------- */
 @media (max-width: 760px) {
