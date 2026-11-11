@@ -1,4 +1,4 @@
-/* Test balansu kosztów jednostek, Łucznika i odporności wczytywania zapisów: node tests/units.js */
+/* Test balansu kosztów jednostek, ataku i obrony (Łucznik, Tarczownik) i odporności wczytywania zapisów: node tests/units.js */
 'use strict';
 require('../config.js'); require('../engine.js'); require('../ai.js'); require('../database.js');
 const E = MP.Engine, C = MP.CONFIG, DB = MP.DB;
@@ -31,6 +31,7 @@ const share = (o, r) => o[r] / total(o);
 const armies = {
   'atak (topornicy, kawaleria, tarany)': { spear: 40, axe: 120, light: 20, ram: 6, scout: 3 },
   'obrona (piki i łucznicy)': { spear: 120, archer: 120, axe: 20, scout: 3 },
+  'obrona z Tarczownikami': { spear: 60, archer: 60, guard: 80, axe: 20, scout: 3 },
   'mieszana': { spear: 80, archer: 60, axe: 80, light: 10, ram: 4, scout: 3 }
 };
 Object.keys(armies).forEach(name => {
@@ -47,6 +48,28 @@ const A = C.UNITS.archer, S = C.UNITS.spear;
 ok(A.cost.iron <= S.cost.iron / 1.3 && dom.archer === 'wood', 'Łucznik: mniej żelaza niż Pikinier, przewaga drewna');
 ok(A.def / total(A.cost) <= S.def / total(S.cost) + 0.001, 'obrona Łucznika nie jest tańsza na surowiec niż Pikiniera');
 
+/* ---------- balans ataku i obrony ---------- */
+// Obrońca dzieli budżet B między mur i najlepszą obronę, atakujący wydaje całe B na toporników (bez rozpędu AI i szczęścia).
+// Cel: przy tych samych nakładach atak i obrona są blisko równowagi (atak nie jest o ~30% silniejszy jak przed Tarczownikiem).
+const Wl = C.BUILDINGS.wall, GU = C.UNITS.guard, AX = C.UNITS.axe;
+const wallCum = L => { let t = 0; for (let i = 1; i <= L; i++) t += Wl.cost.wood[i] + Wl.cost.clay[i] + Wl.cost.iron[i]; return t; };
+function ratioAt(B, unit) {
+  let bestD = 0;
+  for (let L = 0; L <= C.MAX_LEVEL && wallCum(L) <= B; L++) {
+    const D = ((B - wallCum(L)) / total(unit.cost) * unit.def + C.COMBAT.baseDefense + Wl.flat[L]) * (1 + Wl.bonus[L]);
+    bestD = Math.max(bestD, D);
+  }
+  return B / total(AX.cost) * AX.att / bestD;
+}
+ok(GU && GU.role === 'def' && GU.barracks === 3 && GU.pop === 1, 'Tarczownik: jednostka obronna, Koszary 3, 1 miejsce na farmie');
+ok(GU.def / GU.pop > A.def / A.pop * 1.5 && GU.def / GU.pop > AX.att / AX.pop, 'Tarczownik: obrona na miejsce farmy wyższa niż atak Toporników i ≥1,5× Łucznika');
+ok(GU.def / total(GU.cost) > S.def / total(S.cost) && GU.att <= 25, 'Tarczownik: lepszy od Pikiniera na surowiec, a słaby w ataku');
+[6000, 12000, 25000].forEach(B => {
+  const r = ratioAt(B, GU);
+  ok(r >= 0.85 && r <= 1.15, 'budżet ' + B + ': atak/obrona z Tarczownikiem = ' + r.toFixed(2) + ' (cel 0,85–1,15; z samymi Pikinierami ' + ratioAt(B, S).toFixed(2) + ')');
+});
+ok(ratioAt(150000, GU) >= 0.6, 'budżet 150000: obrona nie jest nie do zdobycia (atak/obrona ' + ratioAt(150000, GU).toFixed(2) + ' ≥ 0,6)');
+
 /* ---------- nowa gra i rekrutacja ---------- */
 const s = E.newGame(0, 7, 'normal');
 const v = E.villagesOf(s, 'player')[0];
@@ -57,6 +80,9 @@ const r = E.queueRecruit(s, v, 'archer', 6, 0);
 ok(r.ok && Math.round(v.res.iron) === 100 - 6 * A.cost.iron, 'rekrutacja 6 Łuczników kosztuje ' + 6 * A.cost.iron + ' żelaza');
 v.buildings.barracks = 1;
 ok(E.recruitInfo(s, v, 'archer').code === 'locked', 'Łucznik zablokowany do Koszar 2');
+ok(E.recruitInfo(s, v, 'guard').code === 'locked', 'Tarczownik zablokowany do Koszar 3');
+v.buildings.barracks = 3; v.res = { wood: 5000, clay: 5000, iron: 5000 };
+ok(E.queueRecruit(s, v, 'guard', 5, 0).ok, 'Tarczownik rekrutuje się w Koszarach 3');
 ok(E.ramCount({ ram: 8 }) === 8, 'ramCount liczy tarany');
 
 /* ---------- odporność wczytywania zapisów ---------- */
@@ -105,6 +131,9 @@ E.advance(sim, 12 * 3600 * 1000);
 let archers = 0;
 Object.values(sim.villages).forEach(x => { if (x.owner && x.owner !== 'player') archers += x.units.archer; });
 ok(archers > 0, 'po 12 h AI ma w armiach ' + archers + ' Łuczników');
+let guards = 0;
+Object.values(sim.villages).forEach(x => { if (x.owner && x.owner !== 'player') guards += x.units.guard; });
+ok(guards > 0, 'po 12 h AI ma w armiach ' + guards + ' Tarczowników');
 ok(finiteState(sim), 'symulacja 12 h: brak NaN i ujemnych wartości');
 
 console.log(fails ? '\nNIEPOWODZENIE: ' + fails : '\nWszystkie testy jednostek przeszły.');

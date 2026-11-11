@@ -48,6 +48,7 @@ Serwer jest potrzebny do działania jako PWA (Service Worker, instalacja, tryb o
    |---|---|---|
    | Pikinier | 37 / 38 / 21 | glina |
    | Łucznik (Koszary 2, atak 15, obrona 28) | 60 / 40 / 15 | drewno |
+   | Tarczownik (Koszary 3, atak 20, obrona 48) | 45 / 50 / 60 | żelazo |
    | Topornik | 44 / 30 / 39 | drewno |
    | Zwiadowca | 25 / 55 / 21 | glina |
    | Lekka kawaleria | 100 / 90 / 170 | żelazo |
@@ -57,6 +58,7 @@ Serwer jest potrzebny do działania jako PWA (Service Worker, instalacja, tryb o
 
    Dzięki temu możesz sterować tym, czego zużywasz najwięcej: Łucznicy i Topornicy są „drewniani”, Pikinierzy, tarany i dowódcy „gliniani”, a tylko kawaleria jest „żelazna”. AI korzysta z tych samych kosztów. Wszystkie liczby w `UNITS` w `config.js`; testy: `node tests/units.js`.
 18. **Pokonani i ranking** – za zniszczone jednostki wroga dostajesz punkty (koszt jednostki / `SCORE.costDivisor`, tak jak punkty wojska), osobno za atak i za obronę. Liczą się też zwiadowcy zabici przy obronie przed szpiegami. Punkty widać w raporcie bitwy („Punkty za pokonanych”), na ekranie Wojsko, w Mocy konta i w panelu bocznym. W Menu jest ranking wszystkich frakcji z zakładkami Pokonani, Budynki i Wioski oraz Twoim miejscem. Ranking nie zdradza siły wojska frakcji AI. Stare zapisy zaczynają z zerem (bitwy z przeszłości nie są liczone wstecz). Test: `node tests/ranking.js`.
+19. **Rebalans ataku i obrony** – przy tych samych nakładach atak był ok. 30% silniejszy od obrony: Pikinier daje 26 obrony na 100 surowców, a Topornik 35 ataku, na miejsce farmy 25–28 obrony przeciw 40 ataku, a żadna jednostka obronna nie odblokowywała się wyżej niż w Koszarach 2. Dodano **Tarczownika** (Koszary 3, obrona 48 na jedno miejsce na farmie, atak 20) – dzięki niemu przy budżecie 6–25 tys. surowców (obrona + mur kontra sam atak Toporników) stosunek ataku do obrony wynosi ok. 1,1–0,9 zamiast 1,3–1,1. Atakujący zachowuje inicjatywę, szybkość i łupy, a tarany nadal kruszą mur. AI buduje Tarczowników zależnie od osobowości (najchętniej obronna). Zapisy wczytują się bez migracji (brakujące jednostki dostają 0). Test: `node tests/units.js`.
 16. **Czytelniejsza grafika** – przerysowane ikony wojsk (16×16 px), większe proporce właścicieli i cień pod osadami na mapie; tabela bitwy w raportach mieści się na telefonie.
 
 Wolną osadę przejmujesz, wygrywając bitwę. Wioskę frakcji AI – wysyłając Dowódcę podboju: każda wygrana z żywym dowódcą obniża poparcie o 25–40%, przy 0% wioska jest Twoja. Przez pierwsze 10 minut AI nie atakuje gracza i nie zabiera osad leżących bliżej Ciebie.
