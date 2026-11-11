@@ -213,6 +213,8 @@
     BUILD_TEMPLATES: {
       eco:   { label: 'Gospodarka', desc: 'Tartak, Cegielnia, Kopalnia i Ratusz do 10, Farma do 8.',
                items: [['wood', 10], ['clay', 10], ['iron', 10], ['hq', 10], ['farm', 8]] },
+      res:   { label: 'Surowce', desc: 'Tylko Tartak, Cegielnia i Kopalnia do 10, po równo. Bez Ratusza: wioska zatrzyma się na poziomie Ratusza + 2.',
+               items: [['wood', 10], ['clay', 10], ['iron', 10]] },
       army:  { label: 'Wojsko', desc: 'Koszary, Farma i Mur do 10, Ratusz do 8.',
                items: [['barracks', 10], ['farm', 10], ['wall', 10], ['hq', 8]] },
       trade: { label: 'Handel', desc: 'Targowisko do 10 (kupcy i monety), Ratusz do 8.',
