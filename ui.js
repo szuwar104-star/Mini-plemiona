@@ -205,38 +205,14 @@
       } else {
         html += '<p class="done">Maksymalny poziom</p>';
       }
+      if (k === 'smithy' && lv > 0) {
+        if (v.upgrade) html += '<p class="effect">Badanie: ' + C.UNITS[v.upgrade.unit].name + ' → poz. ' + v.upgrade.level + ' <span class="timer" data-end="' + v.upgrade.end + '"></span></p>';
+        html += '<button class="btn ghost" data-act="smithy-open">' + ico(S.building.smithy) + 'Ulepszenia jednostek</button>';
+      }
       if (k === 'market' && lv > 0) html += '<button class="btn ghost" data-act="exchange-open">' + ico('merchant') + 'Wymień surowce</button>';
       html += '</div></article>';
     });
-    el.innerHTML = html + '</div>' + smithyPanel(v);
-  }
-
-  function smithyPanel(v) {
-    const s = st();
-    if (!(v.buildings.smithy > 0)) return '';
-    const ups = E.upgradesOf(s, 'player') || {};
-    let h = '<section class="panel" id="smithy-panel"><h2>' + ico(S.building.smithy) + 'Kuźnia – ulepszenia jednostek <small>poz. ' + v.buildings.smithy + '</small></h2>';
-    if (v.upgrade) {
-      const e = v.upgrade;
-      h += '<ul class="queue"><li>' + ico(S.building.smithy) + '<span class="qname">' + C.UNITS[e.unit].name + ' – ulepszenie poz. ' + e.level + '</span>' +
-        '<span class="bar"><i data-ps="' + e.start + '" data-pe="' + e.end + '" style="width:' + pct(e.start, e.end) + '%"></i></span>' +
-        '<span class="timer" data-end="' + e.end + '"></span></li></ul>';
-    } else h += '<p class="muted">Kuźnia jest wolna. Ulepszenia działają w całym plemieniu.</p>';
-    h += '<div class="bgrid">';
-    C.SMITHY.units.forEach(u => {
-      const info = E.upgradeInfo(s, v, u), lvl = ups[u] || 0, U = C.UNITS[u];
-      h += '<article class="bcard panel"><div class="bicon">' + S.icon(u) + '</div><div class="bbody"><h3>' + U.name + ' <span class="lvl">' + lvl + '<small>/' + C.MAX_LEVEL + '</small></span></h3>' +
-        '<p class="effect">Atak i obrona +' + Math.round(lvl * C.SMITHY.bonusPerLevel * 100) + '%' +
-        (info.code === 'max' ? '' : ' → +' + Math.round(info.target * C.SMITHY.bonusPerLevel * 100) + '%') + '</p>';
-      if (info.code === 'max') h += '<p class="done">Maksymalny poziom</p>';
-      else {
-        h += costChips(v, info.cost) + '<button class="btn" data-act="upgrade" data-u="' + u + '"' + (info.ok ? '' : ' disabled') + '>' +
-          'Ulepsz do poz. ' + info.target + ' <small>' + dur(info.time) + '</small></button>';
-        if (!info.ok) h += '<p class="why">' + info.reason + '</p>';
-      }
-      h += '</div></article>';
-    });
-    return h + '</div></section>';
+    el.innerHTML = html + '</div>';
   }
 
   function noVillages() {
@@ -784,6 +760,35 @@
       '</tbody></table></div><div id="formSummary" class="summary"></div>' +
       '<div class="actions"><button class="btn ghost" data-act="close">Anuluj</button><button class="btn" data-act="send-transport">Wyślij kupców</button></div>';
   }
+  /* ---------- okno: Kuźnia (ulepszenia jednostek) ---------- */
+  function smithyModal() {
+    const s = st(), v = s.villages[UI.modal.from];
+    E.tickVillage(s, v, s.now);
+    const ups = E.upgradesOf(s, 'player') || {}, pc = n => Math.round(n * C.SMITHY.bonusPerLevel * 100);
+    let h = '<h2>' + ico(S.building.smithy) + 'Kuźnia – ' + esc(v.name) + ' <small>poz. ' + v.buildings.smithy + '</small></h2>' +
+      '<p class="muted">Ulepszenia działają w całym plemieniu. Każdy poziom: +' + pc(1) + '% ataku i obrony. Jedno badanie naraz w wiosce.</p>';
+    if (v.upgrade) {
+      const e = v.upgrade;
+      h += '<ul class="queue"><li>' + ico(S.building.smithy) + '<span class="qname">' + C.UNITS[e.unit].name + ' – poz. ' + e.level + '</span>' +
+        '<span class="bar"><i data-ps="' + e.start + '" data-pe="' + e.end + '" style="width:' + pct(e.start, e.end) + '%"></i></span>' +
+        '<span class="timer" data-end="' + e.end + '"></span></li></ul>';
+    }
+    h += '<div class="upg-list">';
+    C.SMITHY.units.forEach(u => {
+      const info = E.upgradeInfo(s, v, u), lvl = ups[u] || 0;
+      h += '<div class="upg-row"><div class="bicon">' + S.icon(u) + '</div>' +
+        '<div class="upg-main"><b>' + C.UNITS[u].name + '</b><span class="lvl">' + lvl + '<small>/' + C.MAX_LEVEL + '</small></span>' +
+        '<span class="muted">+' + pc(lvl) + '%' + (info.code === 'max' ? '' : ' → +' + pc(info.target) + '%') + '</span></div>';
+      if (info.code === 'max') h += '<p class="done upg-cost">Maksymalny poziom</p>';
+      else {
+        h += '<div class="upg-cost">' + costChips(v, info.cost) + '</div>' +
+          '<button class="btn upg-btn" data-act="upgrade" data-u="' + u + '"' + (info.ok ? '' : ' disabled') + '>Ulepsz<small>' + dur(info.time) + '</small></button>';
+        if (!info.ok && !['busy', 'resources'].includes(info.code)) h += '<p class="why upg-why">' + info.reason + '</p>';
+      }
+      h += '</div>';
+    });
+    return h + '</div><div class="actions"><button class="btn ghost" data-act="close">Zamknij</button></div>';
+  }
   /* ---------- okno: wymiana surowców (Targowisko) ---------- */
   function exchangeModal() {
     const s = st(), m = UI.modal, v = s.villages[m.from];
@@ -1118,6 +1123,7 @@
     else if (UI.modal.type === 'spy') inner = spyModal();
     else if (UI.modal.type === 'transport') inner = transportModal();
     else if (UI.modal.type === 'exchange') inner = exchangeModal();
+    else if (UI.modal.type === 'smithy') inner = smithyModal();
     else if (UI.modal.type === 'support') inner = supportModal();
     else if (UI.modal.type === 'settle') inner = settleModal();
     else if (UI.modal.type === 'gather') inner = gatherModal();
@@ -1412,6 +1418,7 @@
         document.querySelectorAll('[data-fin]').forEach(i => { i.value = ''; });
         updateFormSummary();
         break;
+      case 'smithy-open': UI.form = {}; openModal('smithy', { from: UI.vid }); break;
       case 'exchange-open': UI.form = {}; openModal('exchange', { from: UI.vid }); break;
       case 'ex-pick': {
         const w = b.dataset.w, k = b.dataset.k, other = w === 'from' ? 'to' : 'from';
@@ -1436,6 +1443,7 @@
       case 'upgrade': {
         const r = G.action(s => E.queueUpgrade(s, s.villages[UI.vid], b.dataset.u, s.now));
         if (!r.ok) toast('bad', r.reason);
+        else if (UI.modal && UI.modal.type === 'smithy') { invalidate(); render(); renderModal(); }
         break;
       }
       case 'transport-open': UI.form = {}; openModal('transport', { target: b.dataset.id, from: UI.vid }); break;
