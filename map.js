@@ -30,7 +30,14 @@
     if (!world) return;
     world.style.transform = 'translate(' + view.x + 'px,' + view.y + 'px) scale(' + view.s + ')';
     world.classList.toggle('far', view.s < 0.85);
-    drawMini();
+    scheduleMini();
+  }
+  // Minimapa max. raz na klatkę – przy przeciąganiu i szczypaniu apply() leci po kilka razy na klatkę.
+  let miniRaf = 0;
+  function scheduleMini() {
+    if (!root.requestAnimationFrame) { drawMini(); return; }
+    if (miniRaf) return;
+    miniRaf = root.requestAnimationFrame(() => { miniRaf = 0; drawMini(); });
   }
   function clamp() {
     const W = worldSize() * view.s;
@@ -114,14 +121,57 @@
       (v ? ' tabindex="0" role="button"' : '') + '>' + inner + '</div>';
   }
 
+  // Pełna przebudowa mapy tylko gdy naprawdę zmieniła się plansza. Zmiana właściciela / punktów wioski
+  // przerysowuje tylko potrzebne warstwy, a stan pól (aktywna, atakowana, cel) to przełączenie klas.
   function render(state, ctx) {
-    ensureBoard(state);
-    A.territory(state, layers.territory);
-    A.villages(state, layers.villages);
-    layers.movesKey = null;
-    layers.tiles.innerHTML = state.map.tiles.map(t => tileHtml(state, t, ctx)).join('');
-    miniBase = A.minimap(state, layers.terrain, layers.territory, MINI * 2);
+    const rebuilt = ensureBoard(state);
+    const vs = Object.values(state.villages);
+    const ownerKey = vs.map(v => v.id + ':' + v.owner).join('|');
+    const tierKey = vs.map(v => v.id + ':' + v.owner + ':' + A.villageTier(E.points(v))).join('|');
+    let miniDirty = false;
+    if (rebuilt || layers.ownerKey !== ownerKey) {
+      layers.ownerKey = ownerKey;
+      A.territory(state, layers.territory);   // najdroższa warstwa (piksel po pikselu)
+      miniDirty = true;
+    }
+    if (rebuilt || layers.tierKey !== tierKey) {
+      layers.tierKey = tierKey;
+      A.villages(state, layers.villages);
+      miniDirty = true;
+    }
+    if (rebuilt) {
+      layers.tiles.innerHTML = state.map.tiles.map(t => tileHtml(state, t, ctx)).join('');
+      layers.vt = new Map();
+      vs.forEach(v => {
+        const el = layers.tiles.querySelector('.tile[data-x="' + v.x + '"][data-y="' + v.y + '"]');
+        if (el) layers.vt.set(v.id, { el, sig: villageSig(state, v) });
+      });
+    } else {
+      syncVillageTiles(state, ctx);
+    }
+    if (miniDirty || !miniBase) miniBase = A.minimap(state, layers.terrain, layers.territory, MINI * 2);
     drawMini();
+  }
+  function villageSig(state, v) { return v.owner + '|' + E.points(v) + '|' + v.name; }
+  function syncVillageTiles(state, ctx) {
+    Object.values(state.villages).forEach(v => {
+      const r = layers.vt.get(v.id);
+      if (!r) return;
+      const sig = villageSig(state, v);
+      if (sig !== r.sig) {   // zmienił się właściciel / punkty / nazwa – podmieniamy tylko to jedno pole
+        const t = state.map.tiles.find(q => q.x === v.x && q.y === v.y);
+        const tmp = document.createElement('div');
+        tmp.innerHTML = tileHtml(state, t, ctx);
+        const el = tmp.firstChild;
+        r.el.replaceWith(el);
+        r.el = el; r.sig = sig;
+        return;
+      }
+      const c = r.el.classList;
+      c.toggle('current', v.id === ctx.current);
+      c.toggle('under-attack', ctx.incoming.has(v.id));
+      c.toggle('targeted', ctx.outgoing.has(v.id));
+    });
   }
 
   function setSelected(sel) {
@@ -134,12 +184,18 @@
   }
 
   /* ---------- trasy wojsk ---------- */
+  // Każdy marsz ma własny, trwały element SVG (klucz = id marszu). Co sekundę przesuwamy tylko znaczniki;
+  // dodajemy nowe i usuwamy zakończone trasy, nie dotykając pozostałych. Dzięki temu nie restartuje się
+  // animacja przerywanej linii (to było miganie) i nie przebudowujemy całego SVG przy każdym wyjściu/przybyciu.
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const MANY_ROUTES = 14;   // powyżej tylu tras wyłączamy animację linii (każda klatka przemalowuje całą warstwę)
   function renderMoves(state, list) {
     if (!layers) return;
+    if (!layers.routes) layers.routes = new Map();
+    const routes = layers.routes;
     const now = state.now;
     const c = v => ({ x: (v.x + 0.5) * TILE, y: (v.y + 0.5) * TILE });
-    let svg = '';
-    const tf = [];
+    const seen = new Set();
     list.forEach(m => {
       const from = state.villages[m.from], to = m.to ? state.villages[m.to] : { x: m.x, y: m.y };
       let a = c(from), b = c(to), kind;
@@ -149,23 +205,27 @@
       const prog = Math.max(0, Math.min(1, (now - m.start) / Math.max(1, m.arrive - m.start)));
       const px = a.x + (b.x - a.x) * prog, py = a.y + (b.y - a.y) * prog;
       const ang = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
-      svg += '<g class="route ' + kind + '"><line class="trail" x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '"/>' +
-        '<line class="path" x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '"/>' +
-        '<circle class="dest" cx="' + b.x + '" cy="' + b.y + '" r="22"/>' +
-        '<g class="mk" transform="translate(' + px.toFixed(1) + ' ' + py.toFixed(1) + ') rotate(' + ang.toFixed(1) + ')">' +
-        '<circle class="marker" r="9"/><path class="arrow" d="M-4,-4 L5,0 L-4,4 Z"/></g></g>';
-      tf.push('translate(' + px.toFixed(1) + ' ' + py.toFixed(1) + ') rotate(' + ang.toFixed(1) + ')');
+      const tf = 'translate(' + px.toFixed(1) + ' ' + py.toFixed(1) + ') rotate(' + ang.toFixed(1) + ')';
+      const id = m.id || (m.type + ':' + m.from + ':' + m.to + ':' + m.start);
+      const sig = kind + '|' + a.x + ',' + a.y + '|' + b.x + ',' + b.y;
+      let r = routes.get(id);
+      if (r && r.sig !== sig) { r.g.remove(); routes.delete(id); r = null; }
+      if (!r) {
+        const g = document.createElementNS(SVG_NS, 'g');
+        g.setAttribute('class', 'route ' + kind);
+        g.innerHTML = '<line class="trail" x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '"/>' +
+          '<line class="path" x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '"/>' +
+          '<circle class="dest" cx="' + b.x + '" cy="' + b.y + '" r="22"/>' +
+          '<g class="mk"><circle class="marker" r="9"/><path class="arrow" d="M-4,-4 L5,0 L-4,4 Z"/></g>';
+        layers.moves.appendChild(g);
+        r = { g, mk: g.querySelector('.mk'), sig, tf: null };
+        routes.set(id, r);
+      }
+      if (r.tf !== tf) { r.tf = tf; r.mk.setAttribute('transform', tf); }
+      seen.add(id);
     });
-    // Przebudowa SVG co sekundę restartowała animację przerywanej linii (miganie mapy).
-    // Gdy zmienił się tylko postęp marszu, przesuwamy same znaczniki i nie ruszamy reszty.
-    const key = svg.replace(/class="mk" transform="[^"]*"/g, 'class="mk"');
-    if (layers.movesKey === key) {
-      const mk = layers.moves.querySelectorAll('.mk');
-      mk.forEach((el, i) => { if (tf[i]) el.setAttribute('transform', tf[i]); });
-      return;
-    }
-    layers.movesKey = key;
-    layers.moves.innerHTML = svg;
+    routes.forEach((r, id) => { if (!seen.has(id)) { r.g.remove(); routes.delete(id); } });
+    layers.moves.classList.toggle('many', routes.size > MANY_ROUTES);
   }
 
   /* ---------- minimapa ---------- */

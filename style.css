@@ -555,6 +555,9 @@ input:disabled { opacity: .4; }
 .route.sup .path, .route.sup .dest { stroke: #8fe6d6; }
 .route.sup .marker { fill: var(--teal); }
 @keyframes march { to { stroke-dashoffset: -18; } }
+/* Wydajność: przy wielu marszach i podczas przeciągania mapy linie stoją (animacja przemalowywałaby całą warstwę co klatkę). */
+.moves.many .route .path { animation: none; }
+.map-viewport.dragging .route .path { animation-play-state: paused; }
 
 .map-ui { position: absolute; z-index: 6; }
 .map-tools { right: 14px; top: 14px; display: flex; flex-direction: column; gap: 6px; padding: 5px; border-radius: 14px; background: rgba(14, 19, 24, .75); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--line-2); }
