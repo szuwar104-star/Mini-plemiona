@@ -856,3 +856,16 @@ table.gather td small { color: var(--muted); margin-left: .35rem; }
 .pausebar { position: sticky; top: var(--top-h); z-index: 29; display: flex; align-items: center; justify-content: center; gap: .75rem; flex-wrap: wrap;
   padding: .4rem .8rem; background: rgba(232, 182, 76, .16); border-bottom: 1px solid rgba(232, 182, 76, .4); color: var(--gold-2); font-weight: 700; }
 .pausebar[hidden] { display: none; }
+
+/* ---------- okna: przewijanie dotykiem i szerokość na telefonie ---------- */
+body.modal-open { overflow: hidden; }
+.dialog { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+@supports (height: 100dvh) {
+  .dialog { max-height: calc(100dvh - 2rem); }
+  @media (max-width: 760px) { .dialog { max-height: 92dvh; } }
+}
+/* Moc konta: etykiety zawijają się, liczby nie są ucinane */
+table.units.pw { table-layout: auto; }
+table.units.pw td { white-space: normal; padding: .5rem .4rem; }
+table.units.pw td.num { white-space: nowrap; }
+table.units.pw td.num small { display: block; font-size: .72rem; font-weight: 400; white-space: normal; }

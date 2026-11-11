@@ -1240,7 +1240,7 @@
   function powerSection(s) {
     const p = E.accountPower(s, 'player'), kl = E.killsOf(s, 'player');
     const row = (a, b) => '<tr><td>' + a + '</td><td class="num">' + b + '</td></tr>';
-    return '<section><h3>Moc konta</h3><div class="tablewrap"><table class="units"><tbody>' +
+    return '<section><h3>Moc konta</h3><div class="tablewrap"><table class="units pw"><tbody>' +
       row('Wioski', p.villages) + row('Punkty budynków', fmt(p.buildings)) + row('Punkty wojska (' + fmt(p.units) + ' jedn.)', fmt(p.army)) +
       row('Siła ataku', fmt(p.attack)) + row('Siła obrony (bez muru)', fmt(p.defense)) +
       row('Pokonani wrogowie (' + fmt(kl.units) + ' jedn.)', fmt(Math.round(kl.total)) + ' <small class="muted">atak ' + fmt(Math.round(kl.att)) + ' · obrona ' + fmt(Math.round(kl.def)) + '</small>') +
@@ -1283,7 +1283,7 @@
   }
   function renderModal() {
     const box = $('#modal');
-    if (!UI.modal) { box.hidden = true; box.innerHTML = ''; return; }
+    if (!UI.modal) { box.hidden = true; box.innerHTML = ''; document.body.classList.remove('modal-open'); return; }
     let inner = '';
     const s = st();
     if (UI.modal.type === 'attack') inner = attackModal();
@@ -1303,6 +1303,7 @@
       '<button class="btn ghost" data-act="close">Anuluj</button><button class="btn danger" data-act="' + UI.modal.ok + '">' + UI.modal.okLabel + '</button></div>';
     box.innerHTML = '<div class="dialog" role="dialog" aria-modal="true">' + inner + '</div>';
     box.hidden = false;
+    document.body.classList.add('modal-open');
     if (UI.modal.type === 'attack') updateAttackSummary();
     updateFormSummary();
     updateGatherPlan();
@@ -1825,13 +1826,21 @@
     document.addEventListener('change', onChange);
     document.addEventListener('keydown', onKey);
     // przesunięcie palcem w oknie raportu: w lewo = starszy, w prawo = nowszy
-    let tx = null, ty = null;
-    $('#modal').addEventListener('touchstart', e => { tx = e.touches[0].clientX; ty = e.touches[0].clientY; }, { passive: true });
+    let tx = null, ty = null, tScroll = 0, tTable = false;
+    const dlgOf = () => document.querySelector('#modal .dialog');
+    $('#modal').addEventListener('touchstart', e => {
+      tx = e.touches[0].clientX; ty = e.touches[0].clientY;
+      const d = dlgOf(); tScroll = d ? d.scrollTop : 0;
+      tTable = !!(e.target.closest && e.target.closest('.tablewrap'));
+    }, { passive: true });
+    $('#modal').addEventListener('touchcancel', () => { tx = null; }, { passive: true });
     $('#modal').addEventListener('touchend', e => {
       if (tx == null || !UI.modal || UI.modal.type !== 'report') { tx = null; return; }
       const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty;
+      const d = dlgOf(), scrolled = d && Math.abs(d.scrollTop - tScroll) > 4;
       tx = null;
-      if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) stepReport(dx < 0 ? 1 : -1);
+      // zmiana raportu tylko przy wyraźnie poziomym geście; przewijanie w pionie nigdy jej nie wywołuje
+      if (!scrolled && !tTable && Math.abs(dx) > 80 && Math.abs(dx) > Math.abs(dy) * 2.5) stepReport(dx < 0 ? 1 : -1);
     }, { passive: true });
     $('#modal').addEventListener('click', e => { if (e.target.id === 'modal' && UI.modal.type !== 'end') closeModal(); });
     MP.Map.mount($('#mapViewport'), $('#mapWorld'), $('#minimap'), sel => {
