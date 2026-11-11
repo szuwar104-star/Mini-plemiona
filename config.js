@@ -166,14 +166,17 @@
     // niewykorzystany limit odkłada się do bucketHours godzin.
     // Węzeł: max poziomów, koszt poziomu L = base × factor^(L-1) monet, req = węzeł nadrzędny i jego minimalny poziom.
     // effect: unit – +unitBonus ataku i obrony jednostki na poziom; pozostałe typy działają jako suma per × poziom
-    // (storage, build, recruit – mnożnik wokół 1; exchange – dodatek do kursu wymiany; mint – dodatkowe monety/h na wioskę).
+    // (storage, build, recruit – mnożnik wokół 1; exchange – dodatek do kursu wymiany; mint – dodatkowe monety/h na wioskę;
+    // prod, prodWood, prodClay, prodIron – mnożniki produkcji wokół 1 (prod dotyczy wszystkich surowców); carry – mnożnik udźwigu łupu
+    // atakujących jednostek; hide – dodatkowa część magazynu ukryta przed łupieżcami, dodawana do ochrony z poziomu trudności).
     TECH: {
       unitBonus: 0.05,
       coinPrice: 1500,
       mint: { perLevelPerHour: 3, bucketHours: 6 },
       branches: [
         { id: 'war', name: 'Wojsko' },
-        { id: 'eco', name: 'Gospodarka' }
+        { id: 'eco', name: 'Gospodarka' },
+        { id: 'prod', name: 'Produkcja' }
       ],
       nodes: [
         { id: 'drill', branch: 'war', name: 'Musztra', desc: 'Szybsze szkolenie wojska.', max: 5, base: 10, factor: 1.3, req: null, effect: { type: 'recruit', per: -0.04 } },
@@ -182,10 +185,17 @@
         { id: 'u_guard', branch: 'war', name: 'Tarczownik', desc: 'Atak i obrona Tarczownika.', max: 10, base: 10, factor: 1.25, req: { id: 'u_spear', min: 3 }, effect: { type: 'unit', unit: 'guard' } },
         { id: 'u_axe', branch: 'war', name: 'Topornik', desc: 'Atak i obrona Topornika.', max: 10, base: 10, factor: 1.25, req: { id: 'drill', min: 2 }, effect: { type: 'unit', unit: 'axe' } },
         { id: 'u_light', branch: 'war', name: 'Lekka kawaleria', desc: 'Atak i obrona Lekkiej kawalerii.', max: 10, base: 10, factor: 1.25, req: { id: 'u_axe', min: 3 }, effect: { type: 'unit', unit: 'light' } },
+        { id: 'u_ram', branch: 'war', name: 'Taran', desc: 'Atak i obrona Tarana.', max: 10, base: 12, factor: 1.25, req: { id: 'u_axe', min: 4 }, effect: { type: 'unit', unit: 'ram' } },
+        { id: 'plunder', branch: 'war', name: 'Grabież', desc: 'Większy udźwig łupu atakujących jednostek.', max: 10, base: 14, factor: 1.27, req: { id: 'u_light', min: 3 }, effect: { type: 'carry', per: 0.05 } },
+        { id: 'hide', branch: 'war', name: 'Skrytki', desc: 'Większa część magazynu ukryta przed łupieżcami.', max: 5, base: 14, factor: 1.3, req: { id: 'u_guard', min: 3 }, effect: { type: 'hide', per: 0.03 } },
         { id: 'trade', branch: 'eco', name: 'Kupiectwo', desc: 'Lepszy kurs wymiany surowców w Targowisku.', max: 5, base: 10, factor: 1.3, req: null, effect: { type: 'exchange', per: 0.02 } },
         { id: 'store', branch: 'eco', name: 'Magazyny', desc: 'Większa pojemność magazynów we wszystkich wioskach.', max: 10, base: 12, factor: 1.25, req: { id: 'trade', min: 1 }, effect: { type: 'storage', per: 0.10 } },
         { id: 'mint', branch: 'eco', name: 'Mennica', desc: 'Większy limit zakupu monet w każdej wiosce (monet na godzinę).', max: 5, base: 15, factor: 1.3, req: { id: 'trade', min: 2 }, effect: { type: 'mint', per: 2 } },
-        { id: 'build', branch: 'eco', name: 'Budownictwo', desc: 'Krótszy czas budowy.', max: 10, base: 15, factor: 1.25, req: { id: 'store', min: 3 }, effect: { type: 'build', per: -0.03 } }
+        { id: 'build', branch: 'eco', name: 'Budownictwo', desc: 'Krótszy czas budowy.', max: 10, base: 15, factor: 1.25, req: { id: 'store', min: 3 }, effect: { type: 'build', per: -0.03 } },
+        { id: 'tools', branch: 'prod', name: 'Narzędzia', desc: 'Większa produkcja wszystkich surowców we wszystkich wioskach.', max: 5, base: 12, factor: 1.3, req: null, effect: { type: 'prod', per: 0.02 } },
+        { id: 'p_wood', branch: 'prod', name: 'Leśnictwo', desc: 'Większa produkcja drewna.', max: 10, base: 15, factor: 1.27, req: { id: 'tools', min: 2 }, effect: { type: 'prodWood', per: 0.03 } },
+        { id: 'p_clay', branch: 'prod', name: 'Ceglarstwo', desc: 'Większa produkcja gliny.', max: 10, base: 15, factor: 1.27, req: { id: 'tools', min: 2 }, effect: { type: 'prodClay', per: 0.03 } },
+        { id: 'p_iron', branch: 'prod', name: 'Górnictwo', desc: 'Większa produkcja żelaza.', max: 10, base: 15, factor: 1.27, req: { id: 'tools', min: 2 }, effect: { type: 'prodIron', per: 0.03 } }
       ]
     },
 
