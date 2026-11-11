@@ -207,6 +207,7 @@
       const b = { hq: lvl, wood: randInt(state, 1, lvl + 1), clay: randInt(state, 1, lvl + 1), iron: randInt(state, 1, lvl), farm: lvl, barracks: 0, wall: d > 6 ? 1 : 0 };
       const r = NC.startRes;
       const v = makeVillage(state, x, y, null, b, units, { wood: r, clay: r, iron: Math.round(r * 0.7) }, now);
+      v.garrison = Object.assign(emptyUnits(), units); // stała załoga – odradza się po najazdach
       placed.push(v);
     }
     let made = 0;
@@ -299,6 +300,21 @@
       v.res[r] += whole;
       if (v.res[r] >= cap) { v.res[r] = cap; v.acc[r] = 0; }
     });
+    // Wolna osada odbudowuje załogę po najeździe (część stałej załogi na godzinę, liczone całkowicie jak surowce).
+    if (v.owner === null) {
+      if (!v.garrison) v.garrison = Object.assign(emptyUnits(), v.units); // stare zapisy: obecna załoga jako baza
+      if (!v.acc.g) v.acc.g = {};
+      UNITS.forEach(k => {
+        const g = v.garrison[k] || 0;
+        if (!g || v.units[k] >= g) { v.acc.g[k] = 0; return; }
+        const rate = Math.round(g * C.NEUTRAL.regenPerHour * 1000);   // jednostek na 3 600 000 000 ms
+        const total = (v.acc.g[k] || 0) + rate * dt;
+        const whole = Math.floor(total / 3600000000);
+        v.acc.g[k] = total - whole * 3600000000;
+        v.units[k] = Math.min(g, v.units[k] + whole);
+        if (v.units[k] >= g) v.acc.g[k] = 0;
+      });
+    }
     if (v.owner !== null && v.loyalty < C.LOYALTY.max) {
       const total = v.acc.loyalty + Math.round(C.LOYALTY.regenPerMin * 10) * dt;
       const whole = Math.floor(total / 600000);
@@ -509,7 +525,8 @@
   }
   function travelTime(a, b, units) { return Math.round(dist(a, b) * slowest(units) * 1000); }
 
-  function sendAttack(state, fromId, toId, units, t, type) {
+  // opts.raid – grabież wolnej osady: zwycięstwo daje łup, ale osada zostaje wolna.
+  function sendAttack(state, fromId, toId, units, t, type, opts) {
     type = type || 'attack';
     const from = state.villages[fromId], to = state.villages[toId];
     if (!from || !to) return { ok: false, reason: 'Nieznana wioska' };
@@ -531,6 +548,7 @@
       id: newId(state, 'm'), type, owner: from.owner, from: from.id, to: to.id,
       units: u, loot: null, start: t, arrive: t + travelTime(from, to, u)
     };
+    if (type === 'attack' && opts && opts.raid && to.owner === null) m.raid = true;
     state.movements.push(m);
     if (type === 'attack' && to.owner === 'player' && from.owner !== 'player') {
       state.lastHit = state.lastHit || {};
@@ -1048,7 +1066,7 @@
     let loyaltyAfter = null;
     if (attackerWon && anyAlive) {
       if (defOwner === null) {
-        conquered = true;
+        conquered = !m.raid;
       } else if (survivors.noble > 0) {
         target.loyalty -= randInt(state, C.LOYALTY.dropMin, C.LOYALTY.dropMax);
         loyaltyAfter = Math.max(0, Math.floor(target.loyalty));
@@ -1076,7 +1094,7 @@
       attacker: m.owner, defender: defOwner,
       fromName: origin.name, fromX: origin.x, fromY: origin.y, from: origin.id,
       toName: target.name, toX: target.x, toY: target.y, to: target.id,
-      attUnits, attLoss, defUnits, defLoss, attackerWon, loot, luck: Math.round((luck - 1) * 100),
+      attUnits, attLoss, defUnits, defLoss, attackerWon, loot, luck: Math.round((luck - 1) * 100), raid: !!m.raid,
       loyaltyBefore: defOwner !== null && attUnits.noble > 0 ? loyaltyBefore : null, loyaltyAfter, conquered,
       wallBefore, wallFight, wallAfter, hadSupport, lootCapacity, lootHidden, killPts,
       intel: intel && intel.buildings ? intel : null
@@ -1098,6 +1116,7 @@
 
   function changeOwner(state, v, newOwner, prevOwner, t) {
     v.owner = newOwner;
+    delete v.garrison;
     v.loyalty = C.LOYALTY.afterConquest;
     v.buildQueue = [];
     v.recruitQueue = [];

@@ -32,7 +32,7 @@ Serwer jest potrzebny do działania jako PWA (Service Worker, instalacja, tryb o
 6. **Transport surowców** – zbuduj Targowisko (każdy poziom daje kupców, każdy kupiec wiezie do 1000 surowców). Na mapie wybierz swoją wioskę i kliknij „Wyślij tu surowce”. Kupcy jadą, dostarczają towar i wracają. Nadwyżka ponad magazyn celu przepada.
 7. **Zasiedlanie** – zrekrutuj Osadnika (Koszary, wymaga Ratusza 4), wybierz na mapie pustą równinę (nie las, nie góry, co najmniej 1,5 pola od innej wioski) i kliknij „Załóż osadę”. Powstaje nowa wioska z podstawowymi budynkami. Założone wioski liczą się do celu 20 wiosek. Frakcje gospodarcza i ekspansywna również zakładają osady.
 
-8. **Wsparcie i przenoszenie wojska** – na mapie wybierz swoją wioskę i kliknij „Wyślij tu wojsko” (albo użyj przycisków na ekranie Wojsko). Do wyboru:
+8. **Wsparcie i przenoszenie wojska** – na mapie wybierz swoją wioskę i kliknij „Wyślij tu wojsko” (albo użyj przycisków na ekranie Wojsko). Domyślnie zaznaczone jest **przeniesienie na stałe** (także w oknie „Zbierz / rozdziel wojsko”), wsparcie wybierasz przełącznikiem. Do wyboru:
    - **Wsparcie** – jednostki bronią celu, ale należą do wioski macierzystej (zajmują jej farmę). Na ekranie Wojsko możesz je odwołać albo odesłać. W bitwie straty dzielą się proporcjonalnie między wszystkie oddziały.
    - **Przeniesienie na stałe** – jednostki przechodzą do wioski docelowej i muszą zmieścić się na jej farmie.
 9a. **Wymiana surowców i monety (Targowisko)** – w wiosce z Targowiskiem na ekranie *Wioska* jest panel **Targowisko – szybkie akcje**: wybierasz ilość (monety: 1 / 5 / 10 / maks.; wymiana: 1 000 / 5 000 / 50% / maks.) i jednym kliknięciem kupujesz monety za wybrany surowiec albo wymieniasz dowolną parę surowców (maks. i 50% same przycinają się do zapasu, limitu kupców i miejsca w magazynie). Pełne okno z własną ilością nadal jest pod przyciskiem „Wymiana i monety”. Zakładka *Wymiana surowców*: oddajesz jeden surowiec, dostajesz inny po kursie 100 → 70 (poprawia go badanie Kupiectwo); jednorazowo do (kupcy × 1000), natychmiast, w obrębie jednej wioski. Zakładka *Monety*: za 1500 jednego wybranego surowca kupujesz 1 monetę (tylko w jedną stronę). Limit zakupu w wiosce to poziom Targowiska × 3 monety na godzinę (+ badanie Mennica), z zapasem do 6 godzin – dzięki temu nadmiar z wielu wiosek ma znaczenie.
@@ -146,3 +146,15 @@ Każda frakcja co turę (`C.AI.thinkInterval`):
 Poziomy trudności działają jak wcześniej (produkcja, agresja, ostrożność, strefa wokół gracza). Parametry: `C.AI.tactics` i `C.AI.personalities` w `config.js`. Raport bez gracza: `node tools/ai-report.js normal 8 1`.
 
 Porównanie (świat Mały, Normalny, 8 h bez gracza, średnia z 6 gier na frakcję): suma poziomów budynków 323 → 548, zrekrutowane jednostki 5 404 → 8 798, liczba wypraw 840 → 179 (zamiast garstek – pełne armie).
+
+## Najazdy łupieżcze (grabież wolnych osad)
+
+Na wolnej osadzie masz dwa rozkazy: **Atakuj** (wygrana przejmuje osadę, jak dotąd) i **Grabież**. Grabież to zwykła bitwa, ale po wygranej osada zostaje wolna, a ocalali zabierają surowce do swojego udźwigu. Załoga wolnej osady odradza się po najeździe – 25% stałej załogi na godzinę (`NEUTRAL.regenPerHour` w `config.js`), nigdy ponad stan wyjściowy – a surowce przybywają z jej produkcji, więc do osady opłaca się wracać.
+
+- Tryb wybierasz przyciskiem w panelu osady na mapie albo przełącznikiem **Podbój / Grabież** w oknie ataku (gra pamięta ostatni wybór).
+- W raporcie grabieży jest przycisk **Powtórz grabież** – otwiera okno ataku z tym samym wojskiem i tą samą wioską wysyłającą.
+- Ruch na liście ma etykietę „W drodze · grabież”, a raport – złotą pieczęć „Udana grabież”.
+- AI po osiągnięciu limitu wiosek nie pomija już wolnych osad, tylko je grabi (chęć zależy od osobowości: `raids`). Wolne osady w strefie wokół Twoich wiosek AI nadal omija.
+- Stare zapisy: osady bez zapisanej stałej załogi przyjmują obecną załogę jako bazę przy pierwszym przeliczeniu. Rozkazy wysłane przed aktualizacją działają jak zwykły atak.
+
+Test: `node tests/raid.js`.

@@ -232,7 +232,9 @@
       const target = state.villages[id];
       if (target.owner === v.owner || busy.has(id)) continue;
       if (target.owner !== null && !canTakeAny) continue;
-      if (target.owner === null && owned >= cap) continue;
+      // limit wiosek osiągnięty: wolne osady już tylko grabi (łup bez przejęcia)
+      const raid = target.owner === null && owned >= cap;
+      if (raid && !P.raids) continue;
       if (target.owner === null && D.playerZone && playerAll.some(pv => E.dist(pv, target) <= D.playerZone)) continue;
       if (target.owner === 'player' && (grace || (state.lastHit && t - (state.lastHit[target.id] || -1e15) < cooldown))) continue;
       const d = E.dist(v, target);
@@ -246,17 +248,18 @@
       let w = 1 / (1 + d);
       w *= 1 + Math.min(2, (target.res.wood + target.res.clay + target.res.iron) / T().lootScale); // łup
       w *= 1 + Math.min(1, A / Math.max(1, Dv) / 6);                                              // łatwy cel
-      if (target.owner === null) w *= P.neutralBias;
+      if (raid) w *= P.raids;
+      else if (target.owner === null) w *= P.neutralBias;
       else {
         if (target.owner === 'player') w *= P.playerBias * D.playerBias;
         if (P.nobles && target.loyalty != null && target.loyalty < 100) w *= 1 + (100 - target.loyalty) / 25; // dobijanie podboju
         if (P.nobles && v.units.noble > 0 && owned < cap) w *= 1.5;
       }
-      if (!best || w > best.w) best = { target, w };
+      if (!best || w > best.w) best = { target, w, raid };
     }
     if (!best) return;
     if (best.target.owner !== null && P.nobles && v.units.noble > 0 && owned < cap) send.noble = 1;
-    E.sendAttack(state, v.id, best.target.id, send, t);
+    E.sendAttack(state, v.id, best.target.id, send, t, 'attack', { raid: best.raid });
   }
 
   function think(state, fid, t) {

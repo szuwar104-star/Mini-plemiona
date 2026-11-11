@@ -557,3 +557,23 @@ input[type=checkbox], input[type=radio] { accent-color: var(--gold); width: 1.05
 .seg .btn:not(.ghost) { background: linear-gradient(180deg, var(--gold-2), var(--gold) 55%, #a8832f); color: var(--gold-ink); box-shadow: inset 0 1px 0 rgba(255,245,210,.45), 0 1px 0 #000; }
 .seg .btn.ghost { background: transparent; color: var(--muted); box-shadow: none; }
 .seg .btn.ghost:hover { background: rgba(201, 160, 67, .08); color: var(--text); }
+
+/* --- Wsparcie: przycisk „odeślij / odwołaj całe wsparcie” przy nagłówku listy --- */
+.sup-head { display: flex; align-items: center; justify-content: space-between; gap: .6rem; flex-wrap: wrap; margin: .4rem 0 .5rem; }
+.sup-head .sub { margin: 0; }
+.sup-all { min-height: 34px; padding: .3rem .8rem; font-size: .82rem; }
+@media (max-width: 760px) { .sup-all { width: 100%; } }
+
+/* --- Najazdy łupieżcze --- */
+.mv.out.raid { border-left-color: var(--gold); }
+.mv.out.raid .mvbody b::before { content: "W drodze · grabież"; background: rgba(201, 160, 67, .22); color: var(--gold-2); }
+.seg.amode { display: grid; grid-template-columns: 1fr 1fr; gap: .25rem; padding: .25rem; margin: .2rem 0 .6rem; }
+.seg.amode .btn { width: 100%; }
+.verdict.raid.win { border-left-color: #a8832f; }
+.verdict.raid.win strong { color: #7a5a14; }
+.verdict.raid.win .seal { background: radial-gradient(circle at 35% 30%, #f0cf7c, #b88f35 60%, #7a5a14); }
+
+/* --- Panel mapy: odesłanie / odwołanie wsparcia --- */
+.md-sup { margin: .35rem 0 .6rem; padding: .5rem .6rem; border-radius: 3px; background: rgba(47, 181, 162, .07); box-shadow: inset 3px 0 0 var(--teal, #2fb5a2); }
+.md-sup p { margin: 0 0 .45rem; }
+.md-sup .btn { width: 100%; min-height: 36px; font-size: .85rem; }

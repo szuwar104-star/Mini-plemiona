@@ -241,8 +241,8 @@
       title = 'Nadciąga atak na ' + esc(to.name) + ' z ' + esc(from.name) + ' ' + xy(from.x, from.y);
       extra = flag(s, m.owner) + ' <span class="muted">– siła nieznana</span>';
     } else if (m.type === 'attack') {
-      cls = 'out'; icon = 'sword';
-      title = 'Atak: ' + esc(from.name) + ' → ' + esc(to.name) + ' ' + xy(to.x, to.y);
+      cls = m.raid ? 'out raid' : 'out'; icon = m.raid ? 'merchant' : 'sword';
+      title = (m.raid ? 'Grabież: ' : 'Atak: ') + esc(from.name) + ' → ' + esc(to.name) + ' ' + xy(to.x, to.y);
       extra = unitsLine(m.units);
     } else if (m.type === 'support') {
       cls = 'sup'; icon = 'spear';
@@ -338,10 +338,11 @@
     if (hosted.length || abroad.length) {
       const row = (title, u, btn) => '<li class="sup-row">' + ico('barracks') + '<div><b>' + title + '</b><div>' + unitsLine(u) + '</div></div>' + btn + '</li>';
       html += '<section class="panel"><h2>Wsparcie</h2>';
-      if (hosted.length) html += '<h3 class="sub">Broni tej wioski</h3><ul class="sup-list">' + hosted.map(([o, u]) =>
+      const allBtn = (mode, label, n) => '<button class="btn danger sup-all" data-act="withdraw-all" data-mode="' + mode + '" data-id="' + v.id + '">' + label + ' (' + n + ')</button>';
+      if (hosted.length) html += '<div class="sup-head"><h3 class="sub">Broni tej wioski</h3>' + allBtn('hosted', 'Odeślij całe wsparcie', hosted.length) + '</div><ul class="sup-list">' + hosted.map(([o, u]) =>
         row('Z wioski ' + esc(s.villages[o].name) + ' ' + xy(s.villages[o].x, s.villages[o].y), u,
           '<button class="btn ghost" data-act="withdraw" data-host="' + v.id + '" data-origin="' + o + '">Odeślij</button>')).join('') + '</ul>';
-      if (abroad.length) html += '<h3 class="sub">Twoje wojsko w innych wioskach</h3><ul class="sup-list">' + abroad.map(w =>
+      if (abroad.length) html += '<div class="sup-head"><h3 class="sub">Twoje wojsko w innych wioskach</h3>' + allBtn('abroad', 'Odwołaj całe wsparcie', abroad.length) + '</div><ul class="sup-list">' + abroad.map(w =>
         row('W wiosce ' + esc(w.name) + ' ' + xy(w.x, w.y), w.support[v.id],
           '<button class="btn ghost" data-act="withdraw" data-host="' + w.id + '" data-origin="' + v.id + '">Odwołaj</button>')).join('') + '</ul>';
       html += '</section>';
@@ -359,7 +360,7 @@
     const mv = playerMovements(s);
     const others = E.villagesOf(s, 'player').filter(o => o.id !== v.id);
     if (others.length) {
-      html += '<section class="panel"><h2>Wyślij wojsko do swojej wioski</h2><p class="muted">Jako wsparcie (możesz je odwołać) albo na stałe.</p><div class="actions left">' +
+      html += '<section class="panel"><h2>Wyślij wojsko do swojej wioski</h2><p class="muted">Domyślnie na stałe; w oknie możesz wybrać wsparcie (do odwołania).</p><div class="actions left">' +
         others.sort((a, b) => E.dist(a, v) - E.dist(b, v)).slice(0, 6).map(o => '<button class="btn ghost" data-act="support-from" data-id="' + o.id + '">' +
         ico('spear') + esc(o.name) + ' <small>' + E.dist(o, v).toFixed(1) + ' pola</small></button>').join('') + '</div></section>';
     }
@@ -607,6 +608,7 @@
     }
     if (r.kind === 'spy') return 'Zwiad: ' + esc(r.toName) + ' ' + xy(r.toX, r.toY) + ' – ' + (r.success ? 'udany' : 'zwiadowcy zginęli');
     if (r.kind === 'spydef') return 'Wrogi zwiad w ' + esc(r.toName) + ' – ' + (r.success ? 'wróg przejrzał wioskę' : 'zatrzymany');
+    if (r.kind === 'attack' && r.raid) return 'Grabież: ' + esc(r.toName) + ' ' + xy(r.toX, r.toY) + ' – ' + (r.attackerWon ? 'udana' : 'porażka');
     if (r.kind === 'attack') return 'Atak na ' + esc(r.toName) + ' ' + xy(r.toX, r.toY) + ' – ' +
       (r.conquered ? 'wioska przejęta' : r.attackerWon ? 'zwycięstwo' : 'porażka');
     return esc(E.ownerName(s, r.attacker)) + ' atakuje ' + esc(r.toName) + ' – ' +
@@ -626,6 +628,7 @@
     if (r.kind === 'news') return { cls: 'news', label: r.settled ? 'Nowa osada' : r.eliminated ? 'Upadek frakcji' : 'Podbój', sub: 'Kronika świata' };
     if (r.kind === 'spy') return { cls: tone + ' spy', label: r.success ? 'Zwiad udany' : 'Zwiad przepadł', sub: 'Raport zwiadu' };
     if (r.kind === 'spydef') return { cls: tone + ' spy', label: r.success ? 'Wróg przejrzał wioskę' : 'Szpiedzy zatrzymani', sub: 'Wrogi zwiad' };
+    if (r.kind === 'attack' && r.raid) return { cls: tone + ' raid', label: r.attackerWon ? 'Udana grabież' : 'Porażka', sub: 'Raport z grabieży' };
     if (r.kind === 'attack') return { cls: tone + (r.conquered ? ' conq' : ''), label: r.conquered ? 'Podbój' : r.attackerWon ? 'Zwycięstwo' : 'Porażka', sub: 'Raport z ataku' };
     return { cls: tone + (r.conquered ? ' conq' : ''), label: r.conquered ? 'Wioska utracona' : r.attackerWon ? 'Obrona przegrana' : 'Obrona udana', sub: 'Raport z obrony' };
   }
@@ -672,7 +675,7 @@
     } else {
       html += '<ul class="rlist">' + list.map(r =>
         '<li><button class="ritem ' + reportTone(r) + ' k-' + r.kind + (r.conquered ? ' conq' : '') + (r.read ? '' : ' unread') + '" data-act="report" data-id="' + r.id + '">' +
-        ico(r.kind === 'news' ? (r.settled ? 'settler' : 'noble') : r.kind === 'attack' ? 'sword' : r.kind === 'spy' || r.kind === 'spydef' ? 'scout' : 'barracks') +
+        ico(r.kind === 'news' ? (r.settled ? 'settler' : 'noble') : r.kind === 'attack' ? (r.raid ? 'merchant' : 'sword') : r.kind === 'spy' || r.kind === 'spydef' ? 'scout' : 'barracks') +
         '<span class="rtitle">' + reportTitle(s, r) + '</span><span class="rtime">' + dayClock(r.time) + '</span></button></li>').join('') + '</ul>';
     }
     el.innerHTML = html + '</section>';
@@ -752,7 +755,10 @@
       '<span class="muted">' + (idx + 1) + ' / ' + list.length + '</span>' +
       '<button class="btn ghost" data-act="report-next"' + (idx >= 0 && idx < list.length - 1 ? '' : ' disabled') + ' aria-label="Starszy raport">Starszy ›</button></div>';
     html = nav + html;
-    html += '<div class="actions"><button class="btn ghost" data-act="show-on-map" data-x="' + r.toX + '" data-y="' + r.toY + '">Pokaż na mapie</button>' +
+    const tgt = s.villages[r.to];
+    const again = r.kind === 'attack' && r.raid && tgt && tgt.owner === null
+      ? '<button class="btn" data-act="raid-again" data-id="' + r.id + '">' + ico('merchant') + 'Powtórz grabież</button>' : '';
+    html += '<div class="actions">' + again + '<button class="btn ghost" data-act="show-on-map" data-x="' + r.toX + '" data-y="' + r.toY + '">Pokaż na mapie</button>' +
       '<button class="btn" data-act="close">Zamknij</button></div>' + nav;
     return html;
   }
@@ -854,8 +860,12 @@
       const many = E.villagesOf(s, 'player').length > 1;
       const sup = Object.keys(v.support || {}).length ? E.defenders(v) : null;
       if (sup) E.UNITS.forEach(k => { sup[k] -= v.units[k]; });
+      const abroad = Object.values(s.villages).filter(w => w.support && w.support[v.id]);
       html += '<p><span class="muted">W wiosce:</span> ' + unitsLine(v.units) + '</p>' +
-        (sup ? '<p><span class="muted">Wsparcie:</span> ' + unitsLine(sup) + '</p>' : '') +
+        (sup ? '<div class="md-sup"><p><span class="muted">Wsparcie:</span> ' + unitsLine(sup) + '</p>' +
+          '<button class="btn danger" data-act="withdraw-all" data-mode="hosted" data-id="' + v.id + '">Odeślij całe wsparcie (' + Object.keys(v.support).length + ')</button></div>' : '') +
+        (abroad.length ? '<div class="md-sup"><p><span class="muted">Wojsko tej wioski wspiera:</span> ' + abroad.map(w => esc(w.name)).join(', ') + '</p>' +
+          '<button class="btn danger" data-act="withdraw-all" data-mode="abroad" data-id="' + v.id + '">Odwołaj całe wsparcie (' + abroad.length + ')</button></div>' : '') +
         '<p><span class="muted">Mur:</span> <b>poz. ' + v.buildings.wall + '</b></p>' +
         '<p><span class="muted">Kupcy:</span> <b>' + E.merchantsFree(s, v) + '/' + E.merchantsTotal(v) + '</b></p><div class="actions">' +
         (many ? '<button class="btn ghost" data-act="support-open" data-id="' + v.id + '">' + ico('spear') + 'Wyślij tu wojsko</button>' +
@@ -867,11 +877,12 @@
       const I = s.intel[v.id];
       html += I ? intelHtml(I) : '<p class="hint-box">' + ico('scout') + 'Nie wiesz, co jest w tej wiosce. Wyślij zwiadowców.</p>';
       html += '<p class="muted">' + (v.owner === null
-        ? 'Wygrana bitwa oznacza przejęcie osady.'
+        ? 'Atak: wygrana bitwa przejmuje osadę. Grabież: zabierasz surowce, osada zostaje wolna, a jej załoga odradza się w ciągu kilku godzin.'
         : 'Aby przejąć wioskę, pokonaj obrońców z Dowódcą podboju w armii, aż poparcie spadnie do zera.') + '</p>' +
         '<p class="muted tip">Dwuklik na tej wiosce otwiera okno ataku z ' + esc(v0.name) + '.</p>' +
         '<div class="actions"><button class="btn ghost" data-act="spy-open" data-id="' + v.id + '">' + ico('scout') + 'Zwiad</button>' +
-        '<button class="btn danger" data-act="attack-open" data-id="' + v.id + '">' + ico('sword') + 'Atakuj</button></div>';
+        (v.owner === null ? '<button class="btn" data-act="attack-open" data-mode="raid" data-id="' + v.id + '">' + ico('merchant') + 'Grabież</button>' : '') +
+        '<button class="btn danger" data-act="attack-open" data-mode="conquer" data-id="' + v.id + '">' + ico('sword') + 'Atakuj</button></div>';
     }
     const rel = s.movements.filter(m => (m.to === v.id || m.from === v.id) && (m.owner === 'player' || (m.type === 'attack' && s.villages[m.to].owner === 'player')));
     if (rel.length) html += '<h3>Ruchy wojsk</h3><ul class="mvlist compact">' + rel.map(m => movementItem(s, m)).join('') + '</ul>';
@@ -885,8 +896,11 @@
     if (!own.some(o => o.id === m.from)) m.from = own[0] && own[0].id;
     const from = s.villages[m.from];
     E.tickVillage(s, from, s.now);
-    let html = '<h2>' + ico('sword') + 'Atak na ' + esc(target.name) + ' ' + xy(target.x, target.y) + '</h2>' +
+    const raid = target.owner === null && UI.atkMode === 'raid';
+    let html = '<h2>' + ico(raid ? 'merchant' : 'sword') + (raid ? 'Grabież: ' : 'Atak na ') + esc(target.name) + ' ' + xy(target.x, target.y) + '</h2>' +
       '<p>' + flag(s, target.owner) + ', ' + E.points(target) + ' pkt</p>' +
+      (target.owner === null ? '<div class="seg amode"><button class="btn' + (raid ? ' ghost' : '') + '" data-act="amode" data-m="conquer">' + ico('sword') + 'Podbój</button>' +
+        '<button class="btn' + (raid ? '' : ' ghost') + '" data-act="amode" data-m="raid">' + ico('merchant') + 'Grabież</button></div>' : '') +
       '<label class="field">Wyślij z wioski <select id="atkFrom">' + own.map(o => '<option value="' + o.id + '"' + (o.id === m.from ? ' selected' : '') + '>' +
       esc(o.name) + ' ' + xy(o.x, o.y) + ', ' + E.dist(o, target).toFixed(1) + ' pola</option>').join('') + '</select></label>' +
       '<div class="tablewrap"><table class="units atk"><thead><tr><th>Jednostka</th><th>Dostępne</th><th>Wyślij</th></tr></thead><tbody>';
@@ -898,10 +912,14 @@
     html += '</tbody></table></div><div class="actions left"><button class="btn ghost" data-act="aall">Wszystkie jednostki</button>' +
       '<button class="btn ghost" data-act="anone">Wyczyść</button></div>' +
       '<div id="atkSummary" class="summary"></div>' +
-      '<p class="muted">' + (target.owner === null ? 'Wygrana bitwa = przejęcie osady.' : 'Dowódca podboju obniża poparcie tylko wtedy, gdy przeżyje zwycięską bitwę.') + '</p>' +
-      '<div class="actions"><button class="btn ghost" data-act="close">Anuluj</button><button class="btn danger" data-act="send-attack">Wyślij atak</button></div>';
+      '<p class="muted">' + (target.owner !== null ? 'Dowódca podboju obniża poparcie tylko wtedy, gdy przeżyje zwycięską bitwę.'
+        : raid ? 'Wygrana daje łup do udźwigu ocalałych jednostek, a osada zostaje wolna. Jej załoga odradza się po ' + Math.round(C.NEUTRAL.regenPerHour * 100) + '% na godzinę – można wracać.'
+        : 'Wygrana bitwa = przejęcie osady.') + '</p>' +
+      '<div class="actions"><button class="btn ghost" data-act="close">Anuluj</button><button class="btn danger" data-act="send-attack">' + (raid ? 'Wyślij grabież' : 'Wyślij atak') + '</button></div>';
     return html;
   }
+  // Rodzaj wysyłki wojska do własnej wioski: domyślnie przeniesienie na stałe, wsparcie jako opcja.
+  const supMode = () => UI.form.mode || 'stay';
   function attackUnits() {
     const u = E.emptyUnits();
     E.UNITS.forEach(k => { u[k] = Math.max(0, Math.floor(Number(UI.atk[k]) || 0)); });
@@ -1049,7 +1067,7 @@
   /* ---------- okno: zbieranie / rozdzielanie wojska ---------- */
   function troopsDefaults(target) {
     const units = {}; E.UNITS.forEach(k => { units[k] = k !== 'settler' && k !== 'scout'; });
-    return { target, mode: 'gather', stay: false, units, reserve: 0, capToRoom: true, off: {} };
+    return { target, mode: 'gather', stay: true, units, reserve: 0, capToRoom: true, off: {} };
   }
   function troopsArgs(g) { return { mode: g.mode, stay: g.stay, units: g.units, reservePct: g.reserve, capToRoom: g.capToRoom, off: g.off }; }
   function troopsModal() {
@@ -1062,8 +1080,8 @@
       '<label class="field">' + (spread ? 'Wioska źródłowa' : 'Wioska docelowa') + ' <select data-ttarget>' + own.map(o => '<option value="' + o.id + '"' + (o.id === g.target ? ' selected' : '') + '>' +
         esc(o.name) + ' ' + xy(o.x, o.y) + '</option>').join('') + '</select></label>' +
       '<label class="field">Rodzaj wysyłki <select data-tstay>' +
-        '<option value="0"' + (g.stay ? '' : ' selected') + '>Wsparcie (można odwołać)</option>' +
-        '<option value="1"' + (g.stay ? ' selected' : '') + '>Przeniesienie na stałe (zajmuje farmę)</option></select></label>' +
+        '<option value="1"' + (g.stay ? ' selected' : '') + '>Przeniesienie na stałe (zajmuje farmę)</option>' +
+        '<option value="0"' + (g.stay ? '' : ' selected') + '>Wsparcie (można odwołać)</option></select></label>' +
       '<div class="gopts"><div class="field">Jednostki<span class="selbar"><button type="button" class="btn ghost" data-act="tunits-all" data-on="1">Zaznacz wszystkie</button><button type="button" class="btn ghost" data-act="tunits-all" data-on="0">Odznacz wszystkie</button></span><span class="gres ugrid">' + E.UNITS.map(k => '<label class="chk"><input type="checkbox" data-tunit="' + k + '"' + (g.units[k] ? ' checked' : '') + '>' + ico(k) + C.UNITS[k].name + '</label>').join('') + '</span></div>' +
       '<label class="field">Zostaw w wiosce wysyłającej (% wojska)<input type="number" inputmode="numeric" min="0" max="100" step="5" data-treserve value="' + esc(g.reserve) + '"></label></div>' +
       (g.stay ? '<label class="chk"><input type="checkbox" data-tcap' + (g.capToRoom ? ' checked' : '') + '>Nie wysyłaj więcej, niż mieści farma ' + (spread ? 'celów' : 'celu') + '</label>' : '') +
@@ -1144,11 +1162,11 @@
     if (!own.some(o => o.id === m.from)) m.from = own[0].id;
     const from = s.villages[m.from];
     E.tickVillage(s, from, s.now);
-    const mode = UI.form.mode || 'support';
+    const mode = supMode();
     let html = '<h2>' + ico('spear') + 'Wojsko do ' + esc(target.name) + ' ' + xy(target.x, target.y) + '</h2>' +
       '<div class="seg" role="radiogroup" aria-label="Rodzaj wysyłki">' +
-      '<button role="radio" aria-checked="' + (mode === 'support') + '" class="' + (mode === 'support' ? 'on' : '') + '" data-act="smode" data-m="support">Wsparcie</button>' +
-      '<button role="radio" aria-checked="' + (mode === 'stay') + '" class="' + (mode === 'stay' ? 'on' : '') + '" data-act="smode" data-m="stay">Przeniesienie na stałe</button></div>' +
+      '<button role="radio" aria-checked="' + (mode === 'stay') + '" class="' + (mode === 'stay' ? 'on' : '') + '" data-act="smode" data-m="stay">Przeniesienie na stałe</button>' +
+      '<button role="radio" aria-checked="' + (mode === 'support') + '" class="' + (mode === 'support' ? 'on' : '') + '" data-act="smode" data-m="support">Wsparcie</button></div>' +
       '<p class="muted seg-note">' + (mode === 'support'
         ? 'Jednostki bronią celu, ale należą do wioski macierzystej: zajmują jej farmę i możesz je w każdej chwili odwołać.'
         : 'Jednostki przechodzą do wioski docelowej na stałe i zajmują miejsce na jej farmie.') + '</p>' +
@@ -1200,7 +1218,7 @@
       if (!E.sumUnits(u)) { box.innerHTML = '<p class="muted">Wpisz liczbę jednostek albo kliknij liczbę dostępnych.</p>'; return; }
       const tt = E.travelTime(from, target, u), room = E.supportRoom(s, target), need = E.unitsPop(u);
       const over = E.UNITS.some(k => u[k] > from.units[k]);
-      const stay = UI.form.mode === 'stay';
+      const stay = supMode() === 'stay';
       const combined = E.defenders(target);
       E.UNITS.forEach(k => { combined[k] += u[k]; });
       box.innerHTML = '<div><span>Czas marszu</span><b>' + dur(tt) + '</b></div><div><span>Przybycie</span><b>' + clock(s.now + tt) + '</b></div>' +
@@ -1586,8 +1604,21 @@
       case 'select-cur': { const v = cur(); if (v) { UI.sel = { x: v.x, y: v.y }; MP.Map.setSelected(UI.sel); MP.Map.centerOn(v.x, v.y); renderDetails(); } break; }
       case 'attack-open':
         UI.atk = {};
+        if (b.dataset.mode) UI.atkMode = b.dataset.mode;
         openModal('attack', { target: b.dataset.id, from: UI.vid });
         break;
+      case 'amode': UI.atkMode = b.dataset.m; renderModal(); break;
+      // Raport grabieży: to samo wojsko jeszcze raz na tę samą osadę (z tej samej wioski, jeśli nadal jest Twoja).
+      case 'raid-again': {
+        const s = st(), r = s.reports.find(x => x.id === b.dataset.id);
+        if (!r) break;
+        UI.atk = {};
+        E.UNITS.forEach(k => { if (r.attUnits[k]) UI.atk[k] = r.attUnits[k]; });
+        UI.atkMode = 'raid';
+        const from = r.from && s.villages[r.from] && s.villages[r.from].owner === 'player' ? r.from : UI.vid;
+        openModal('attack', { target: r.to, from });
+        break;
+      }
       case 'amax': {
         const k = b.dataset.u, from = st().villages[UI.modal.from];
         UI.atk[k] = from.units[k];
@@ -1608,7 +1639,8 @@
         break;
       case 'send-attack': {
         const m = UI.modal;
-        const r = G.action(s => E.sendAttack(s, m.from, m.target, attackUnits(), s.now));
+        const r = G.action(s => E.sendAttack(s, m.from, m.target, attackUnits(), s.now, 'attack',
+          { raid: UI.atkMode === 'raid' && s.villages[m.target] && s.villages[m.target].owner === null }));
         if (r.ok) {
           toast('info', 'Wojsko wyruszyło. Przybycie za ' + dur(r.movement.arrive - st().now) + '.');
           UI.atk = {};
@@ -1622,6 +1654,23 @@
       case 'withdraw': {
         const r = G.action(s => E.withdrawSupport(s, b.dataset.host, b.dataset.origin, s.now));
         if (r.ok) toast('info', 'Wsparcie wraca do domu. Powrót za ' + dur(r.movement.arrive - st().now) + '.'); else toast('bad', r.reason);
+        UI.sigs = {}; render();
+        break;
+      }
+      // Odsyła (hosted) albo odwołuje (abroad) wszystkie oddziały wsparcia danej wioski naraz.
+      case 'withdraw-all': {
+        const id = b.dataset.id, mode = b.dataset.mode;
+        const r = G.action(s => {
+          const pairs = mode === 'hosted'
+            ? Object.keys(s.villages[id].support || {}).filter(o => s.villages[o]).map(o => [id, o])
+            : Object.values(s.villages).filter(w => w.support && w.support[id]).map(w => [w.id, id]);
+          let n = 0, last = 0;
+          pairs.forEach(([h, o]) => { const x = E.withdrawSupport(s, h, o, s.now); if (x.ok) { n++; last = Math.max(last, x.movement.arrive); } });
+          return { n, last };
+        });
+        if (r && r.ok === false) { /* gra wstrzymana – komunikat już pokazany */ }
+        else if (r && r.n) toast('info', (mode === 'hosted' ? 'Odesłano wsparcie: ' : 'Odwołano wsparcie: ') + r.n + ' odd. Ostatni dotrze za ' + dur(r.last - st().now) + '.');
+        else toast('bad', 'Brak wsparcia do ' + (mode === 'hosted' ? 'odesłania' : 'odwołania') + '.');
         UI.sigs = {}; render();
         break;
       }
@@ -1783,12 +1832,12 @@
       }
       case 'send-spy': case 'send-transport': case 'send-settle': case 'send-support': {
         const m = UI.modal;
-        const r = G.action(s => act === 'send-support' ? E.sendSupport(s, m.from, m.target, formUnits(), s.now, UI.form.mode || 'support')
+        const r = G.action(s => act === 'send-support' ? E.sendSupport(s, m.from, m.target, formUnits(), s.now, supMode())
           : act === 'send-spy' ? E.sendSpy(s, m.from, m.target, UI.form.scout, s.now)
           : act === 'send-transport' ? E.sendTransport(s, m.from, m.target, formRes(), s.now)
           : E.sendSettler(s, m.from, m.x, m.y, s.now));
         if (r.ok) {
-          toast('info', (act === 'send-support' ? (UI.form.mode === 'stay' ? 'Wojsko wyruszyło' : 'Wsparcie wyruszyło') : act === 'send-spy' ? 'Zwiadowcy wyruszyli' : act === 'send-transport' ? 'Kupcy wyruszyli' : 'Osadnik wyruszył') +
+          toast('info', (act === 'send-support' ? (supMode() === 'stay' ? 'Wojsko wyruszyło' : 'Wsparcie wyruszyło') : act === 'send-spy' ? 'Zwiadowcy wyruszyli' : act === 'send-transport' ? 'Kupcy wyruszyli' : 'Osadnik wyruszył') +
             '. Na miejscu za ' + dur(r.movement.arrive - st().now) + '.');
           UI.form = {};
           closeModal(); invalidate(); render();

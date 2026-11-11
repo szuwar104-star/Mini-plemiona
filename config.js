@@ -287,7 +287,8 @@
       spearPerDist: 1.5,
       axePerDist: 0.6,
       lightFromDist: 7,
-      startRes: 300
+      startRes: 300,
+      regenPerHour: 0.25           // po najeździe wolna osada odtwarza 25% swojej stałej załogi na godzinę
     },
 
     PLAYER: { name: 'Twoje plemię', color: '#2f62c9' },
@@ -311,6 +312,7 @@
         lootScale: 3000,         // ile surowców w celu podwaja jego atrakcyjność
         gatherRange: 7,          // z jak daleka frakcja ściąga jednostki ataku do wioski frontowej
         powerPerPoint: 30,       // min. siła wyprawy = minPower osobowości + punkty wioski × ta wartość
+        // raids (osobowość): chęć grabienia wolnych osad po osiągnięciu limitu wiosek; 0 = nie grabi
         scoutCap: 6, siegeCap: 20
       },
       startBuildings: { hq: 3, wood: 3, clay: 3, iron: 2, farm: 2, barracks: 2 },
@@ -343,7 +345,7 @@
           recruitShare: 0.7, attackChance: 0.6, attackRatio: 1.3, keepHome: 0.2,
           minPower: 250, range: 8, targets: 'any', anyAfterMin: 0,
           neutralBias: 1, playerBias: 1.6, nobles: true, maxVillages: 12, settle: false, spyChance: 0.15,
-          homeDef: 28, waves: 2, gatherChance: 0.08
+          homeDef: 28, waves: 2, gatherChance: 0.08, raids: 1.2
         },
         economic: {
           label: 'gospodarcza',
@@ -352,7 +354,7 @@
           recruitShare: 0.35, attackChance: 0.25, attackRatio: 2.0, keepHome: 0.5,
           minPower: 300, range: 6, targets: 'neutral', anyAfterMin: 30,
           neutralBias: 2, playerBias: 0.8, nobles: true, maxVillages: 8, settleMax: 12, settle: true, spyChance: 0.05,
-          homeDef: 30, waves: 1, gatherChance: 0.04
+          homeDef: 30, waves: 1, gatherChance: 0.04, raids: 1
         },
         defensive: {
           label: 'obronna',
@@ -361,7 +363,7 @@
           recruitShare: 0.5, attackChance: 0.2, attackRatio: 2.5, keepHome: 0.8,
           minPower: 300, range: 5, targets: 'neutral', anyAfterMin: 45,
           neutralBias: 2, playerBias: 0.6, nobles: false, maxVillages: 6, settleMax: 7, settle: true, spyChance: 0.05,
-          homeDef: 45, waves: 1, gatherChance: 0
+          homeDef: 45, waves: 1, gatherChance: 0, raids: 0.5
         },
         expansionist: {
           label: 'ekspansywna',
@@ -370,7 +372,7 @@
           recruitShare: 0.55, attackChance: 0.5, attackRatio: 1.5, keepHome: 0.3,
           minPower: 200, range: 9, targets: 'any', anyAfterMin: 0,
           neutralBias: 2.5, playerBias: 1, nobles: true, maxVillages: 13, settleMax: 17, settle: true, spyChance: 0.1,
-          homeDef: 25, waves: 2, gatherChance: 0.06
+          homeDef: 25, waves: 2, gatherChance: 0.06, raids: 0.8
         }
       }
     },
