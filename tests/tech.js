@@ -205,5 +205,19 @@ sv.buildings.market = 5; sim.factions.player.coins = 5000;
 for (let i = 0; i < 24; i++) { sv.res = { wood: 14000, clay: 14000, iron: 14000 }; E.buyCoins(sim, sv.id, 'clay', 3, sim.now); E.advance(sim, sim.now + 3600 * 1000); }
 ok(Object.values(sim.villages).every(x => E.RES.every(k => Number.isFinite(x.res[k]) && x.res[k] >= 0)), 'brak NaN i wartości ujemnych po symulacji');
 
+/* ---------- Rolnictwo: miejsce na farmach ---------- */
+{
+  const g = E.newGame(0, 777, 'normal', 'small'), pv = E.villagesOf(g, 'player')[0], av = E.villagesOf(g, 'ai')[0];
+  pv.buildings.farm = 10; if (av) av.buildings.farm = 10;
+  E.useDifficulty(g);
+  const base = C.BUILDINGS.farm.pop[10];
+  ok(E.popCap(pv) === base, 'bez badania limit farmy = tabela (' + base + ')');
+  g.factions.player.tech = g.factions.player.tech || {};
+  g.factions.player.tech.agri = 4;
+  E.useDifficulty(g);
+  ok(E.popCap(pv) === Math.floor(base * 1.2), 'Rolnictwo 4 daje +20% miejsca (' + E.popCap(pv) + ')');
+  if (av) ok(E.popCap(av) === base, 'AI nie korzysta z badań – limit bez zmian');
+}
+
 console.log(fails ? '\nBŁĘDÓW: ' + fails : '\nWszystkie testy Technologii przeszły.');
 process.exit(fails ? 1 : 0);

@@ -129,7 +129,10 @@
         return B.prod[L] + (next ? ' → ' + B.prod[next] : '') + ' ' +
           { wood: 'drewna', clay: 'gliny', iron: 'żelaza' }[key] + ' na minutę';
       }
-      case 'farm': return 'Miejsca dla wojska: ' + fmt(B.pop[L]) + (next ? ' → ' + fmt(B.pop[next]) : '');
+      case 'farm': {
+        const m = v.owner === 'player' ? E.popMult() : 1;
+        return 'Miejsca dla wojska: ' + fmt(Math.floor(B.pop[L] * m)) + (next ? ' → ' + fmt(Math.floor(B.pop[next] * m)) : '');
+      }
       case 'wall': return 'Obrona +' + Math.round(B.bonus[L] * 100) + '%' + (next ? ' → +' + Math.round(B.bonus[next] * 100) + '%' : '') +
         ', mur sam broni siłą ' + B.flat[L] + (next ? ' → ' + B.flat[next] : '');
       case 'market': return 'Wymiana surowców (kurs ' + Math.round(E.exchangeRate() * 100) + '%) i zakup monet. Kupcy: ' + B.merchants[L] + (next ? ' → ' + B.merchants[next] : '') + ', każdy wiezie do ' + fmt(C.MERCHANT.capacity) + ' surowców';
@@ -487,7 +490,7 @@
   }
 
   /* ---------- ekran: TECHNOLOGIA ---------- */
-  const TECH_ICON = { drill: 'barracks', trade: 'market', store: 'hq', mint: 'coin', build: 'pick', tools: 'pick', p_wood: 'wood', p_clay: 'clay', p_iron: 'iron', plunder: 'merchant', hide: 'wall' };
+  const TECH_ICON = { drill: 'barracks', trade: 'market', store: 'hq', agri: 'farm', mint: 'coin', build: 'pick', tools: 'pick', p_wood: 'wood', p_clay: 'clay', p_iron: 'iron', plunder: 'merchant', hide: 'wall' };
   function techEffectText(n, lvl, next) {
     const e = n.effect, pc = x => Math.round(x * 1000) / 10;
     const cur = lvl, nxt = next;
@@ -501,6 +504,7 @@
       case 'prod': return 'Produkcja wszystkich surowców ' + line(l => '+' + pc(e.per * l) + '%');
       case 'prodWood': case 'prodClay': case 'prodIron': return 'Produkcja surowca ' + line(l => '+' + pc(e.per * l) + '%');
       case 'carry': return 'Udźwig łupu ' + line(l => '+' + pc(e.per * l) + '%');
+      case 'pop': return 'Miejsce na farmach ' + line(l => '+' + pc(e.per * l) + '%');
       case 'hide': return 'Ukryta część magazynu ' + line(l => '+' + pc(e.per * l) + ' p.p.');
       case 'mint': return 'Limit zakupu monet ' + line(l => '+' + (e.per * l) + '/h na wioskę');
     }
