@@ -158,3 +158,12 @@ Na wolnej osadzie masz dwa rozkazy: **Atakuj** (wygrana przejmuje osadę, jak do
 - Stare zapisy: osady bez zapisanej stałej załogi przyjmują obecną załogę jako bazę przy pierwszym przeliczeniu. Rozkazy wysłane przed aktualizacją działają jak zwykły atak.
 
 Test: `node tests/raid.js`.
+
+## Podbój: wojsko zostaje, kolejne fale zawracają
+
+- **Zdobywcy zostają.** Gdy atak przejmuje wioskę (wolną osadę albo wioskę frakcji Dowódcą), ocalałe jednostki zostają w niej jako jej załoga, zamiast wracać do domu. Surowce, które normalnie byłyby łupem, też zostają w przejętej wiosce. W raporcie: „Twoje wojsko (N jedn.) zostało w przejętej wiosce”.
+- **Kolejne fale zawracają.** Jeśli atak dociera do wioski, która w międzyczasie stała się Twoja (np. zdobyła ją wcześniejsza fala), bitwy nie ma – wojsko zawraca do wioski, z której wyruszyło („Zawraca do X – Y jest już Twoja”). Wcześniej takie wojsko wzmacniało zdobytą wioskę.
+- Zasady dotyczą też AI. Grabież (tryb bez przejęcia) działa bez zmian – wojsko wraca z łupem.
+- Ocalali mogą przekroczyć miejsce na farmie przejętej wioski – wtedy rekrutacja jest tam wstrzymana do rozbudowy Farmy albo odesłania części wojska.
+
+Test: `node tests/conquest.js`.

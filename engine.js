@@ -994,10 +994,13 @@
     const origin = state.villages[m.from];
     tickVillage(state, target, t);
 
-    // Cel w międzyczasie przeszedł na własność atakującego – wojsko wzmacnia wioskę.
+    // Cel w międzyczasie przeszedł na własność atakującego (np. zdobyła go wcześniejsza fala) –
+    // bitwy nie ma, wojsko zawraca do wioski, z której wyruszyło.
     if (target.owner === m.owner) {
-      UNITS.forEach(k => { target.units[k] += m.units[k]; });
-      if (m.owner === 'player') notice(state, t, 'info', 'Wojsko dotarło do Twojej wioski ' + target.name + ' i ją wzmocniło.');
+      const units = Object.assign(emptyUnits(), m.units);
+      state.movements.push({ id: newId(state, 'm'), type: 'return', owner: m.owner, from: m.from, to: m.to, bounced: true,
+        units, loot: null, start: t, arrive: t + travelTime(target, origin, units) });
+      if (m.owner === 'player') notice(state, t, 'info', 'Wioska ' + target.name + ' jest już Twoja – wojsko zawraca do ' + origin.name + '.');
       return;
     }
 
@@ -1075,6 +1078,15 @@
     }
     if (conquered) changeOwner(state, target, m.owner, defOwner, t);
 
+    // Zdobywcy zostają w przejętej wiosce; zrabowane surowce też zostają na miejscu.
+    let stayed = 0;
+    if (conquered) {
+      stayed = sumUnits(survivors);
+      UNITS.forEach(k => { target.units[k] += survivors[k]; survivors[k] = 0; });
+      const cap = storageCap(target);
+      RES.forEach(r => { target.res[r] = Math.min(cap, target.res[r] + loot[r]); loot[r] = 0; });
+    }
+
     // Powrót ocalałych
     if (sumUnits(survivors) > 0) {
       const back = { id: newId(state, 'm'), type: 'return', owner: m.owner, from: m.from, to: m.to,
@@ -1094,7 +1106,7 @@
       attacker: m.owner, defender: defOwner,
       fromName: origin.name, fromX: origin.x, fromY: origin.y, from: origin.id,
       toName: target.name, toX: target.x, toY: target.y, to: target.id,
-      attUnits, attLoss, defUnits, defLoss, attackerWon, loot, luck: Math.round((luck - 1) * 100), raid: !!m.raid,
+      attUnits, attLoss, defUnits, defLoss, attackerWon, loot, luck: Math.round((luck - 1) * 100), raid: !!m.raid, stayed,
       loyaltyBefore: defOwner !== null && attUnits.noble > 0 ? loyaltyBefore : null, loyaltyAfter, conquered,
       wallBefore, wallFight, wallAfter, hadSupport, lootCapacity, lootHidden, killPts,
       intel: intel && intel.buildings ? intel : null

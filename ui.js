@@ -266,7 +266,7 @@
       extra = '<span class="muted">założą nową wioskę</span>';
     } else {
       cls = 'ret'; icon = 'light';
-      title = 'Powrót do ' + esc(from.name) + ' z ' + esc(to.name);
+      title = m.bounced ? 'Zawraca do ' + esc(from.name) + ' – ' + esc(to.name) + ' jest już Twoja' : 'Powrót do ' + esc(from.name) + ' z ' + esc(to.name);
       extra = unitsLine(m.units);
       if (m.loot && (m.loot.wood + m.loot.clay + m.loot.iron) > 0) extra += ' <span class="loot">' + E.RES.map(r => ico(r) + fmt(m.loot[r])).join(' ') + '</span>';
     }
@@ -737,6 +737,8 @@
       if (lootSum > 0) {
         html += '<p>' + (r.kind === 'defense' ? 'Wróg zrabował: ' : 'Łup: ') + E.RES.map(rs => ico(rs) + fmt(r.loot[rs])).join(' ') +
           (r.lootCapacity ? ' <span class="muted">(udźwig oddziału: ' + fmt(r.lootCapacity) + ')</span>' : '') + '</p>';
+      } else if (r.stayed) {
+        html += '<p>' + (r.attacker === 'player' ? 'Twoje wojsko' : 'Wojsko zdobywcy') + ' (' + fmt(r.stayed) + ' jedn.) zostało w przejętej wiosce, surowce zostały na miejscu.</p>';
       } else if (r.attackerWon && E.sumUnits(E.UNITS.reduce((o, k) => { o[k] = r.attUnits[k] - r.attLoss[k]; return o; }, {})) > 0) {
         const why = r.lootCapacity === 0 ? 'ocalałe jednostki nie przenoszą surowców'
           : r.lootHidden ? 'wszystkie surowce były w schowku (chronione do ' + fmt(r.lootHidden) + ' każdego surowca)'
