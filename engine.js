@@ -686,6 +686,46 @@
       first: Math.min.apply(null, sent.map(m => m.arrive)) };
   }
 
+  /* ---------- rekrutacja zbiorcza: ta sama jednostka we wszystkich wioskach ---------- */
+  // opts.count – liczba na wioskę (każda bierze tyle, ile może, ale nie więcej); opts.max – maksimum w każdej wiosce;
+  // opts.off – { villageId: true } wioski pominięte.
+  function planRecruitAll(state, unit, opts, t) {
+    opts = opts || {};
+    const want = Math.max(0, Math.floor(Number(opts.count) || 0)), off = opts.off || {};
+    const plan = { unit, rows: [], total: 0, cost: { wood: 0, clay: 0, iron: 0 } };
+    if (!C.UNITS[unit]) return plan;
+    const U = C.UNITS[unit];
+    villagesOf(state, 'player').sort((a, b) => a.name.localeCompare(b.name, 'pl')).forEach(v => {
+      tickVillage(state, v, t);
+      const info = recruitInfo(state, v, unit);
+      const row = { villageId: v.id, n: 0, off: !!off[v.id], skip: '' };
+      if (!info.ok) row.skip = info.reason || 'Niedostępne';
+      else if (!opts.max && want < 1) row.skip = 'Podaj liczbę';
+      else {
+        row.n = opts.max ? info.max : Math.min(want, info.max);
+        row.short = !opts.max && row.n < want;
+        if (row.off) row.skip = 'Pominięta';
+      }
+      if (row.skip) row.n = 0;
+      if (row.n > 0) {
+        plan.total += row.n;
+        RES.forEach(r => { plan.cost[r] += U.cost[r] * row.n; });
+      }
+      plan.rows.push(row);
+    });
+    return plan;
+  }
+  function recruitAll(state, plan, t) {
+    const done = [], failed = [];
+    plan.rows.forEach(r => {
+      if (r.skip || r.n < 1) return;
+      const res = queueRecruit(state, state.villages[r.villageId], plan.unit, r.n, t);
+      if (res.ok) done.push({ villageId: r.villageId, n: r.n }); else failed.push(res.reason);
+    });
+    if (!done.length) return { ok: false, reason: failed[0] || 'Nic do zrekrutowania', done, failed };
+    return { ok: true, done, failed, total: done.reduce((a, d) => a + d.n, 0) };
+  }
+
   function resolveTransport(state, m, t) {
     const to = state.villages[m.to], from = state.villages[m.from];
     let back = { wood: 0, clay: 0, iron: 0 };
@@ -1033,6 +1073,6 @@
     buildInfo, queueBuild, recruitInfo, queueRecruit, recruitPer,
     travelTime, slowest, sendAttack, sendSpy, advance, nextEvent,
     unitsPop, supportRoom, sendSupport, withdrawSupport, defenders, defenseFrom, villageDefense,
-    merchantsTotal, merchantsBusy, merchantsFree, merchantTime, sendTransport, planGather, sendGather, planTroops, sendTroops, incomingRes, settleCheck, sendSettler
+    merchantsTotal, merchantsBusy, merchantsFree, merchantTime, sendTransport, planGather, sendGather, planTroops, sendTroops, planRecruitAll, recruitAll, incomingRes, settleCheck, sendSettler
   };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -750,3 +750,7 @@ table.gather td small { color: var(--muted); margin-left: .35rem; }
 .rnav .btn { flex: 0 0 auto; }
 .rnav .muted { flex: 1; text-align: center; }
 .dialog > .actions + .rnav { margin: .75rem 0 0; }
+
+/* ---------- szkolenie zbiorcze ---------- */
+.rrow { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.rrow input[type=number] { flex: 1 1 8rem; min-width: 0; }
