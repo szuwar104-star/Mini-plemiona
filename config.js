@@ -23,7 +23,7 @@
   }
 
   MP.CONFIG = {
-    SAVE_VERSION: 8,
+    SAVE_VERSION: 9,
 
     // Poziomy trudności – mnożniki dla gracza i AI.
     // playerProd / aiProd: produkcja surowców; graceMinutes: ochrona gracza na starcie;
@@ -223,6 +223,26 @@
     // Konwoje (automatyczne odsyłanie nadwyżek do wioski centralnej)
     AUTO: { everyMin: [5, 15, 30], defaults: { high: 80, keep: 40, everyMin: 15, coins: true } },
 
+    // Dyplomacja (diplomacy.js): nastawienie frakcji AI, pakty o nieagresji, dary, zdrada.
+    // Czasy w minutach, tempo zmian nastawienia w punktach NA GODZINĘ. Nastawienie: -100 (wróg) … +100 (przyjaciel).
+    DIPLO: {
+      pactMin: 360,              // czas trwania paktu o nieagresji
+      breakNoticeMin: 20,        // wypowiedzenie: tyle minut pakt jeszcze chroni po zerwaniu
+      renewWindowMin: 45,        // AI proponuje przedłużenie, gdy do końca paktu zostaje tyle minut
+      warnMin: 30,               // ostrzeżenie o wygasaniu paktu gracza
+      maxPacts: 2, playerMaxPacts: 3,
+      offerTtlMin: 180,          // oferta AI dla gracza wygasa po tylu minutach
+      rejectCoolMin: 30,         // po odrzuceniu propozycji kolejna dopiero po tylu minutach
+      breakPenalty: 40,          // o tyle spada nastawienie ofiary zerwanego paktu do zrywającego
+      repPerBreak: 1,            // zerwanie paktu: punkt nieufności u wszystkich (maleje w czasie)
+      repDecayHours: 8,          // tyle godzin znika 1 punkt nieufności
+      hitWin: 12, hitLoss: 5, hitConquer: 30, allyOutrage: 6, // spadek nastawienia po ataku (wygrany / przegrany / z podbojem)
+      signBonus: 8,              // wzrost nastawienia po podpisaniu paktu
+      giftPerRes: 600,           // tyle surowców daje +1 do nastawienia
+      giftMax: 20, giftCoolMin: 20, // maks. wzrost z jednego daru i przerwa między darami dla tej samej frakcji
+      leaderShare: 0.6           // frakcja z tą częścią celu zwycięstwa jest „liderem”: nikt nie zawiera z nią paktu, wszyscy chętniej ją atakują
+    },
+
     // Nowa wioska założona przez Osadnika
     SETTLE: {
       buildings: { hq: 1, wood: 1, clay: 1, iron: 1, farm: 1, barracks: 0, market: 0, wall: 0 },
@@ -375,6 +395,10 @@
       personalities: {
         aggressive: {
           label: 'agresywna',
+          // dyplomacja: baseline/cap = zakres nastawienia; warm/heal = tempo na godzinę; minAttitude = próg zgody na pakt;
+          // repLimit = ile zerwanych paktów u proponującego go zniechęca; offerChance = szansa na minutę na własną propozycję;
+          // betray = szansa na minutę na zdradę słabszego partnera; revenge = skala zemsty; leaderBias = zapał do atakowania lidera
+          diplo: { baseline: -10, cap: 25, warm: 1.5, heal: 3, minAttitude: 5, repLimit: 3, offerChance: 0.004, betray: 0.006, revenge: 30, leaderBias: 0.5 },
           buildWeights: { hq: 1, wood: 1, clay: 1, iron: 1.2, farm: 1.2, barracks: 1.5, market: 0.4, wall: 0.6 },
           unitWeights: { spear: 1, axe: 4, scout: 0.3, light: 3, ram: 0.5, archer: 0.5, guard: 0.4 },
           recruitShare: 0.7, attackChance: 0.6, attackRatio: 1.3, keepHome: 0.2,
@@ -384,6 +408,10 @@
         },
         economic: {
           label: 'gospodarcza',
+          // dyplomacja: baseline/cap = zakres nastawienia; warm/heal = tempo na godzinę; minAttitude = próg zgody na pakt;
+          // repLimit = ile zerwanych paktów u proponującego go zniechęca; offerChance = szansa na minutę na własną propozycję;
+          // betray = szansa na minutę na zdradę słabszego partnera; revenge = skala zemsty; leaderBias = zapał do atakowania lidera
+          diplo: { baseline: 10, cap: 60, warm: 3, heal: 5, minAttitude: -5, repLimit: 2, offerChance: 0.02, betray: 0, revenge: 60, leaderBias: 1 },
           buildWeights: { hq: 1.3, wood: 1.5, clay: 1.5, iron: 1.4, farm: 1, barracks: 0.7, market: 0.6, wall: 0.8 },
           unitWeights: { spear: 2, axe: 1, scout: 0.2, light: 1, ram: 0.1, archer: 2, guard: 1.5 },
           recruitShare: 0.35, attackChance: 0.25, attackRatio: 2.0, keepHome: 0.5,
@@ -393,6 +421,10 @@
         },
         defensive: {
           label: 'obronna',
+          // dyplomacja: baseline/cap = zakres nastawienia; warm/heal = tempo na godzinę; minAttitude = próg zgody na pakt;
+          // repLimit = ile zerwanych paktów u proponującego go zniechęca; offerChance = szansa na minutę na własną propozycję;
+          // betray = szansa na minutę na zdradę słabszego partnera; revenge = skala zemsty; leaderBias = zapał do atakowania lidera
+          diplo: { baseline: 5, cap: 60, warm: 2.5, heal: 4, minAttitude: 0, repLimit: 2, offerChance: 0.015, betray: 0, revenge: 50, leaderBias: 0.8 },
           buildWeights: { hq: 1.2, wood: 1.2, clay: 1.2, iron: 1, farm: 1.4, barracks: 1, market: 0.4, wall: 1.4 },
           unitWeights: { spear: 5, axe: 1, scout: 0.5, light: 0.5, ram: 0, archer: 4, guard: 5 },
           recruitShare: 0.5, attackChance: 0.2, attackRatio: 2.5, keepHome: 0.8,
@@ -402,6 +434,10 @@
         },
         expansionist: {
           label: 'ekspansywna',
+          // dyplomacja: baseline/cap = zakres nastawienia; warm/heal = tempo na godzinę; minAttitude = próg zgody na pakt;
+          // repLimit = ile zerwanych paktów u proponującego go zniechęca; offerChance = szansa na minutę na własną propozycję;
+          // betray = szansa na minutę na zdradę słabszego partnera; revenge = skala zemsty; leaderBias = zapał do atakowania lidera
+          diplo: { baseline: -5, cap: 40, warm: 2, heal: 3, minAttitude: 10, repLimit: 3, offerChance: 0.006, betray: 0.004, revenge: 35, leaderBias: 0.7 },
           buildWeights: { hq: 1.2, wood: 1.1, clay: 1.1, iron: 1.1, farm: 1.2, barracks: 1.3, market: 0.4, wall: 0.6 },
           unitWeights: { spear: 1, axe: 3, scout: 0.3, light: 2, ram: 0.3, archer: 0.5, guard: 0.4 },
           recruitShare: 0.55, attackChance: 0.5, attackRatio: 1.5, keepHome: 0.3,

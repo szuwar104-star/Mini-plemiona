@@ -375,7 +375,7 @@
     const s = st(), el = $('#screen-overview');
     const own = E.villagesOf(s, 'player').sort((a, b) => a.name.localeCompare(b.name, 'pl'));
     // odświeżanie co 5 s albo przy zmianie struktury – liczniki czasu tykają same
-    const sig = JSON.stringify([own.map(v => [v.id, v.buildQueue.length, v.recruitQueue.length, E.sumUnits(v.units)]), incomingAttacks(s).length, UI.vid, Math.floor(s.now / 5000)]);
+    const sig = JSON.stringify([own.map(v => [v.id, v.buildQueue.length, v.recruitQueue.length, E.sumUnits(v.units)]), incomingAttacks(s).length, diploOffers(s), UI.vid, Math.floor(s.now / 5000)]);
     if (UI.sigs.overview === sig) return;
     UI.sigs.overview = sig;
     if (!own.length) { el.innerHTML = noVillages(); return; }
@@ -405,14 +405,16 @@
         '<td>' + (attacks.length ? '<span class="alert">' + ico('sword') + attacks.length + ' <span class="timer" data-end="' + attacks[0].arrive + '"></span></span>' : '') + '</td></tr>';
     }).join('');
     el.innerHTML = '<section class="ov-head panel"><div><h1>Przegląd wiosek</h1><p class="tags"><span>' + own.length + ' z ' + E.winVillages(s) + ' wiosek</span>' +
-      (inc.length ? '<span class="warn">Nadciągające ataki: ' + inc.length + '</span>' : '') + '</p>' +
+      (inc.length ? '<span class="warn">Nadciągające ataki: ' + inc.length + '</span>' : '') +
+      (diploOffers(s) ? '<span class="warn">Oferty paktów: ' + diploOffers(s) + '</span>' : '') + '</p>' +
       '<div class="actions left"><button class="btn" data-act="gather-open"' + (own.length > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"') + '>' + ico('merchant') + 'Zbierz / rozdziel surowce</button>' +
       '<button class="btn" data-act="troops-open"' + (own.length > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"') + '>' + ico('spear') + 'Zbierz / rozdziel wojsko</button>' +
       '<button class="btn" data-act="mass-open">' + ico('barracks') + 'Szkol we wszystkich wioskach</button>' +
       '<button class="btn" data-act="buildall-open">' + ico('hq') + 'Buduj we wszystkich wioskach</button>' +
       '<button class="btn" data-act="auto-open"' + (own.length > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"') + '>' + ico('merchant') + 'Konwoje' +
         (s.auto && s.auto.on ? ' <small>(wł.)</small>' : '') + '</button>' +
-      '<button class="btn" data-act="tech-open">' + ico('scroll') + 'Technologia</button></div></div>' +
+      '<button class="btn" data-act="tech-open">' + ico('scroll') + 'Technologia</button>' +
+      '<button class="btn" data-act="diplo-open">' + ico('scroll') + 'Dyplomacja' + (diploOffers(s) ? ' <small>(' + diploOffers(s) + ')</small>' : '') + '</button></div></div>' +
       '<div class="army-kpis ov-kpis">' + E.RES.map(r => '<div class="kpi"><small>' + C.RESOURCES[r].name + ' razem</small><b>' + fmt(total[r]) + '</b><small>+' + Math.round(prod[r]) + ' / min</small></div>').join('') +
       '<div class="kpi"><small>Wojsko w wioskach</small><b>' + fmt(army) + '</b></div>' +
       '<div class="kpi"><small>Moc konta</small><b>' + fmt(pw.total) + '</b><small>bud. ' + fmt(pw.buildings) + ' + woj. ' + fmt(pw.army) + '</small></div></div></section>' +
@@ -895,6 +897,7 @@
         : 'Aby przejąć wioskę, pokonaj obrońców z Dowódcą podboju w armii, aż poparcie spadnie do zera.') + '</p>' +
         '<p class="muted tip">Dwuklik na tej wiosce otwiera okno ataku z ' + esc(v0.name) + '.</p>' +
         '<div class="actions"><button class="btn ghost" data-act="spy-open" data-id="' + v.id + '">' + ico('scout') + 'Zwiad</button>' +
+        (v.owner !== null ? '<button class="btn ghost" data-act="diplo-open">' + ico('scroll') + 'Dyplomacja</button>' : '') +
         (v.owner === null ? '<button class="btn" data-act="attack-open" data-mode="raid" data-id="' + v.id + '">' + ico('merchant') + 'Grabież</button>' : '') +
         '<button class="btn danger" data-act="attack-open" data-mode="conquer" data-id="' + v.id + '">' + ico('sword') + 'Atakuj</button></div>';
     }
@@ -1332,6 +1335,64 @@
       '</tbody></table></div></section>';
   }
 
+  /* ---------- dyplomacja ---------- */
+  const DIP = () => MP.Diplomacy;
+  function diploOffers(s) { const d = s.diplo; return d ? d.offers.filter(o => o.expires > s.now && s.factions[o.from] && s.factions[o.from].alive).length : 0; }
+  function diploModal() {
+    const s = st(), D = DIP(), d = D.ensure(s), cfg = C.DIPLO, t = s.now;
+    const v0 = cur();
+    const factions = Object.values(s.factions).filter(f => f.ai && f.alive);
+    const left = Math.max(0, Math.round(s.now));
+    const offers = d.offers.filter(o => o.expires > t && s.factions[o.from] && s.factions[o.from].alive);
+    const myPacts = D.pactsOf(s, 'player', t);
+    let html = '<h2>' + ico('scroll') + 'Dyplomacja</h2>' +
+      '<p class="muted">Pakt o nieagresji trwa ' + Math.round(cfg.pactMin / 60) + ' h: żadna ze stron nie może wtedy atakować drugiej. Masz ' + myPacts.length + ' z ' + cfg.playerMaxPacts + ' paktów. ' +
+      'Wypowiedzenie chroni jeszcze ' + cfg.breakNoticeMin + ' min, a zrywający traci zaufanie wszystkich frakcji. Zwiad pozostaje dozwolony.</p>';
+    if (offers.length) {
+      html += '<section><h3>Oferty dla Ciebie</h3><ul class="dp-list">' + offers.map(o =>
+        '<li class="dp-card"><div class="dp-top"><span>' + flag(s, o.from) + ' <small class="muted">' + (o.renew ? 'proponuje przedłużenie paktu' : 'proponuje pakt o nieagresji') + '</small></span>' +
+        '<span class="muted">wygasa za <span class="timer" data-end="' + o.expires + '"></span></span></div>' +
+        '<div class="actions left"><button class="btn" data-act="diplo-accept" data-id="' + o.id + '">Przyjmij</button>' +
+        '<button class="btn ghost" data-act="diplo-decline" data-id="' + o.id + '">Odrzuć</button></div></li>').join('') + '</ul></section>';
+    }
+    html += '<section><h3>Frakcje</h3><ul class="dp-list">' + factions.map(f => {
+      const att = Math.round(D.attitude(s, f.id, 'player'));
+      const pact = D.pactBetween(s, 'player', f.id, t);
+      const pend = offers.some(o => o.from === f.id);
+      const a = D.assess(s, f.id, 'player', t);
+      const others = D.pactsOf(s, f.id, t).map(p => D.partnerOf(p, f.id)).filter(x => x !== 'player');
+      const leader = D.isLeader(s, f.id, t);
+      let status, btns = '';
+      if (pact) {
+        status = pact.breakAt != null
+          ? '<span class="dp-warn">Pakt wypowiedziany – chroni jeszcze <span class="timer" data-end="' + pact.breakAt + '"></span></span>'
+          : '<span class="dp-ok">Pakt o nieagresji: jeszcze <span class="timer" data-end="' + pact.end + '"></span></span>';
+        if (pact.breakAt == null) {
+          const late = pact.end - t <= cfg.pactMin * 60000 / 2;
+          btns += '<button class="btn"' + (late ? '' : ' disabled title="Przedłużenie w drugiej połowie paktu"') + ' data-act="diplo-propose" data-id="' + f.id + '">Przedłuż pakt</button>' +
+            '<button class="btn danger" data-act="diplo-break" data-id="' + f.id + '">Wypowiedz pakt</button>';
+        }
+      } else {
+        status = '<span class="muted">Brak paktu</span>';
+        btns += '<button class="btn"' + (pend ? ' disabled title="Ta frakcja złożyła Ci już ofertę"' : '') + ' data-act="diplo-propose" data-id="' + f.id + '">Zaproponuj pakt</button>';
+      }
+      const hint = pact ? '' : pend ? 'Ta frakcja złożyła Ci ofertę.' : a.ok ? 'Skłonna do paktu.' : esc(a.reason) + (a.need ? ' (brakuje ok. ' + a.need + ' pkt nastawienia)' : '');
+      const gv = v0 ? [3000, 6000, 12000].map(n => '<button class="btn ghost sm" data-act="diplo-gift" data-id="' + f.id + '" data-n="' + n + '" title="Dar z wioski ' + esc(v0.name) + '">' +
+        fmt(n) + ' <small>+' + Math.min(cfg.giftMax, Math.floor(n / cfg.giftPerRes)) + '</small></button>').join('') : '';
+      return '<li class="dp-card"><div class="dp-top"><span>' + flag(s, f.id) + ' <small class="muted">' + C.AI.personalities[f.personality].label + ', ' + E.villagesOf(s, f.id).length + ' wiosek</small>' +
+        (leader ? ' <span class="dp-warn">lider</span>' : '') + '</span><span>' + D.attitudeLabel(att) + ' <small class="muted">' + (att > 0 ? '+' : '') + att + '</small></span></div>' +
+        '<span class="dp-meter"><i style="left:' + ((att + 100) / 2) + '%"></i></span>' +
+        '<div class="dp-line">' + status + (others.length ? '<small class="muted"> · w pakcie z: ' + others.map(o => esc(E.ownerName(s, o))).join(', ') + '</small>' : '') + '</div>' +
+        (hint ? '<p class="muted dp-hint">' + hint + '</p>' : '') +
+        '<div class="actions left">' + btns + '</div>' +
+        (gv ? '<div class="dp-gift"><small class="muted">Dar z aktywnej wioski:</small> ' + gv + '</div>' : '') + '</li>';
+    }).join('') + '</ul></section>' +
+      '<p class="muted seg-note">Nastawienie rośnie, gdy nikogo nie atakujesz, i spada po atakach na daną frakcję (najmocniej po podboju). Frakcja z ' +
+      Math.ceil(E.winVillages(s) * cfg.leaderShare) + ' wioskami jest „liderem”: nikt nie zawiera z nią paktu i wszyscy chętniej ją atakują.</p>' +
+      '<div class="actions"><button class="btn" data-act="close">Wróć do gry</button></div>';
+    return html;
+  }
+
   /* ---------- menu ---------- */
   function menuModal() {
     const s = st();
@@ -1341,6 +1402,9 @@
       '<div class="goal"><i style="width:' + Math.min(100, own / E.winVillages(s) * 100) + '%"></i></div></section>' +
       '<section><h3>Technologia</h3><p class="muted">Drzewko badań płatne monetami: ulepszenia wojska, magazyny, kurs wymiany.</p>' +
       '<div class="actions left"><button class="btn" data-act="tech-open">' + ico('scroll') + 'Otwórz Technologię</button></div></section>' +
+      '<section><h3>Dyplomacja</h3><p class="muted">Pakty o nieagresji z frakcjami, dary i oferty. Pakt chroni obie strony przed atakiem.' +
+        (diploOffers(s) ? ' <b>Masz ' + diploOffers(s) + ' ofert do rozpatrzenia.</b>' : '') + '</p>' +
+      '<div class="actions left"><button class="btn" data-act="diplo-open">' + ico('scroll') + 'Otwórz Dyplomację</button></div></section>' +
       powerSection(s) +
       rankingSection(s) +
       '<section><h3>Poziom trudności</h3>' + diffPicker(s.difficulty, 'set-diff') +
@@ -1360,6 +1424,7 @@
       '<li>Zwiadowcy odkrywają siłę obrony celu. Targowisko pozwala przewozić surowce, a Osadnik zakłada wioski na pustych równinach.</li>' +
       '<li>Mur obronny zwiększa obronę wioski, a tarany go burzą. Wsparcie broni innej Twojej wioski i możesz je odwołać na ekranie Wojsko.</li>' +
       '<li>Technologia (Menu lub Przegląd): badania kupujesz monetami. Monety kupisz w Targowisku za nadmiar surowca.</li>' +
+      '<li>Dyplomacja (Menu lub Przegląd): pakt o nieagresji chroni Cię przed frakcją na kilka godzin. Frakcje pamiętają ataki, dary poprawiają ich nastawienie.</li>' +
       '<li>Ekran Przegląd pokazuje wszystkie wioski naraz: surowce, kolejki, wojsko i nadciągające ataki.</li>' +
       '<li>Przez pierwsze ' + E.diff(s).graceMinutes + ' minut frakcje AI Cię nie atakują. ' + Math.round(E.diff(s).lootProtect * 100) + '% pojemności magazynu jest ukryte przed łupieżcami.</li></ul></section>' +
       '<section><h3>Nowa gra</h3><div class="actions left"><button class="btn danger" data-act="new-game">Zacznij od nowa</button></div></section>' +
@@ -1429,6 +1494,7 @@
     else if (UI.modal.type === 'auto') inner = autoModal();
     else if (UI.modal.type === 'report') inner = reportModal(s.reports.find(r => r.id === UI.modal.id));
     else if (UI.modal.type === 'menu') inner = menuModal();
+    else if (UI.modal.type === 'diplo') inner = diploModal();
     else if (UI.modal.type === 'newgame') inner = newGameModal();
     else if (UI.modal.type === 'end') inner = endModal();
     else if (UI.modal.type === 'confirm') inner = '<h2>' + UI.modal.title + '</h2><p>' + UI.modal.text + '</p><div class="actions">' +
@@ -1811,6 +1877,46 @@
         const v = cur();
         if (!v || !(v.buildings.market > 0)) { toast('bad', 'Zbuduj Targowisko w tej wiosce, aby kupować monety.'); break; }
         UI.form = { tab: 'coin' }; openModal('exchange', { from: v.id });
+        break;
+      }
+      case 'diplo-open': if (UI.modal) closeModal(); openModal('diplo'); break;
+      case 'diplo-propose': {
+        const r = G.action(s => DIP().proposeFromPlayer(s, b.dataset.id, s.now));
+        toast(r.ok ? 'good' : 'bad', r.ok ? (r.renewed ? 'Pakt przedłużony.' : 'Pakt zawarty.') : r.reason);
+        renderModal();
+        break;
+      }
+      case 'diplo-accept': case 'diplo-decline': {
+        const acc = b.dataset.act === 'diplo-accept';
+        const r = G.action(s => DIP().answerOffer(s, b.dataset.id, acc, s.now));
+        toast(r.ok ? 'good' : 'bad', r.ok ? (acc ? (r.renewed ? 'Pakt przedłużony.' : 'Pakt zawarty.') : 'Oferta odrzucona.') : r.reason);
+        renderModal();
+        break;
+      }
+      case 'diplo-break': {
+        UI.diploBreak = b.dataset.id;
+        const name = esc(E.ownerName(st(), b.dataset.id));
+        openModal('confirm', { title: 'Wypowiedzieć pakt z ' + name + '?', text: 'Pakt będzie chronił jeszcze ' + C.DIPLO.breakNoticeMin + ' min. Frakcja zapamięta zdradę, a inne chętniej odmówią Ci paktu.',
+          ok: 'diplo-break-ok', okLabel: 'Wypowiedz pakt' });
+        break;
+      }
+      case 'diplo-break-ok': {
+        const id = UI.diploBreak; UI.diploBreak = null;
+        const r = G.action(s => DIP().breakPact(s, 'player', id, s.now));
+        openModal('diplo');
+        toast(r.ok ? 'info' : 'bad', r.ok ? 'Pakt wypowiedziany.' : r.reason);
+        break;
+      }
+      case 'diplo-gift': {
+        const v = cur(), n = Number(b.dataset.n) || 0;
+        if (!v) break;
+        const r = G.action(s => {
+          const vv = s.villages[v.id]; E.tickVillage(s, vv, s.now);
+          const res = {}; E.RES.forEach(k => { res[k] = Math.min(Math.floor(n / E.RES.length), Math.floor(vv.res[k])); });
+          return DIP().gift(s, v.id, b.dataset.id, res, s.now);
+        });
+        toast(r.ok ? 'good' : 'bad', r.ok ? 'Dar przyjęty: nastawienie +' + r.delta + '.' : r.reason);
+        renderModal();
         break;
       }
       case 'tech-open': if (UI.modal) closeModal(); show('tech'); break;

@@ -573,6 +573,9 @@
     if (!from || !to) return { ok: false, reason: 'Nieznana wioska' };
     if (from.id === to.id) return { ok: false, reason: 'Nie można zaatakować tej samej wioski' };
     if (to.owner === from.owner) return { ok: false, reason: 'To Twoja wioska' };
+    if (type === 'attack' && to.owner !== null && MP.Diplomacy && MP.Diplomacy.blocked(state, from.owner, to.owner, t)) {
+      return { ok: false, reason: 'Pakt o nieagresji z ' + ownerName(state, to.owner) + ' – najpierw go wypowiedz (Menu → Dyplomacja).' };
+    }
     tickVillage(state, from, t);
     const u = cleanUnits(units);
     if (u.settler > 0) return { ok: false, reason: 'Osadnika wysyłasz przyciskiem „Załóż osadę” na pustym polu' };
@@ -1128,6 +1131,15 @@
       return;
     }
 
+    // Pakt o nieagresji podpisany w trakcie marszu – wojsko zawraca bez bitwy.
+    if (target.owner !== null && MP.Diplomacy && MP.Diplomacy.blocked(state, m.owner, target.owner, t)) {
+      const units = Object.assign(emptyUnits(), m.units);
+      state.movements.push({ id: newId(state, 'm'), type: 'return', owner: m.owner, from: m.from, to: m.to, bounced: true,
+        units, loot: null, start: t, arrive: t + travelTime(target, origin, units, m.owner) });
+      if (m.owner === 'player') notice(state, t, 'info', 'Pakt z ' + ownerName(state, target.owner) + ' – wojsko zawraca do ' + origin.name + '.');
+      return;
+    }
+
     const defOwner = target.owner;
     const attUnits = Object.assign(emptyUnits(), m.units);
     const defUnits = defenders(target);
@@ -1216,6 +1228,7 @@
       }
     }
     if (conquered) changeOwner(state, target, m.owner, defOwner, t);
+    if (MP.Diplomacy) MP.Diplomacy.onBattle(state, m.owner, defOwner, attackerWon, conquered, t);
 
     // Zdobywcy zostają w przejętej wiosce; zrabowane surowce też zostają na miejscu.
     let stayed = 0;
@@ -1409,6 +1422,7 @@
     exchange, exchangeMax, exchangeGet, exchangeRate, exchangeQuick, coinQuick, buyCoinsAll, mintLimit, mintTokens, buyCoins, techInfo, researchTech, techNode, techLevel, techCost, techEffects,
     tileAt, villagesOf, points, unitPoints, armyOf, accountPower, addKills, killsOf, ranking, ownerName, ownerColor,
     newGame, worldOf, winVillages, productionPerMin, storageCap, popCap, popMult, popUsed, tickVillage,
+    notice,
     buildInfo, queueBuild, recruitInfo, queueRecruit, recruitPer,
     travelTime, slowest, sendAttack, sendSpy, advance, nextEvent, gameClock, pauseGame, resumeGame,
     unitsPop, supportRoom, sendSupport, withdrawSupport, defenders, defenseFrom, villageDefense,
