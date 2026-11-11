@@ -1054,7 +1054,7 @@
       '<label class="field">' + (spread ? 'Wioska źródłowa' : 'Wioska docelowa') + ' <select data-gtarget>' + own.map(o => '<option value="' + o.id + '"' + (o.id === g.target ? ' selected' : '') + '>' +
         esc(o.name) + ' ' + xy(o.x, o.y) + '</option>').join('') + '</select></label>' +
       '<div class="gopts"><div class="field">Surowce<span class="gres">' + E.RES.map(k => '<label class="chk"><input type="checkbox" data-gres="' + k + '"' + (g.res[k] ? ' checked' : '') + '>' + ico(k) + C.RESOURCES[k].name + '</label>').join('') + '</span></div>' +
-      '<label class="field">Zostaw w wiosce wysyłającej (% magazynu)<input type="number" inputmode="numeric" min="0" max="100" step="5" data-greserve value="' + esc(g.reserve) + '"></label></div>' +
+      '<label class="field">Zostaw w wiosce wysyłającej (% magazynu)<input type="number" inputmode="numeric" min="0" max="100" step="5" placeholder="0" data-greserve value="' + nz(g.reserve) + '"></label></div>' +
       '<label class="chk"><input type="checkbox" data-gcap' + (g.capToRoom ? ' checked' : '') + '>Nie wysyłaj więcej, niż mieści magazyn ' + (spread ? 'celów' : 'celu') + '</label>' +
       '<div id="gatherPlan"></div>' +
       '<div class="actions"><button class="btn ghost" data-act="close">Anuluj</button><button class="btn" data-act="gather-send" id="gatherSend">Wyślij kupców</button></div>';
@@ -1092,6 +1092,7 @@
     const units = {}; E.UNITS.forEach(k => { units[k] = k !== 'settler' && k !== 'scout'; });
     return { target, mode: 'gather', stay: true, units, reserve: 0, capToRoom: true, off: {} };
   }
+  function nz(v) { return (v === 0 || v === '0' || v === undefined || v === null) ? '' : esc(v); }
   function troopsArgs(g) { return { mode: g.mode, stay: g.stay, units: g.units, reservePct: g.reserve, capToRoom: g.capToRoom, off: g.off }; }
   function troopsModal() {
     const s = st(), g = UI.troops, own = E.villagesOf(s, 'player').sort((a, b) => a.name.localeCompare(b.name, 'pl'));
@@ -1106,7 +1107,7 @@
         '<option value="1"' + (g.stay ? ' selected' : '') + '>Przeniesienie na stałe (zajmuje farmę)</option>' +
         '<option value="0"' + (g.stay ? '' : ' selected') + '>Wsparcie (można odwołać)</option></select></label>' +
       '<div class="gopts"><div class="field">Jednostki<span class="selbar"><button type="button" class="btn ghost" data-act="tunits-all" data-on="1">Zaznacz wszystkie</button><button type="button" class="btn ghost" data-act="tunits-all" data-on="0">Odznacz wszystkie</button></span><span class="gres ugrid">' + E.UNITS.map(k => '<label class="chk"><input type="checkbox" data-tunit="' + k + '"' + (g.units[k] ? ' checked' : '') + '>' + ico(k) + C.UNITS[k].name + '</label>').join('') + '</span></div>' +
-      '<label class="field">Zostaw w wiosce wysyłającej (% wojska)<input type="number" inputmode="numeric" min="0" max="100" step="5" data-treserve value="' + esc(g.reserve) + '"></label></div>' +
+      '<label class="field">Zostaw w wiosce wysyłającej (% wojska)<input type="number" inputmode="numeric" min="0" max="100" step="5" placeholder="0" data-treserve value="' + nz(g.reserve) + '"></label></div>' +
       (g.stay ? '<label class="chk"><input type="checkbox" data-tcap' + (g.capToRoom ? ' checked' : '') + '>Nie wysyłaj więcej, niż mieści farma ' + (spread ? 'celów' : 'celu') + '</label>' : '') +
       '<div id="troopsPlan"></div>' +
       '<div class="actions"><button class="btn ghost" data-act="close">Anuluj</button><button class="btn" data-act="troops-send" id="troopsSend">Wyślij wojsko</button></div>';
@@ -1193,8 +1194,8 @@
       '<label class="chk big-chk"><input type="checkbox" data-aon' + (g.on ? ' checked' : '') + '>Konwoje włączone</label>' +
       '<label class="field">Wioska centralna <select data-ahub>' + own.map(v => '<option value="' + v.id + '"' + (v.id === g.hub ? ' selected' : '') + '>' + esc(v.name) + ' ' + xy(v.x, v.y) +
         ((v.buildings.market || 0) > 0 ? '' : ' – bez Targowiska') + '</option>').join('') + '</select></label>' +
-      '<div class="gopts"><label class="field">Wysyłaj, gdy magazyn ma ponad (%)<input type="number" inputmode="numeric" min="10" max="100" step="5" data-ahigh value="' + esc(g.high) + '"></label>' +
-      '<label class="field">Zostaw w wiosce (% magazynu)<input type="number" inputmode="numeric" min="0" max="90" step="5" data-akeep value="' + esc(g.keep) + '"></label></div>' +
+      '<div class="gopts"><label class="field">Wysyłaj, gdy magazyn ma ponad (%)<input type="number" inputmode="numeric" min="10" max="100" step="5" placeholder="80" data-ahigh value="' + nz(g.high) + '"></label>' +
+      '<label class="field">Zostaw w wiosce (% magazynu)<input type="number" inputmode="numeric" min="0" max="90" step="5" placeholder="0" data-akeep value="' + nz(g.keep) + '"></label></div>' +
       '<label class="field">Sprawdzaj co <select data-aevery>' + C.AUTO.everyMin.map(m => '<option value="' + m + '"' + (m === Number(g.everyMin) ? ' selected' : '') + '>' + m + ' min</option>').join('') + '</select></label>' +
       '<label class="chk"><input type="checkbox" data-acoins' + (g.coins ? ' checked' : '') + '>Kupuj monety w wiosce centralnej (maks. limitu, najobfitszym surowcem)</label>' +
       (hub && !((hub.buildings.market || 0) > 0) && g.coins ? '<p class="why">Wioska centralna nie ma Targowiska – monet nie kupi. Wysyłające wioski też potrzebują Targowiska (kupcy).</p>' : '') +
