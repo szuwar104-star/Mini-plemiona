@@ -30,6 +30,8 @@
   function upgradeMult(ups, k) { return 1 + C.TECH.unitBonus * ((ups && ups[k]) || 0); }
   function attackPower(u, ups) { return UNITS.reduce((s, k) => s + (u[k] || 0) * C.UNITS[k].att * upgradeMult(ups, k), 0); }
   // Ile "taranów" liczą jednostki przy burzeniu muru (Taran i Taran z bali mają wallPower w config.js).
+  // Machiny oblężnicze (badanie gracza): tarany gracza liczą się za więcej przy burzeniu muru.
+  function ramEff(n, owner) { return owner === 'player' ? Math.floor(n * FX.siege) : n; }
   function ramCount(u) { return UNITS.reduce((s, k) => s + (u[k] || 0) * (C.UNITS[k].wallPower || 0), 0); }
   function defensePower(u, ups) { return UNITS.reduce((s, k) => s + (u[k] || 0) * C.UNITS[k].def * upgradeMult(ups, k), 0); }
   // Wszystkie jednostki broniące wioski: własne + wsparcie z innych wiosek.
@@ -41,14 +43,15 @@
   // Siła obrony wioski z murem (poziom muru można podać, np. po uderzeniu taranów).
   function defenseFrom(units, wallLevel, ups) {
     const W = C.BUILDINGS.wall, L = Math.max(0, Math.min(C.MAX_LEVEL, wallLevel || 0));
-    return (defensePower(units, ups) + C.COMBAT.baseDefense + W.flat[L]) * (1 + W.bonus[L] * (1 + ((ups && ups.__fort) || 0)));
+    return (defensePower(units, ups) + C.COMBAT.baseDefense + ((ups && ups.__militia) || 0) + W.flat[L]) * (1 + W.bonus[L] * (1 + ((ups && ups.__fort) || 0)));
   }
   function villageDefense(v, wallLevel, ups) { return defenseFrom(defenders(v), wallLevel == null ? v.buildings.wall : wallLevel, ups); }
   function upgradesOf(state, owner) {
     const f = state.factions[owner];
     if (!f) return null;
-    const fort = f.tech && f.tech.fort ? f.tech.fort * techNode('fort').effect.per : 0;
-    return fort ? Object.assign({}, f.upgrades, { __fort: fort }) : (f.upgrades || null);
+    const lv = id => (f.tech && f.tech[id]) ? f.tech[id] * techNode(id).effect.per : 0;
+    const fort = lv('fort'), militia = lv('militia');
+    return fort || militia ? Object.assign({}, f.upgrades, { __fort: fort, __militia: militia }) : (f.upgrades || null);
   }
   function newId(state, prefix) { return prefix + (state.nextId++); }
   function tileAt(state, x, y) { return state.map.tiles[y * state.map.size + x]; }
@@ -233,7 +236,8 @@
   // Mnożniki trudności ustawia advance()/newGame – produkcja nie potrzebuje wtedy dostępu do stanu.
   let D = C.DIFFICULTY[C.DEFAULT_DIFFICULTY];
   // Efekty badań gracza (AI nie ma technologii) liczone przy każdym tiku świata – tak samo jak poziom trudności (D).
-  let FX = { storage: 1, exchange: C.MARKET.exchangeRate, build: 1, recruit: 1, mint: 0, prod: 1, prodWood: 1, prodClay: 1, prodIron: 1, carry: 1, hide: 0, pop: 1 };
+  let FX = { storage: 1, exchange: C.MARKET.exchangeRate, build: 1, recruit: 1, mint: 0, prod: 1, prodWood: 1, prodClay: 1, prodIron: 1, carry: 1, hide: 0, pop: 1,
+    queue: 0, march: 1, heal: 0, fort: 0, command: 0, faith: 0, militia: 0, siege: 1, caravan: 1, tactics: 0 };
   function techNode(id) { return C.TECH.nodes.find(n => n.id === id) || null; }
   function techLevel(f, node) {
     if (!f) return 0;
@@ -246,13 +250,13 @@
   function techCost(node, level) { return Math.max(1, Math.round(node.base * Math.pow(node.factor, level - 1))); }
   function techEffects(f) {
     const fx = { storage: 1, exchange: C.MARKET.exchangeRate, build: 1, recruit: 1, mint: 0, prod: 1, prodWood: 1, prodClay: 1, prodIron: 1, carry: 1, hide: 0, pop: 1,
-      queue: 0, march: 1, heal: 0, fort: 0, command: 0, faith: 0 };
+      queue: 0, march: 1, heal: 0, fort: 0, command: 0, faith: 0, militia: 0, siege: 1, caravan: 1, tactics: 0 };
     C.TECH.nodes.forEach(n => {
       const lvl = techLevel(f, n);
       if (lvl && n.effect.type !== 'unit') fx[n.effect.type] += n.effect.per * lvl;
     });
     fx.build = Math.max(0.3, fx.build); fx.recruit = Math.max(0.3, fx.recruit);
-    fx.march = Math.max(0.5, fx.march); fx.heal = Math.min(0.3, fx.heal); fx.faith = Math.min(0.4, fx.faith);
+    fx.march = Math.max(0.5, fx.march); fx.heal = Math.min(0.3, fx.heal); fx.faith = Math.min(0.4, fx.faith); fx.tactics = Math.min(0.8, fx.tactics);
     return fx;
   }
   // Część magazynu ukryta przed łupieżcami: ochrona z poziomu trudności + badanie Skrytki (maks. 90%).
@@ -442,7 +446,9 @@
   }
 
   /* ---------- Targowisko: wymiana surowców ---------- */
-  function exchangeMax(v) { return merchantsTotal(v) * C.MERCHANT.capacity; }
+  // Udźwig kupca z badaniem Karawany (kupcy działają tylko dla gracza).
+  function merchantCap() { return Math.floor(C.MERCHANT.capacity * FX.caravan); }
+  function exchangeMax(v) { return merchantsTotal(v) * merchantCap(); }
   function exchangeRate() { return FX.exchange; }
   function exchangeGet(amount) { return Math.floor(amount * FX.exchange + 1e-9); }
   function exchange(state, villageId, from, to, amount, t) {
@@ -684,7 +690,7 @@
     const total = r.wood + r.clay + r.iron;
     if (total < 1) return { ok: false, reason: 'Wpisz ilość surowców' };
     for (const k of RES) if (r[k] > Math.floor(from.res[k])) return { ok: false, reason: 'Za mało surowca: ' + C.RESOURCES[k].name.toLowerCase() };
-    const need = Math.ceil(total / C.MERCHANT.capacity);
+    const need = Math.ceil(total / merchantCap());
     const free = merchantsFree(state, from);
     if (merchantsTotal(from) < 1) return { ok: false, reason: 'Zbuduj Targowisko w wiosce ' + from.name };
     if (need > free) return { ok: false, reason: 'Potrzeba ' + need + ' kupców, wolnych: ' + free };
@@ -723,7 +729,7 @@
     tickVillage(state, target, t);
     const mk = v => ({ villageId: v.id, off: !!(opts.off && opts.off[v.id]), skip: '', res: { wood: 0, clay: 0, iron: 0 },
       total: 0, merchants: 0, time: merchantTime(v, target) });
-    const cap = C.MERCHANT.capacity;
+    const cap = merchantCap();
     // Ile mieści się w magazynie wioski (z uwzględnieniem transportów w drodze).
     const roomOf = v => { const inc = incomingRes(state, v.id), c = storageCap(v), r = {};
       RES.forEach(k => { r[k] = Math.max(0, c - Math.floor(v.res[k]) - inc[k]); }); return r; };
@@ -1143,8 +1149,10 @@
     const defUnits = defenders(target);
     const hadSupport = Object.keys(target.support || {}).length > 0;
     const wallBefore = target.buildings.wall || 0;
-    const wallFight = Math.max(0, wallBefore - Math.floor(ramCount(attUnits) / C.RAM.fightPerLevel));
-    const luck = 1 + (rand(state) * 2 - 1) * C.COMBAT.luck;
+    const wallFight = Math.max(0, wallBefore - Math.floor(ramEff(ramCount(attUnits), m.owner) / C.RAM.fightPerLevel));
+    let lr = rand(state) * 2 - 1;
+    if (lr < 0 && m.owner === 'player') lr *= 1 - FX.tactics;   // Taktyka łagodzi pecha atakującego gracza
+    const luck = 1 + lr * C.COMBAT.luck;
     const A = attackPower(attUnits, upgradesOf(state, m.owner)) * luck;
     const D = defenseFrom(defUnits, wallFight, upgradesOf(state, defOwner));
     const attLoss = emptyUnits(), defLoss = emptyUnits();
@@ -1180,7 +1188,7 @@
     // tarany burzą mur na stałe
     let wallAfter = wallBefore;
     if (attackerWon && ramCount(survivors) > 0 && wallBefore > 0) {
-      wallAfter = Math.max(0, wallBefore - Math.floor(ramCount(survivors) / C.RAM.destroyPerLevel));
+      wallAfter = Math.max(0, wallBefore - Math.floor(ramEff(ramCount(survivors), m.owner) / C.RAM.destroyPerLevel));
       target.buildings.wall = wallAfter;
       target.buildQueue = target.buildQueue.filter(e => e.building !== 'wall');
     }
@@ -1430,7 +1438,7 @@
     queueMax, planBuildAll, buildAll, setAuto, runAuto,
     RES, UNITS, BUILDINGS, ramCount, diff, useDifficulty, hiddenRes,
     rand, randInt, dist, emptyUnits, cleanUnits, sumUnits, attackPower, defensePower, upgradeMult, upgradesOf,
-    exchange, exchangeMax, exchangeGet, exchangeRate, exchangeQuick, coinQuick, buyCoinsAll, mintLimit, mintTokens, buyCoins, techInfo, researchTech, techNode, techLevel, techCost, techEffects,
+    exchange, exchangeMax, merchantCap, ramEff, exchangeGet, exchangeRate, exchangeQuick, coinQuick, buyCoinsAll, mintLimit, mintTokens, buyCoins, techInfo, researchTech, techNode, techLevel, techCost, techEffects,
     tileAt, villagesOf, points, unitPoints, armyOf, accountPower, addKills, killsOf, ranking, ownerName, ownerColor,
     newGame, worldOf, winVillages, productionPerMin, storageCap, popCap, popMult, popUsed, tickVillage,
     notice, checkWin,

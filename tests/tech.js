@@ -47,7 +47,7 @@ ok(E.buyCoins(st, v.id, 'wood', 1, 7200 * 1000).ok, 'zakup monet za inny surowie
 
 /* ---------- badania ---------- */
 f.coins = 0;
-ok(E.techInfo(st, 'u_spear').code === 'req', 'Pikinier wymaga Musztry');
+ok(E.techInfo(st, 'u_spear').code === 'req', 'Pikinier wymaga Pospolitego ruszenia');
 ok(E.techInfo(st, 'drill').code === 'coins', 'bez monet: badanie zablokowane');
 f.coins = 1000;
 const c1 = E.techInfo(st, 'drill').cost;
@@ -56,12 +56,13 @@ ok(r.ok && f.tech.drill === 1 && f.coins === 1000 - c1, 'Musztra poz. 1 kupiona 
 const recBefore = E.recruitPer(v, 'spear');
 E.researchTech(st, 'drill', 0); E.researchTech(st, 'drill', 0);
 ok(E.recruitPer(v, 'spear') < recBefore, 'Musztra skraca szkolenie');
-ok(E.techInfo(st, 'u_spear').ok, 'po Musztrze 1 można badać Pikiniera');
+E.researchTech(st, 'militia', 0);
+ok(E.techInfo(st, 'u_spear').ok, 'po Pospolitym ruszeniu 1 można badać Pikiniera');
 const atk0 = E.attackPower({ spear: 10 }, null);
 E.researchTech(st, 'u_spear', 0);
 ok(f.upgrades.spear === 1, 'badanie Pikiniera zapisuje poziom w ulepszeniach plemienia');
 ok(Math.abs(E.attackPower({ spear: 10 }, E.upgradesOf(st, 'player')) - atk0 * 1.05) < 1e-9, 'atak +5% na poziom');
-ok(E.techInfo(st, 'u_guard').code === 'req', 'Tarczownik wymaga Pikiniera poz. 3');
+ok(E.techInfo(st, 'u_guard').code === 'req', 'Tarczownik wymaga Pospolitego ruszenia poz. 2 (nie Pikiniera)');
 f.coins = 100000;
 for (let i = 0; i < 12; i++) E.researchTech(st, 'u_spear', 0);
 ok(f.upgrades.spear === 10 && E.techInfo(st, 'u_spear').code === 'max', 'poziom maksymalny 10 i dalej zablokowany');
@@ -171,13 +172,13 @@ const aiv = Object.values(nt.villages).find(x => x.owner && x.owner !== 'player'
 ok(E.productionPerMin(aiv).wood === C.BUILDINGS.wood.prod[aiv.buildings.wood] * E.diff(nt).aiProd, 'AI nie dostaje bonusu do produkcji');
 // łupy i skrytki
 const h0 = E.hiddenRes(nt, nv);
-['drill', 'drill', 'u_spear', 'u_spear', 'u_spear', 'u_guard', 'u_guard', 'u_guard'].forEach(id => E.researchTech(nt, id, 0));
-ok(E.techInfo(nt, 'hide').ok, 'Skrytki dostępne po Tarczowniku poz. 3');
+['militia', 'militia', 'militia'].forEach(id => E.researchTech(nt, id, 0));
+ok(E.techInfo(nt, 'hide').ok, 'Skrytki dostępne po Pospolitym ruszeniu poz. 3');
 E.researchTech(nt, 'hide', 0); E.researchTech(nt, 'hide', 0);
 ok(E.hiddenRes(nt, nv) > h0 && Math.abs(E.hiddenRes(nt, nv) - Math.floor(E.storageCap(nv) * (E.diff(nt).lootProtect + 0.06))) <= 1, 'Skrytki poz. 2: +6 p.p. ukrytego magazynu');
 ok(E.techInfo(nt, 'plunder').code === 'req' && E.techInfo(nt, 'u_ram').code === 'req', 'Grabież i Taran wymagają wcześniejszych badań');
-['u_axe', 'u_axe', 'u_axe', 'u_axe', 'u_light', 'u_light', 'u_light'].forEach(id => E.researchTech(nt, id, 0));
-ok(E.techInfo(nt, 'u_ram').ok && E.techInfo(nt, 'plunder').ok, 'Taran (Topornik 4) i Grabież (Lekka kaw. 3) odblokowane');
+['drill', 'drill', 'drill', 'u_light', 'u_light', 'u_light'].forEach(id => E.researchTech(nt, id, 0));
+ok(E.techInfo(nt, 'u_ram').ok && E.techInfo(nt, 'plunder').ok, 'Taran (Musztra 3) i Grabież (Lekka kaw. 3) odblokowane – Taran nie wymaga Topornika');
 E.researchTech(nt, 'u_ram', 0);
 ok(nf.upgrades.ram === 1, 'badanie Tarana zapisuje poziom w ulepszeniach plemienia');
 // udźwig łupu: wygrany atak na wioskę z surowcami
@@ -196,6 +197,48 @@ function raid(plunderLvl) {
 }
 const cap0r = raid(0), cap5r = raid(10);
 ok(cap0r > 0 && cap5r === Math.floor(cap0r * 1.5), 'Grabież poz. 10: udźwig łupu +50% (' + cap0r + ' → ' + cap5r + ')');
+
+/* ---------- niezależność jednostek i nowe węzły ---------- */
+const unitNodes = T.nodes.filter(n => n.effect.type === 'unit');
+ok(unitNodes.every(n => !n.req || T.nodes.find(p => p.id === n.req.id).effect.type !== 'unit'), 'ulepszenie jednostki nie wymaga ulepszenia innej jednostki');
+ok(T.nodes.filter(n => n.req && T.nodes.find(p => p.id === n.req.id).effect.type === 'unit').map(n => n.id + '<-' + n.req.id).sort().join() === 'plunder<-u_light,siege<-u_ram', 'jedyne dzieci węzłów jednostek: Grabież (Lekka kaw.) i Machiny oblężnicze (Taran)');
+ok(T.nodes.every(n => T.branches.some(b => b.id === n.branch)), 'każdy węzeł należy do istniejącej gałęzi');
+{ // każda jednostka da się ulepszyć niezależnie od pozostałych: tylko korzeń gałęzi + własne minimum
+  const g = E.newGame(0, 31337, 'normal', 'small'); E.useDifficulty(g); g.factions.player.coins = 1e6;
+  ['u_axe', 'u_light', 'u_ram'].forEach(id => ok(E.techInfo(g, id).code === 'req', id + ': bez Musztry zablokowany'));
+  ['u_spear', 'u_archer', 'u_guard'].forEach(id => ok(E.techInfo(g, id).code === 'req', id + ': bez Pospolitego ruszenia zablokowany'));
+  E.researchTech(g, 'militia', 0); E.researchTech(g, 'militia', 0);
+  ok(['u_spear', 'u_archer', 'u_guard'].every(id => E.techInfo(g, id).ok), 'Pospolite ruszenie 2: wszystkie trzy jednostki obrony badane od razu, w dowolnej kolejności');
+  E.researchTech(g, 'u_guard', 0);
+  ok(g.factions.player.upgrades.guard === 1 && !g.factions.player.upgrades.spear, 'Tarczownik ulepszony bez Pikiniera');
+  for (let i = 0; i < 3; i++) E.researchTech(g, 'drill', 0);
+  ok(['u_axe', 'u_light', 'u_ram'].every(id => E.techInfo(g, id).ok), 'Musztra 3: Topornik, Lekka kawaleria i Taran badane niezależnie');
+  E.researchTech(g, 'u_ram', 0);
+  ok(E.techInfo(g, 'siege').code === 'req', 'Machiny oblężnicze wymagają Tarana poz. 3');
+}
+{ // Pospolite ruszenie: stała obrona wioski, tylko dla gracza
+  const g = E.newGame(0, 2024, 'normal', 'small'); E.useDifficulty(g);
+  const gv = E.villagesOf(g, 'player')[0]; gv.units = E.emptyUnits();
+  const d0 = E.villageDefense(gv, null, E.upgradesOf(g, 'player'));
+  g.factions.player.tech.militia = 5; E.useDifficulty(g);
+  ok(Math.abs(E.villageDefense(gv, null, E.upgradesOf(g, 'player')) - d0 - 40 * (1 + C.BUILDINGS.wall.bonus[gv.buildings.wall])) < 1e-6, 'Pospolite ruszenie poz. 5: +40 obrony wioski');
+  const av2 = Object.values(g.villages).find(x => x.owner && x.owner !== 'player');
+  ok(!E.upgradesOf(g, av2.owner) || !E.upgradesOf(g, av2.owner).__militia, 'AI bez Pospolitego ruszenia');
+}
+{ // Karawany: większy udźwig kupca
+  const g = E.newGame(0, 11, 'normal', 'small'); g.factions.player.tech.caravan = 5; E.useDifficulty(g);
+  ok(E.merchantCap() === Math.floor(C.MERCHANT.capacity * 1.75), 'Karawany poz. 5: udźwig kupca ×1,75 (' + E.merchantCap() + ')');
+  const cv = E.villagesOf(g, 'player')[0]; cv.buildings.market = 1;
+  ok(E.exchangeMax(cv) === E.merchantsTotal(cv) * E.merchantCap(), 'limit wymiany liczy się z udźwigu Karawan');
+}
+{ // Machiny oblężnicze: tarany liczą się za więcej
+  const g = E.newGame(0, 12, 'normal', 'small'); g.factions.player.tech.siege = 5; E.useDifficulty(g);
+  ok(E.ramEff(10, 'player') === 15 && E.ramEff(10, 'ai1') === 10, 'Machiny oblężnicze poz. 5: tarany gracza ×1,5, AI bez zmian');
+}
+{ // Taktyka: pech w ataku złagodzony – ten sam los daje nie mniejszy atak
+  const g = E.newGame(0, 13, 'normal', 'small'); g.factions.player.tech.tactics = 4; E.useDifficulty(g);
+  ok(T.nodes.find(n => n.id === 'tactics').effect.per * 4 === 0.8 && E.techEffects(g.factions.player).tactics === 0.8, 'Taktyka poz. 4: 80% pecha znika');
+}
 
 /* ---------- symulacja bez NaN ---------- */
 const sim = E.newGame(0, 31337, 'normal', 'small');
