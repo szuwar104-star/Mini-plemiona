@@ -1393,13 +1393,19 @@
     return html;
   }
 
+  // W trybie Wyścig: najsilniejsza frakcja AI i jej postęp do celu.
+  function raceLeader(s) {
+    if (!s.race) return '';
+    const top = Object.values(s.factions).filter(f => f.ai && f.alive).map(f => ({ f, n: E.villagesOf(s, f.id).length })).sort((a, b) => b.n - a.n)[0];
+    return top ? '<p class="muted seg-note">Wyścig: najdalej jest ' + flag(s, top.f.id) + ' (' + top.n + ' z ' + E.winVillages(s) + ').</p>' : '';
+  }
   /* ---------- menu ---------- */
   function menuModal() {
     const s = st();
     const own = E.villagesOf(s, 'player').length;
     return '<h2>Menu</h2>' +
       '<section><h3>Cel gry</h3><p>Zdobądź ' + E.winVillages(s) + ' wiosek. Masz ' + own + '.</p>' +
-      '<div class="goal"><i style="width:' + Math.min(100, own / E.winVillages(s) * 100) + '%"></i></div></section>' +
+      '<div class="goal"><i style="width:' + Math.min(100, own / E.winVillages(s) * 100) + '%"></i></div>' + raceLeader(s) + '</section>' +
       '<section><h3>Technologia</h3><p class="muted">Drzewko badań płatne monetami: ulepszenia wojska, magazyny, kurs wymiany.</p>' +
       '<div class="actions left"><button class="btn" data-act="tech-open">' + ico('scroll') + 'Otwórz Technologię</button></div></section>' +
       '<section><h3>Dyplomacja</h3><p class="muted">Pakty o nieagresji z frakcjami, dary i oferty. Pakt chroni obie strony przed atakiem.' +
@@ -1407,6 +1413,7 @@
       '<div class="actions left"><button class="btn" data-act="diplo-open">' + ico('scroll') + 'Otwórz Dyplomację</button></div></section>' +
       powerSection(s) +
       rankingSection(s) +
+      '<section><h3>Tryb gry</h3>' + racePicker(s.race, 'set-race') + '<p class="muted seg-note">Zmiana działa od razu.</p></section>' +
       '<section><h3>Poziom trudności</h3>' + diffPicker(s.difficulty, 'set-diff') +
       '<p class="muted seg-note">' + E.diff(s).desc + ' Zmiana działa od razu.</p></section>' +
       '<section><h3>Zapis gry</h3><p class="muted">Gra zapisuje się sama. Czas płynie także przy zamkniętej grze – AI rozwija się wtedy dalej. ' +
@@ -1447,6 +1454,13 @@
     return '<div class="seg seg3" role="radiogroup" aria-label="Poziom trudności">' + Object.entries(C.DIFFICULTY).map(([k, d]) =>
       '<button role="radio" aria-checked="' + (k === current) + '" class="' + (k === current ? 'on' : '') + '" data-act="' + act + '" data-d="' + k + '">' + d.label + '</button>').join('') + '</div>';
   }
+  const RACE_MODES = [[false, 'Spokojny', 'Tylko Ty możesz wygrać: zdobądź cel wiosek. AI nie ma celu zwycięstwa.'],
+    [true, 'Wyścig', 'Frakcja AI, która pierwsza zdobędzie cel wiosek, wygrywa, a Ty przegrywasz. AI rozwija się szybciej (limit wiosek do celu) i dostajesz ostrzeżenie przy 80% celu.']];
+  function racePicker(current, act) {
+    return '<div class="seg" role="radiogroup" aria-label="Tryb gry">' + RACE_MODES.map(m =>
+      '<button role="radio" aria-checked="' + (m[0] === !!current) + '" class="' + (m[0] === !!current ? 'on' : '') + '" data-act="' + act + '" data-r="' + (m[0] ? 1 : 0) + '">' + m[1] + '</button>').join('') + '</div>' +
+      '<p class="muted seg-note">' + RACE_MODES.find(m => m[0] === !!current)[2] + '</p>';
+  }
   function worldPicker(current) {
     return '<div class="seg seg4" role="radiogroup" aria-label="Rozmiar świata">' + Object.entries(C.WORLDS).map(([k, w]) =>
       '<button role="radio" aria-checked="' + (k === current) + '" class="' + (k === current ? 'on' : '') + '" data-act="pick-world" data-w="' + k + '">' + w.label + '</button>').join('') + '</div>';
@@ -1457,17 +1471,20 @@
       '<p class="muted seg-note">' + C.WORLDS[w].desc + '</p>' +
       '<h3 class="pick-h">Poziom trudności</h3>' + diffPicker(d, 'pick-diff') +
       '<p class="muted seg-note">' + C.DIFFICULTY[d].desc + '</p>' +
+      '<h3 class="pick-h">Tryb gry</h3>' + racePicker(UI.modal.race, 'pick-race') +
       '<p class="why">Obecna rozgrywka zostanie usunięta. Jeśli chcesz ją zachować, najpierw pobierz kopię zapisu.</p>' +
       '<div class="actions"><button class="btn ghost" data-act="close">Anuluj</button><button class="btn danger" data-act="new-game-now">Zacznij nową grę</button></div>';
   }
 
   function endModal() {
-    const s = st(), win = s.ended.type === 'victory';
+    const s = st(), win = s.ended.type === 'victory', by = s.ended.by;
+    const title = win ? 'Zwycięstwo!' : by ? 'Przegrałeś wyścig' : 'Twoje plemię upadło';
+    const text = win ? 'Zdobyłeś ' + E.winVillages(s) + ' wiosek i zdominowałeś mapę. Możesz grać dalej albo zacząć nową kampanię.'
+      : by ? flag(s, by) + ' jako pierwsza zdobyła ' + E.winVillages(s) + ' wiosek. Możesz grać dalej albo zacząć nową kampanię.'
+      : 'Straciłeś ostatnią wioskę. Spróbuj ponownie – tym razem z mocniejszą obroną.';
     return '<div class="endgame ' + (win ? 'win' : 'loss') + '">' + S.icon(win ? 'noble' : 'sword') +
-      '<h2>' + (win ? 'Zwycięstwo!' : 'Twoje plemię upadło') + '</h2>' +
-      '<p>' + (win ? 'Zdobyłeś ' + E.winVillages(s) + ' wiosek i zdominowałeś mapę. Możesz grać dalej albo zacząć nową kampanię.'
-        : 'Straciłeś ostatnią wioskę. Spróbuj ponownie – tym razem z mocniejszą obroną.') + '</p>' +
-      '<div class="actions">' + (win ? '<button class="btn ghost" data-act="close">Graj dalej</button>' : '') +
+      '<h2>' + title + '</h2><p>' + text + '</p>' +
+      '<div class="actions">' + (win || by ? '<button class="btn ghost" data-act="close">Graj dalej</button>' : '') +
       '<button class="btn" data-act="new-game-now">Nowa gra</button></div></div>';
   }
 
@@ -2071,18 +2088,24 @@
         break;
       }
       case 'import': $('#importFile').click(); break;
-      case 'new-game': openModal('newgame', { diff: st().difficulty, world: st().world || C.DEFAULT_WORLD }); break;
+      case 'new-game': openModal('newgame', { diff: st().difficulty, world: st().world || C.DEFAULT_WORLD, race: !!st().race }); break;
       case 'pick-diff': UI.modal.diff = b.dataset.d; renderModal(); break;
       case 'pick-world': UI.modal.world = b.dataset.w; renderModal(); break;
+      case 'pick-race': UI.modal.race = b.dataset.r === '1'; renderModal(); break;
+      case 'set-race':
+        G.action(s => { s.race = b.dataset.r === '1'; }, { allowPaused: true });
+        toast('info', b.dataset.r === '1' ? 'Tryb Wyścig: AI też może wygrać.' : 'Tryb Spokojny: wygrać możesz tylko Ty.');
+        renderModal();
+        break;
       case 'set-diff':
         G.action(s => { s.difficulty = b.dataset.d; }, { allowPaused: true });
         toast('info', 'Poziom trudności: ' + C.DIFFICULTY[b.dataset.d].label + '.');
         renderModal();
         break;
       case 'new-game-now': {
-        const d = UI.modal && UI.modal.diff, w = UI.modal && UI.modal.world;
+        const d = UI.modal && UI.modal.diff, w = UI.modal && UI.modal.world, r = !!(UI.modal && UI.modal.race);
         closeModal();
-        G.newGame(d, w);
+        G.newGame(d, w, r);
         break;
       }
     }

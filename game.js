@@ -112,8 +112,8 @@
       }
     },
 
-    async newGame(difficulty, world) {
-      this.state = E.newGame(Date.now(), (Math.random() * 4294967295) >>> 0, difficulty, world);
+    async newGame(difficulty, world, race) {
+      this.state = E.newGame(Date.now(), (Math.random() * 4294967295) >>> 0, difficulty, world, race);
       const ui = UI().state;
       ui.vid = null; ui.sel = null; ui.recruit = {}; ui.atk = {}; ui.filter = 'all';
       MP.Map.reset();

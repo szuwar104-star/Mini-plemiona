@@ -137,7 +137,7 @@
   function worldOf(key) { return C.WORLDS[key] || C.WORLDS[C.DEFAULT_WORLD]; }
   function winVillages(state) { return (state && state.winVillages) || C.WIN_VILLAGES; }
 
-  function newGame(now, seed, difficulty, world) {
+  function newGame(now, seed, difficulty, world, race) {
     const W = worldOf(world), N = W.size, aiFactions = C.AI.factions.slice(0, W.ai);
     const state = {
       version: C.SAVE_VERSION, created: now, now: now,
@@ -146,7 +146,7 @@
       world: C.WORLDS[world] ? world : C.DEFAULT_WORLD, winVillages: W.win,
       movements: [], reports: [], notices: [], ended: null, intel: {}, lastHit: {},
       difficulty: C.DIFFICULTY[difficulty] ? difficulty : C.DEFAULT_DIFFICULTY,
-      stats: { battles: 0, conquests: 0 }
+      stats: { battles: 0, conquests: 0 }, race: !!race, raceWarn: {}
     };
     state.factions.player = { id: 'player', name: C.PLAYER.name, color: C.PLAYER.color, ai: false, alive: true, killsAtt: 0, killsDef: 0, killUnits: 0, coins: 0, tech: {}, upgrades: {} };
     aiFactions.forEach((f, i) => {
@@ -1075,10 +1075,8 @@
     const v = makeVillage(state, m.x, m.y, m.owner, C.SETTLE.buildings, emptyUnits(), C.SETTLE.resources, t);
     addReport(state, { id: newId(state, 'r'), time: t, kind: 'news', read: m.owner !== 'player', settled: true,
       attacker: m.owner, defender: null, toName: v.name, toX: v.x, toY: v.y, to: v.id });
-    if (m.owner === 'player') {
-      notice(state, t, 'good', 'Założono nową osadę: ' + v.name + ' (' + v.x + ':' + v.y + ')!');
-      if (!state.ended && villagesOf(state, 'player').length >= winVillages(state)) state.ended = { type: 'victory', time: t, seen: false };
-    }
+    if (m.owner === 'player') notice(state, t, 'good', 'Założono nową osadę: ' + v.name + ' (' + v.x + ':' + v.y + ')!');
+    checkWin(state, m.owner, t);
   }
 
   /* ---------- zwiad ---------- */
@@ -1278,6 +1276,21 @@
     }
   }
 
+  // Zwycięstwo: gracz wygrywa, gdy ma tyle wiosek, ile wynosi cel świata. W trybie Wyścig (state.race) tak samo wygrywa
+  // pierwsza frakcja AI, która osiągnie cel (to jest wtedy porażka gracza); przy 80% celu gracz dostaje ostrzeżenie.
+  function checkWin(state, owner, t) {
+    if (state.ended || owner === null) return;
+    const n = villagesOf(state, owner).length, goal = winVillages(state);
+    if (owner === 'player') { if (n >= goal) state.ended = { type: 'victory', time: t, seen: false }; return; }
+    if (!state.race) return;
+    if (n >= goal) { state.ended = { type: 'defeat', by: owner, villages: n, time: t, seen: false }; return; }
+    state.raceWarn = state.raceWarn || {};
+    if (n >= Math.ceil(goal * C.RACE.warnShare) && !state.raceWarn[owner]) {
+      state.raceWarn[owner] = true;
+      notice(state, t, 'danger', ownerName(state, owner) + ' ma ' + n + ' z ' + goal + ' wiosek i zbliża się do zwycięstwa!');
+    }
+  }
+
   function changeOwner(state, v, newOwner, prevOwner, t) {
     v.owner = newOwner;
     delete v.garrison; delete v.garrison0; delete v.growNext; delete v.grown;
@@ -1306,9 +1319,7 @@
           attacker: newOwner, defender: prevOwner, toName: v.name, toX: v.x, toY: v.y, to: v.id });
       }
     }
-    if (newOwner === 'player' && !state.ended && villagesOf(state, 'player').length >= winVillages(state)) {
-      state.ended = { type: 'victory', time: t, seen: false };
-    }
+    checkWin(state, newOwner, t);
   }
 
   function resolveReturn(state, m, t) {
@@ -1422,7 +1433,7 @@
     exchange, exchangeMax, exchangeGet, exchangeRate, exchangeQuick, coinQuick, buyCoinsAll, mintLimit, mintTokens, buyCoins, techInfo, researchTech, techNode, techLevel, techCost, techEffects,
     tileAt, villagesOf, points, unitPoints, armyOf, accountPower, addKills, killsOf, ranking, ownerName, ownerColor,
     newGame, worldOf, winVillages, productionPerMin, storageCap, popCap, popMult, popUsed, tickVillage,
-    notice,
+    notice, checkWin,
     buildInfo, queueBuild, recruitInfo, queueRecruit, recruitPer,
     travelTime, slowest, sendAttack, sendSpy, advance, nextEvent, gameClock, pauseGame, resumeGame,
     unitsPop, supportRoom, sendSupport, withdrawSupport, defenders, defenseFrom, villageDefense,

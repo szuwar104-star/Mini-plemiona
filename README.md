@@ -203,6 +203,16 @@ Test: `node tests/diplomacy.js` (pakty, blokada, zawracanie wojska, dary, oferty
 
 Limit wiosek frakcji (osobowość × poziom trudności) zatrzymywał AI na ok. 9 wioskach, a większość wolnych osad na dużych mapach zostawała pusta. Teraz limit rośnie o `C.AI.growth.perStep` (1) co `everyHours` (3 h gry), pomnożony przez mnożnik trudności `aiExpand`, aż do `ceilingShare` (50%) celu zwycięstwa świata (Mała 10, Średnia 15, Duża 20, Ogromna 25); nigdy nie jest niższy niż dotychczasowy bazowy. Poniżej limitu frakcje podbijają osady i szkolą Osadników i Dowódców, powyżej tylko grabią. Wynik na świecie Średnim po 24 h: średnio 11,8 wiosek na frakcję zamiast 8,5. Test: `node tests/expansion.js`.
 
+## Tryb gry: Spokojny i Wyścig
+
+Tryb wybierasz przy nowej grze (Menu → Zacznij od nowa) i możesz go zmienić w trakcie gry w Menu → Tryb gry (zmiana działa od razu).
+
+- **Spokojny** (domyślny): tylko Ty możesz wygrać, zdobywając cel wiosek świata. AI nie ma celu zwycięstwa.
+- **Wyścig**: frakcja AI, która pierwsza zdobędzie cel wiosek (Mała 20, Średnia 30, Duża 40, Ogromna 50), wygrywa, a Ty przegrywasz (możesz grać dalej). Limit wiosek AI sięga wtedy celu (`growth.ceilingShareRace` w `config.js`), więc AI naprawdę biegnie do zwycięstwa. Przy 80% celu (`RACE.warnShare`) dostajesz ostrzeżenie, a Menu pokazuje najdalszą frakcję. Mechanizm lidera z dyplomacji (od 60% celu nikt nie zawiera paktu, partnerzy zrywają, wszyscy chętniej atakują) hamuje frakcję, która prowadzi.
+- Przy biernym graczu (jedna wioska, bez ruchu) frakcja wygrywa wyścig na Małej mapie po ok. 28–64 h gry (Trudny szybciej, Normalny wolniej).
+
+Stare zapisy działają jak tryb Spokojny. Test: `node tests/race.js`.
+
 ## Ulepszenia jednostek AI
 
 Frakcje AI nie kupują badań, ale ich jednostki same zyskują ulepszenia (jak gracz w gałęzi Wojsko: +5% ataku i obrony na poziom). Pierwszy poziom po 30 minutach gry, kolejne co 45 minut × tempo poziomu trudności (`aiTech`: Łatwy 0,5, Normalny 0,8, Trudny 1). Maksimum: poziom 10 (+50%) – na Normalnym po ok. 10 h, na Trudnym po ok. 8 h, na Łatwym po ok. 15 h. Ulubione jednostki frakcji dostają pełny poziom, pozostałe o 2 niższy. Panel „Frakcje” pokazuje najwyższe ulepszenie każdej frakcji (np. „+30%”). Parametry: `AI.tech` i `DIFFICULTY.*.aiTech` w `config.js`. Stare zapisy: AI od razu dostaje poziom odpowiadający czasowi gry.
