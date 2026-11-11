@@ -169,35 +169,50 @@
     // Limit zakupu na wioskę: (poziom Targowiska × perLevelPerHour + bonus z badania Mennica) monet na godzinę;
     // niewykorzystany limit odkłada się do bucketHours godzin.
     // Węzeł: max poziomów, koszt poziomu L = base × factor^(L-1) monet, req = węzeł nadrzędny i jego minimalny poziom.
+    // ZASADA UKŁADU: ulepszenie jednostki nigdy nie zależy od ulepszenia innej jednostki – każda ma własne wymaganie od ogólnego węzła
+    // swojej gałęzi (Pospolite ruszenie / Musztra). Węzeł jednostki może mieć dzieci tylko wtedy, gdy rozwija TĘ SAMĄ jednostkę
+    // (Lekka kawaleria → Grabież, Taran → Machiny oblężnicze).
     // effect: unit – +unitBonus ataku i obrony jednostki na poziom; pozostałe typy działają jako suma per × poziom
     // (storage, build, recruit – mnożnik wokół 1; exchange – dodatek do kursu wymiany; mint – dodatkowe monety/h na wioskę;
     // prod, prodWood, prodClay, prodIron – mnożniki produkcji wokół 1 (prod dotyczy wszystkich surowców); carry – mnożnik udźwigu łupu
-    // atakujących jednostek; hide – dodatkowa część magazynu ukryta przed łupieżcami, dodawana do ochrony z poziomu trudności).
+    // atakujących jednostek; hide – dodatkowa część magazynu ukryta przed łupieżcami, dodawana do ochrony z poziomu trudności;
+    // militia – stała obrona każdej Twojej wioski (dodawana do COMBAT.baseDefense); siege – mnożnik skuteczności taranów (walka i burzenie);
+    // caravan – mnożnik udźwigu kupca; tactics – część ujemnego szczęścia Twojego ataku, która znika (0,2 = −20% „pecha”)).
     TECH: {
       unitBonus: 0.05,
       coinPrice: 1500,
       mint: { perLevelPerHour: 3, bucketHours: 6 },
       branches: [
-        { id: 'war', name: 'Wojsko' },
+        { id: 'war', name: 'Wojsko – atak' },
+        { id: 'def', name: 'Wojsko – obrona' },
         { id: 'eco', name: 'Gospodarka' },
         { id: 'prod', name: 'Produkcja' },
         { id: 'realm', name: 'Królestwo' }      // późna gra: drogie badania dla rozbudowanego plemienia
       ],
       nodes: [
-        { id: 'drill', branch: 'war', name: 'Musztra', desc: 'Szybsze szkolenie wojska.', max: 5, base: 10, factor: 1.3, req: null, effect: { type: 'recruit', per: -0.04 } },
-        { id: 'u_spear', branch: 'war', name: 'Pikinier', desc: 'Atak i obrona Pikiniera.', max: 10, base: 10, factor: 1.25, req: { id: 'drill', min: 1 }, effect: { type: 'unit', unit: 'spear' } },
-        { id: 'u_archer', branch: 'war', name: 'Łucznik', desc: 'Atak i obrona Łucznika.', max: 10, base: 10, factor: 1.25, req: { id: 'drill', min: 1 }, effect: { type: 'unit', unit: 'archer' } },
-        { id: 'u_guard', branch: 'war', name: 'Tarczownik', desc: 'Atak i obrona Tarczownika.', max: 10, base: 10, factor: 1.25, req: { id: 'u_spear', min: 3 }, effect: { type: 'unit', unit: 'guard' } },
-        { id: 'u_axe', branch: 'war', name: 'Topornik', desc: 'Atak i obrona Topornika.', max: 10, base: 10, factor: 1.25, req: { id: 'drill', min: 2 }, effect: { type: 'unit', unit: 'axe' } },
-        { id: 'u_light', branch: 'war', name: 'Lekka kawaleria', desc: 'Atak i obrona Lekkiej kawalerii.', max: 10, base: 10, factor: 1.25, req: { id: 'u_axe', min: 3 }, effect: { type: 'unit', unit: 'light' } },
-        { id: 'u_ram', branch: 'war', name: 'Taran', desc: 'Atak i obrona Tarana.', max: 10, base: 12, factor: 1.25, req: { id: 'u_axe', min: 4 }, effect: { type: 'unit', unit: 'ram' } },
+        // --- Wojsko – atak: korzeń Musztra; jednostki ataku niezależne od siebie ---
+        { id: 'drill', branch: 'war', name: 'Musztra', desc: 'Szybsze szkolenie wojska (wszystkich jednostek).', max: 5, base: 10, factor: 1.3, req: null, effect: { type: 'recruit', per: -0.04 } },
+        { id: 'u_axe', branch: 'war', name: 'Topornik', desc: 'Atak i obrona Topornika.', max: 10, base: 10, factor: 1.25, req: { id: 'drill', min: 1 }, effect: { type: 'unit', unit: 'axe' } },
+        { id: 'u_light', branch: 'war', name: 'Lekka kawaleria', desc: 'Atak i obrona Lekkiej kawalerii.', max: 10, base: 10, factor: 1.25, req: { id: 'drill', min: 2 }, effect: { type: 'unit', unit: 'light' } },
         { id: 'plunder', branch: 'war', name: 'Grabież', desc: 'Większy udźwig łupu atakujących jednostek.', max: 10, base: 14, factor: 1.27, req: { id: 'u_light', min: 3 }, effect: { type: 'carry', per: 0.05 } },
-        { id: 'hide', branch: 'war', name: 'Skrytki', desc: 'Większa część magazynu ukryta przed łupieżcami.', max: 5, base: 14, factor: 1.3, req: { id: 'u_guard', min: 3 }, effect: { type: 'hide', per: 0.03 } },
+        { id: 'u_ram', branch: 'war', name: 'Taran', desc: 'Atak i obrona Tarana.', max: 10, base: 12, factor: 1.25, req: { id: 'drill', min: 3 }, effect: { type: 'unit', unit: 'ram' } },
+        { id: 'siege', branch: 'war', name: 'Machiny oblężnicze', desc: 'Tarany skuteczniej kruszą mur: w trakcie bitwy i po wygranej.', max: 5, base: 20, factor: 1.3, req: { id: 'u_ram', min: 3 }, effect: { type: 'siege', per: 0.10 } },
+        { id: 'tactics', branch: 'war', name: 'Taktyka', desc: 'Mniej pecha w Twoich atakach – najgorsze szczęście bitwy jest łagodniejsze.', max: 4, base: 14, factor: 1.3, req: { id: 'drill', min: 4 }, effect: { type: 'tactics', per: 0.2 } },
+        // --- Wojsko – obrona: korzeń Pospolite ruszenie; jednostki obrony niezależne od siebie ---
+        { id: 'militia', branch: 'def', name: 'Pospolite ruszenie', desc: 'Stała obrona każdej Twojej wioski, także bez żołnierzy.', max: 5, base: 8, factor: 1.3, req: null, effect: { type: 'militia', per: 8 } },
+        { id: 'u_spear', branch: 'def', name: 'Pikinier', desc: 'Atak i obrona Pikiniera.', max: 10, base: 10, factor: 1.25, req: { id: 'militia', min: 1 }, effect: { type: 'unit', unit: 'spear' } },
+        { id: 'u_archer', branch: 'def', name: 'Łucznik', desc: 'Atak i obrona Łucznika.', max: 10, base: 10, factor: 1.25, req: { id: 'militia', min: 1 }, effect: { type: 'unit', unit: 'archer' } },
+        { id: 'u_guard', branch: 'def', name: 'Tarczownik', desc: 'Atak i obrona Tarczownika.', max: 10, base: 10, factor: 1.25, req: { id: 'militia', min: 2 }, effect: { type: 'unit', unit: 'guard' } },
+        { id: 'hide', branch: 'def', name: 'Skrytki', desc: 'Większa część magazynu ukryta przed łupieżcami.', max: 5, base: 14, factor: 1.3, req: { id: 'militia', min: 3 }, effect: { type: 'hide', per: 0.03 } },
+        { id: 'fort', branch: 'def', name: 'Fortyfikacje', desc: 'Mocniejszy bonus muru w Twoich wioskach.', max: 10, base: 25, factor: 1.27, req: { id: 'militia', min: 5 }, effect: { type: 'fort', per: 0.03 } },
+        // --- Gospodarka ---
         { id: 'trade', branch: 'eco', name: 'Kupiectwo', desc: 'Lepszy kurs wymiany surowców w Targowisku.', max: 5, base: 10, factor: 1.3, req: null, effect: { type: 'exchange', per: 0.02 } },
         { id: 'store', branch: 'eco', name: 'Magazyny', desc: 'Większa pojemność magazynów we wszystkich wioskach.', max: 10, base: 12, factor: 1.25, req: { id: 'trade', min: 1 }, effect: { type: 'storage', per: 0.10 } },
-        { id: 'mint', branch: 'eco', name: 'Mennica', desc: 'Większy limit zakupu monet w każdej wiosce (monet na godzinę).', max: 5, base: 15, factor: 1.3, req: { id: 'trade', min: 2 }, effect: { type: 'mint', per: 2 } },
         { id: 'agri', branch: 'eco', name: 'Rolnictwo', desc: 'Więcej miejsca na farmach we wszystkich wioskach.', max: 10, base: 14, factor: 1.25, req: { id: 'store', min: 2 }, effect: { type: 'pop', per: 0.05 } },
         { id: 'build', branch: 'eco', name: 'Budownictwo', desc: 'Krótszy czas budowy.', max: 10, base: 15, factor: 1.25, req: { id: 'store', min: 3 }, effect: { type: 'build', per: -0.03 } },
+        { id: 'mint', branch: 'eco', name: 'Mennica', desc: 'Większy limit zakupu monet w każdej wiosce (monet na godzinę).', max: 5, base: 15, factor: 1.3, req: { id: 'trade', min: 2 }, effect: { type: 'mint', per: 2 } },
+        { id: 'caravan', branch: 'eco', name: 'Karawany', desc: 'Kupcy wożą więcej: wymiana, transporty i konwoje między wioskami.', max: 5, base: 12, factor: 1.3, req: { id: 'trade', min: 2 }, effect: { type: 'caravan', per: 0.15 } },
+        // --- Produkcja ---
         { id: 'tools', branch: 'prod', name: 'Narzędzia', desc: 'Większa produkcja wszystkich surowców we wszystkich wioskach.', max: 5, base: 12, factor: 1.3, req: null, effect: { type: 'prod', per: 0.02 } },
         { id: 'p_wood', branch: 'prod', name: 'Leśnictwo', desc: 'Większa produkcja drewna.', max: 10, base: 15, factor: 1.27, req: { id: 'tools', min: 2 }, effect: { type: 'prodWood', per: 0.03 } },
         { id: 'p_clay', branch: 'prod', name: 'Ceglarstwo', desc: 'Większa produkcja gliny.', max: 10, base: 15, factor: 1.27, req: { id: 'tools', min: 2 }, effect: { type: 'prodClay', per: 0.03 } },
@@ -206,7 +221,6 @@
         { id: 'admin', branch: 'realm', name: 'Administracja', desc: 'Dłuższe kolejki budowy i rekrutacji we wszystkich wioskach.', max: 2, base: 120, factor: 2, req: null, effect: { type: 'queue', per: 1 } },
         { id: 'roads', branch: 'realm', name: 'Trakty', desc: 'Szybszy marsz Twoich wojsk i osadników (ataki, wsparcie, powroty).', max: 10, base: 25, factor: 1.27, req: { id: 'admin', min: 1 }, effect: { type: 'march', per: -0.03 } },
         { id: 'medic', branch: 'realm', name: 'Lazaret', desc: 'Część poległych w Twoich atakach wraca ranna do domu zamiast ginąć.', max: 10, base: 25, factor: 1.27, req: { id: 'admin', min: 1 }, effect: { type: 'heal', per: 0.03 } },
-        { id: 'fort', branch: 'realm', name: 'Fortyfikacje', desc: 'Mocniejszy bonus muru w Twoich wioskach.', max: 10, base: 25, factor: 1.27, req: { id: 'admin', min: 2 }, effect: { type: 'fort', per: 0.03 } },
         { id: 'command', branch: 'realm', name: 'Dowództwo', desc: 'Twoi Dowódcy podboju mocniej obniżają poparcie.', max: 5, base: 40, factor: 1.35, req: { id: 'roads', min: 3 }, effect: { type: 'command', per: 3 } },
         { id: 'faith', branch: 'realm', name: 'Wiara', desc: 'Wrodzy Dowódcy słabiej obniżają poparcie Twoich wiosek.', max: 5, base: 40, factor: 1.35, req: { id: 'medic', min: 3 }, effect: { type: 'faith', per: 0.08 } }
       ]

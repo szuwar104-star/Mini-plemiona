@@ -16,9 +16,9 @@ const nearest = (s, p, pred) => Object.values(s.villages).filter(pred).sort((a, 
 
 // koszty i struktura
 const realm = C.TECH.nodes.filter(n => n.branch === 'realm');
-ok(realm.length === 6 && realm.every(n => !n.req || realm.some(r => r.id === n.req.id)), 'Królestwo: 6 badań, wymagania w obrębie gałęzi');
+ok(realm.length === 5 && realm.every(n => !n.req || realm.some(r => r.id === n.req.id)), 'Królestwo: 5 badań, wymagania w obrębie gałęzi (Fortyfikacje są w gałęzi Obrona)');
 const cost = realm.reduce((a, n) => { let c = 0; for (let l = 1; l <= n.max; l++) c += Math.max(1, Math.round(n.base * Math.pow(n.factor, l - 1))); return a + c; }, 0);
-ok(cost > 3000 && cost < 6000, 'koszt całej gałęzi: ' + cost + ' monet (późna gra)');
+ok(cost > 1500 && cost < 6000, 'koszt całej gałęzi: ' + cost + ' monet (późna gra)');
 { const { s } = setup(1); ok(E.techInfo(s, 'roads').code === 'req', 'Trakty wymagają Administracji'); }
 
 // Administracja: dłuższe kolejki

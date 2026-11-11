@@ -135,7 +135,7 @@
       }
       case 'wall': return 'Obrona +' + Math.round(B.bonus[L] * 100) + '%' + (next ? ' → +' + Math.round(B.bonus[next] * 100) + '%' : '') +
         ', mur sam broni siłą ' + B.flat[L] + (next ? ' → ' + B.flat[next] : '');
-      case 'market': return 'Wymiana surowców (kurs ' + Math.round(E.exchangeRate() * 100) + '%) i zakup monet. Kupcy: ' + B.merchants[L] + (next ? ' → ' + B.merchants[next] : '') + ', każdy wiezie do ' + fmt(C.MERCHANT.capacity) + ' surowców';
+      case 'market': return 'Wymiana surowców (kurs ' + Math.round(E.exchangeRate() * 100) + '%) i zakup monet. Kupcy: ' + B.merchants[L] + (next ? ' → ' + B.merchants[next] : '') + ', każdy wiezie do ' + fmt(E.merchantCap()) + ' surowców';
       case 'barracks': {
         let t = 'Czas szkolenia ' + Math.round(B.recruitSpeed[L] * 100) + '%' + (next ? ' → ' + Math.round(B.recruitSpeed[next] * 100) + '%' : '');
         const unlock = next ? E.UNITS.filter(u => C.UNITS[u].barracks === next).map(u => C.UNITS[u].name) : [];
@@ -497,7 +497,7 @@
 
   /* ---------- ekran: TECHNOLOGIA ---------- */
   const TECH_ICON = { drill: 'barracks', trade: 'market', store: 'hq', agri: 'farm', mint: 'coin', build: 'pick', tools: 'pick', p_wood: 'wood', p_clay: 'clay', p_iron: 'iron', plunder: 'merchant', hide: 'wall',
-    admin: 'hq', roads: 'map', medic: 'pop', fort: 'wall', command: 'noble', faith: 'village' };
+    admin: 'hq', roads: 'map', medic: 'pop', fort: 'wall', command: 'noble', faith: 'village', militia: 'village', siege: 'ram', tactics: 'map', caravan: 'merchant' };
   function techEffectText(n, lvl, next) {
     const e = n.effect, pc = x => Math.round(x * 1000) / 10;
     const cur = lvl, nxt = next;
@@ -519,6 +519,10 @@
       case 'heal': return 'Ranni wracający z ataków ' + line(l => pc(Math.min(0.3, e.per * l)) + '% poległych');
       case 'fort': return 'Bonus muru ' + line(l => '+' + pc(e.per * l) + '% (mur 10: +' + Math.round(C.BUILDINGS.wall.bonus[C.MAX_LEVEL] * (1 + e.per * l) * 100) + '% obrony)');
       case 'command': return 'Spadek poparcia od Twojego Dowódcy ' + line(l => '+' + (e.per * l) + ' p.p.');
+      case 'militia': return 'Stała obrona wioski ' + line(l => '+' + (e.per * l));
+      case 'siege': return 'Skuteczność taranów ' + line(l => '+' + pc(e.per * l) + '%');
+      case 'caravan': return 'Udźwig kupca ' + line(l => fmt(Math.floor(C.MERCHANT.capacity * (1 + e.per * l))));
+      case 'tactics': return 'Złagodzenie pecha w ataku ' + line(l => pc(Math.min(0.8, e.per * l)) + '%');
       case 'faith': return 'Spadek poparcia Twoich wiosek ' + line(l => '−' + pc(Math.min(0.4, e.per * l)) + '%');
     }
     return '';
@@ -956,7 +960,7 @@
     let est = 'nieznana';
     if (I) {
       const wallKnown = I.buildings ? I.buildings.wall || 0 : 0;
-      const wall = Math.max(0, wallKnown - Math.floor(E.ramCount(u) / C.RAM.fightPerLevel));
+      const wall = Math.max(0, wallKnown - Math.floor(E.ramEff(E.ramCount(u), 'player') / C.RAM.fightPerLevel));
       est = fmt(E.defenseFrom(I.units, wall)) + (I.buildings ? (wallKnown ? ' (mur ' + wall + ')' : '') : ' (mur nieznany)');
     }
     box.innerHTML = '<div><span>Siła ataku</span><b>' + fmt(E.attackPower(u, E.upgradesOf(s, 'player'))) + '</b></div>' +
@@ -994,7 +998,7 @@
     const from = s.villages[m.from];
     E.tickVillage(s, from, s.now);
     return '<h2>' + ico('merchant') + 'Transport do ' + esc(target.name) + ' ' + xy(target.x, target.y) + '</h2>' + fromSelect(own, m.from, target) +
-      '<p>Kupcy w wiosce ' + esc(from.name) + ': <b>' + E.merchantsFree(s, from) + ' wolnych z ' + E.merchantsTotal(from) + '</b>, każdy wiezie do ' + fmt(C.MERCHANT.capacity) + '.</p>' +
+      '<p>Kupcy w wiosce ' + esc(from.name) + ': <b>' + E.merchantsFree(s, from) + ' wolnych z ' + E.merchantsTotal(from) + '</b>, każdy wiezie do ' + fmt(E.merchantCap()) + '.</p>' +
       (E.merchantsTotal(from) ? '' : '<p class="why">Ta wioska nie ma Targowiska. Zbuduj je, aby wysyłać surowce.</p>') +
       '<div class="tablewrap"><table class="units atk"><tbody>' + E.RES.map(k =>
         '<tr><td>' + ico(k) + C.RESOURCES[k].name + '</td><td><button class="link" data-act="fmax" data-k="' + k + '" data-v="' + Math.floor(from.res[k]) + '">' + fmt(from.res[k]) + '</button></td>' +
@@ -1278,7 +1282,7 @@
         (n > from.units.scout ? '<p class="why">Masz tylko ' + from.units.scout + ' zwiadowców.</p>' : '');
     } else if (m.type === 'transport') {
       const target = s.villages[m.target], r = formRes(), total = r.wood + r.clay + r.iron;
-      const need = Math.ceil(total / C.MERCHANT.capacity), tt = E.merchantTime(from, target);
+      const need = Math.ceil(total / E.merchantCap()), tt = E.merchantTime(from, target);
       const room = E.storageCap(target);
       box.innerHTML = '<div><span>Razem</span><b>' + fmt(total) + '</b></div><div><span>Potrzebni kupcy</span><b>' + need + ' / ' + E.merchantsFree(s, from) + '</b></div>' +
         '<div><span>Czas drogi</span><b>' + dur(tt) + '</b></div><div><span>Dostawa</span><b>' + clock(s.now + tt) + '</b></div>' +
