@@ -31,7 +31,7 @@
     // aiCaution: jakiej przewagi AI potrzebuje do ataku; lootProtect: część magazynu
     // gracza ukryta przed łupieniem; hitCooldownMin: przerwa między atakami AI na tę samą wioskę gracza;
     // aiTech: tempo automatycznych ulepszeń jednostek AI (1 = poziom co AI.tech.minutesPerLevel minut gry);
-    // aiExpand: mnożnik limitu wiosek AI; playerZone: promień (w polach) wokół wiosek gracza, w którym AI nie zajmuje wolnych osad ani pól.
+    // aiExpand: mnożnik limitu wiosek AI; aiCatchUp: do jakiej części wiosek lidera (gracza) AI może dorosnąć mimo limitu czasowego; playerZone: promień (w polach) wokół wiosek gracza, w którym AI nie zajmuje wolnych osad ani pól.
     // Tryb Wyścig (state.race, wybierany przy nowej grze i w Menu): frakcja AI, która pierwsza zdobędzie cel wiosek świata, wygrywa.
     // warnShare: od jakiej części celu gracz dostaje ostrzeżenie o frakcji zbliżającej się do zwycięstwa.
     RACE: { warnShare: 0.8 },
@@ -39,13 +39,13 @@
     DIFFICULTY: {
       easy:   { label: 'Łatwy',    desc: 'Spokojny rozwój. AI rzadko atakuje i wolniej rośnie.',
                 playerProd: 1.3, aiProd: 0.6, graceMinutes: 40, aiAggro: 0.4, playerBias: 0.4, aiCaution: 1.5, lootProtect: 0.4, hitCooldownMin: 15,
-                aiExpand: 0.5, playerZone: 4, aiTech: 0.5 },
+                aiExpand: 0.5, aiCatchUp: 0.5, playerZone: 4, aiTech: 0.5 },
       normal: { label: 'Normalny', desc: 'Wyważona rozgrywka. AI naciska, ale da się je wyprzedzić.',
                 playerProd: 1.15, aiProd: 0.72, graceMinutes: 25, aiAggro: 0.7, playerBias: 0.7, aiCaution: 1.2, lootProtect: 0.25, hitCooldownMin: 8,
-                aiExpand: 0.7, playerZone: 3, aiTech: 0.8 },
+                aiExpand: 0.7, aiCatchUp: 0.7, playerZone: 3, aiTech: 0.8 },
       hard:   { label: 'Trudny',   desc: 'Agresywne i szybkie AI. Dla doświadczonych.',
                 playerProd: 1, aiProd: 0.95, graceMinutes: 10, aiAggro: 1, playerBias: 1, aiCaution: 1, lootProtect: 0.1, hitCooldownMin: 0,
-                aiExpand: 1, playerZone: 0, aiTech: 1 }
+                aiExpand: 1, aiCatchUp: 0.9, playerZone: 0, aiTech: 1 }
     },
     WIN_VILLAGES: 20,           // domyślny cel (stare zapisy); nowe gry biorą cel ze świata (WORLDS)
 
@@ -374,7 +374,8 @@
       tech: { minutesPerLevel: 45, startAfterMin: 30, max: 10 },
       // Limit wiosek AI rośnie z czasem: +perStep co everyHours (× mnożnik aiExpand trudności), do ceilingShare celu zwycięstwa świata.
       // ceilingShareRace: sufit w trybie Wyścig (AI może dojść do celu zwycięstwa).
-      growth: { everyHours: 3, perStep: 1, ceilingShare: 0.5, ceilingShareRace: 1 },
+      // zoneFadeHours: po tylu godzinach gry strefa ochronna wokół wiosek gracza (DIFFICULTY.playerZone) znika.
+      growth: { everyHours: 3, perStep: 1, ceilingShare: 0.5, ceilingShareRace: 1, zoneFadeHours: 24 },
       // Taktyka wspólna dla wszystkich frakcji (ai.js)
       tactics: {
         buildQueue: 2,           // ile budów AI trzyma w kolejce
