@@ -887,3 +887,7 @@ html, body { max-width: 100%; overflow-x: clip; }
 
 .selbar { display: flex; flex-wrap: wrap; gap: .4rem; margin: .5rem 0; }
 .selbar .btn { padding: .35rem .7rem; font-size: .85rem; }
+
+.ugrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: .5rem .8rem; }
+.ugrid .chk { min-height: 2.2rem; }
+.ugrid .chk input { flex: 0 0 auto; }

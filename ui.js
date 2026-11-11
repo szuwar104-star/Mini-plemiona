@@ -1034,9 +1034,9 @@
       '<label class="field">' + (spread ? 'Wioska źródłowa' : 'Wioska docelowa') + ' <select data-ttarget>' + own.map(o => '<option value="' + o.id + '"' + (o.id === g.target ? ' selected' : '') + '>' +
         esc(o.name) + ' ' + xy(o.x, o.y) + '</option>').join('') + '</select></label>' +
       '<label class="field">Rodzaj wysyłki <select data-tstay>' +
-        '<option value="0"' + (g.stay ? '' : ' selected') + '>Wsparcie – wojsko zostaje Twoje i można je odwołać</option>' +
-        '<option value="1"' + (g.stay ? ' selected' : '') + '>Przeniesienie na stałe – zajmuje farmę celu</option></select></label>' +
-      '<div class="gopts"><div class="field">Jednostki<span class="gres">' + E.UNITS.map(k => '<label class="chk"><input type="checkbox" data-tunit="' + k + '"' + (g.units[k] ? ' checked' : '') + '>' + ico(k) + C.UNITS[k].name + '</label>').join('') + '</span></div>' +
+        '<option value="0"' + (g.stay ? '' : ' selected') + '>Wsparcie (można odwołać)</option>' +
+        '<option value="1"' + (g.stay ? ' selected' : '') + '>Przeniesienie na stałe (zajmuje farmę)</option></select></label>' +
+      '<div class="gopts"><div class="field">Jednostki<span class="selbar"><button type="button" class="btn ghost" data-act="tunits-all" data-on="1">Zaznacz wszystkie</button><button type="button" class="btn ghost" data-act="tunits-all" data-on="0">Odznacz wszystkie</button></span><span class="gres ugrid">' + E.UNITS.map(k => '<label class="chk"><input type="checkbox" data-tunit="' + k + '"' + (g.units[k] ? ' checked' : '') + '>' + ico(k) + C.UNITS[k].name + '</label>').join('') + '</span></div>' +
       '<label class="field">Zostaw w wiosce wysyłającej (% wojska)<input type="number" inputmode="numeric" min="0" max="100" step="5" data-treserve value="' + esc(g.reserve) + '"></label></div>' +
       (g.stay ? '<label class="chk"><input type="checkbox" data-tcap' + (g.capToRoom ? ' checked' : '') + '>Nie wysyłaj więcej, niż mieści farma ' + (spread ? 'celów' : 'celu') + '</label>' : '') +
       '<div id="troopsPlan"></div>' +
@@ -1721,6 +1721,13 @@
         break;
       }
       case 'troops-open': UI.troops = troopsDefaults(UI.vid || (cur() && cur().id)); openModal('troops'); break;
+      case 'tunits-all': {
+        const on = b.dataset.on === '1';
+        E.UNITS.forEach(k => { UI.troops.units[k] = on; });
+        document.querySelectorAll('[data-tunit]').forEach(i => { i.checked = on; });
+        updateTroopsPlan();
+        break;
+      }
       case 'sel-all': {
         const w = b.dataset.w, on = b.dataset.on === '1', O = w === 'g' ? UI.gather : w === 'm' ? UI.mass : UI.troops;
         document.querySelectorAll('[data-' + w + 'src]').forEach(i => { if (on) delete O.off[i.dataset[w + 'src']]; else O.off[i.dataset[w + 'src']] = true; });
