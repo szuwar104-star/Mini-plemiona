@@ -355,10 +355,10 @@
         const i = (y * W + x) * 4, c = colors[o];
         const diff = k => (x - k < 0 || ownerIdx[y * W + x - k] !== o) || (x + k > W - 1 || ownerIdx[y * W + x + k] !== o) ||
           (y - k < 0 || ownerIdx[(y - k) * W + x] !== o) || (y + k > W - 1 || ownerIdx[(y + k) * W + x] !== o);
-        const edge = diff(1), band = !edge && diff(2);
-        // granica: ciągła linia w kolorze frakcji, pod nią pas przejściowy, wnętrze lekko podbarwione
-        if (edge) { d[i] = c[0] * .8; d[i + 1] = c[1] * .8; d[i + 2] = c[2] * .8; d[i + 3] = 225; }
-        else { d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = band ? 105 : 40; }
+        const edge = diff(1) || diff(2), glow = !edge && diff(6), band = !edge && !glow && diff(10);
+        // granica: gruba, pełna linia w ciemniejszym kolorze frakcji, od środka pas "poświaty", wnętrze wyraźnie podbarwione
+        if (edge) { d[i] = c[0] * .6; d[i + 1] = c[1] * .6; d[i + 2] = c[2] * .6; d[i + 3] = 255; }
+        else { d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = glow ? 170 : band ? 120 : 85; }
       }
     }
     ctx.clearRect(0, 0, W, W);
