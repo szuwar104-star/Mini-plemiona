@@ -426,6 +426,46 @@
     f.coins = (f.coins || 0) + count;
     return { ok: true, coins: count, spent: price };
   }
+  // Szybkie przyciski w wiosce: ilość dla trybu ('1000', '5000', 'half', 'max') przycięta do limitu kupców i miejsca w magazynie.
+  // Stałe ilości nie są przycinane do zapasu (za mało surowca = przycisk nieaktywny); 'half' i 'max' liczą się z zapasu.
+  function exchangeQuick(v, from, to, mode) {
+    const out = { amount: 0, got: 0, ok: false };
+    if (!v || !(merchantsTotal(v) > 0) || from === to) return out;
+    const stock = Math.floor(v.res[from]), room = Math.max(0, storageCap(v) - Math.floor(v.res[to]));
+    let n = mode === 'max' ? stock : mode === 'half' ? Math.floor(stock / 2) : Math.floor(Number(mode) || 0);
+    n = Math.min(n, exchangeMax(v));
+    if (mode === 'max' || mode === 'half') {
+      if (exchangeGet(n) > room) n = Math.max(0, Math.floor((room + 1) / FX.exchange));
+      while (n > 0 && exchangeGet(n) > room) n--;
+    }
+    out.amount = n; out.got = exchangeGet(n);
+    out.ok = n >= 1 && out.got >= 1 && stock >= n && out.got <= room;
+    return out;
+  }
+  // Szybki zakup monet: liczba monet dla trybu ('1', '5', '10', 'max') przycięta do limitu wioski i zapasu surowca.
+  function coinQuick(v, res, mode, t) {
+    const out = { count: 0, cost: 0, ok: false };
+    if (!v || !((v.buildings.market || 0) > 0)) return out;
+    const tokens = Math.floor(mintTokens(v, t)), afford = Math.floor(Math.floor(v.res[res]) / C.TECH.coinPrice);
+    const n = mode === 'max' ? Math.min(tokens, afford) : Math.floor(Number(mode) || 0);
+    out.count = Math.max(0, n); out.cost = out.count * C.TECH.coinPrice;
+    out.ok = n >= 1 && n <= tokens && n <= afford;
+    return out;
+  }
+  // Maksimum monet z każdej wioski z Targowiskiem; płaci się surowcem, którego jest w danej wiosce najwięcej.
+  function buyCoinsAll(state, t) {
+    let coins = 0, spent = 0, villages = 0;
+    Object.keys(state.villages).forEach(id => {
+      const v = state.villages[id];
+      if (v.owner !== 'player' || !((v.buildings.market || 0) > 0)) return;
+      tickVillage(state, v, t);
+      const res = RES.slice().sort((a, b) => v.res[b] - v.res[a])[0], q = coinQuick(v, res, 'max', t);
+      if (!q.ok) return;
+      const r = buyCoins(state, id, res, q.count, t);
+      if (r.ok) { coins += r.coins; spent += r.spent; villages++; }
+    });
+    return coins ? { ok: true, coins, spent, villages } : { ok: false, reason: 'Brak limitu zakupu albo surowców na monety' };
+  }
   function techInfo(state, id) {
     const node = techNode(id), f = state.factions.player;
     const info = { id, level: 0, target: 0, cost: 0, ok: false, code: '', reason: '', req: null };
@@ -1185,7 +1225,7 @@
   MP.Engine = {
     RES, UNITS, BUILDINGS, ramCount, diff, useDifficulty, hiddenRes,
     rand, randInt, dist, emptyUnits, cleanUnits, sumUnits, attackPower, defensePower, upgradeMult, upgradesOf,
-    exchange, exchangeMax, exchangeGet, exchangeRate, mintLimit, mintTokens, buyCoins, techInfo, researchTech, techNode, techLevel, techCost, techEffects,
+    exchange, exchangeMax, exchangeGet, exchangeRate, exchangeQuick, coinQuick, buyCoinsAll, mintLimit, mintTokens, buyCoins, techInfo, researchTech, techNode, techLevel, techCost, techEffects,
     tileAt, villagesOf, points, unitPoints, armyOf, accountPower, addKills, killsOf, ranking, ownerName, ownerColor,
     newGame, worldOf, winVillages, productionPerMin, storageCap, popCap, popUsed, tickVillage,
     buildInfo, queueBuild, recruitInfo, queueRecruit, recruitPer,

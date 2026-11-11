@@ -14,7 +14,7 @@
 
   const UI = {
     screen: 'village', vid: null, sel: null, filter: 'all',
-    recruit: {}, atk: {}, form: {}, gather: null, troops: null, sigs: {}, modal: null, toastQueue: []
+    recruit: {}, atk: {}, form: {}, quick: { ex: '1000', coin: '1', msg: null }, techSel: null, gather: null, troops: null, sigs: {}, modal: null, toastQueue: []
   };
 
   /* ---------- formatowanie ---------- */
@@ -175,6 +175,7 @@
       '<span class="prod" title="Miejsca na farmie">' + ico('pop') + '<b>' + fmt(used) + '</b><small>/' + fmt(cap) + '</small></span>' +
       '</div><div class="vh-units"><span class="muted">W wiosce</span>' + unitsLine(v.units) + '</div></section>';
 
+    if (v.buildings.market > 0) html += '<section class="panel quick"><h2>Targowisko – szybkie akcje</h2><div data-quick="village"></div></section>';
     html += '<section class="panel"><h2>Kolejka budowy <small>' + v.buildQueue.length + '/' + C.BUILD_QUEUE_MAX + '</small></h2>';
     if (!v.buildQueue.length) html += '<p class="muted">Nic się nie buduje. Wybierz budynek poniżej.</p>';
     else html += '<ul class="queue">' + v.buildQueue.map(e =>
@@ -413,6 +414,78 @@
       '<tbody>' + rows + '</tbody></table></div></section>';
   }
 
+  /* ---------- szybkie przyciski: monety i wymiana surowców ---------- */
+  const QUICK_EX = [['1000', '1 000'], ['5000', '5 000'], ['half', '50%'], ['max', 'Maks.']];
+  const QUICK_COIN = [['1', '1'], ['5', '5'], ['10', '10'], ['max', 'Maks.']];
+  const RES_GEN = { wood: 'drewna', clay: 'gliny', iron: 'żelaza' };
+  const plVillages = n => n === 1 ? 'wiosce' : 'wioskach';
+  const plCoins = n => n === 1 ? 'monetę' : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) ? 'monety' : 'monet';
+  function quickSeg(curMode, opts, act, label) {
+    return '<div class="seg s4" role="group" aria-label="' + label + '">' + opts.map(o =>
+      '<button class="' + (curMode === o[0] ? 'on' : '') + '" aria-pressed="' + (curMode === o[0]) + '" data-act="' + act + '" data-m="' + o[0] + '">' + o[1] + '</button>').join('') + '</div>';
+  }
+  function quickMsg(v) {
+    const m = UI.quick.msg;
+    return m && Date.now() - m.at < 8000 && (m.vid === '*' || m.vid === v.id) ? '<p class="qk-msg" role="status">' + esc(m.text) + '</p>' : '';
+  }
+  function quickCoinsHtml(v, s, withAll) {
+    const mode = UI.quick.coin, tokens = Math.floor(E.mintTokens(v, s.now)), lim = E.mintLimit(v);
+    const btns = E.RES.map(r => {
+      const q = E.coinQuick(v, r, mode, s.now);
+      const lbl = q.count > 0 ? '+' + q.count + ' ' + ico('coin') : 'brak';
+      return '<button class="btn qk-btn qk-coinbtn" data-act="qk-coin" data-r="' + r + '"' + (q.ok ? '' : ' disabled') + ' title="Za ' + C.RESOURCES[r].name.toLowerCase() + ' – koszt ' + fmt(q.cost) + '">' +
+        '<span class="qk-pay">' + ico(r) + (q.count > 0 ? '<small>' + fmt(q.cost) + '</small>' : '') + '</span><span class="qk-get">' + lbl + '</span></button>';
+    }).join('');
+    return '<div class="qk-sec"><div class="qk-head"><h3>' + ico('coin') + 'Monety</h3><span class="chip">Masz ' + ico('coin') + fmt(s.factions.player.coins || 0) + '</span></div>' +
+      '<p class="muted qk-note">Płacisz surowcem, 1 moneta = ' + fmt(C.TECH.coinPrice) + '. Limit tej wioski: <b>' + tokens + '</b> (+' + lim + '/h).</p>' +
+      quickSeg(mode, QUICK_COIN, 'qk-coin-mode', 'Liczba monet') + '<div class="qk-btns">' + btns + '</div>' +
+      (withAll ? '<button class="btn ghost qk-all" data-act="qk-coin-all" title="W każdej wiosce z Targowiskiem kupuje maksimum, płacąc jej najobfitszym surowcem">Maks. ze wszystkich wiosek</button>' : '') + '</div>';
+  }
+  function quickExchangeHtml(v) {
+    const mode = UI.quick.ex, s = st();
+    const rows = E.RES.map(from => '<div class="qk-row"><span class="qk-from">' + ico(from) + C.RESOURCES[from].name + '</span>' +
+      E.RES.filter(to => to !== from).map(to => {
+        const q = E.exchangeQuick(v, from, to, mode), fixed = mode === '1000' || mode === '5000';
+        const tip = 'Wymień ' + C.RESOURCES[from].name.toLowerCase() + ' → ' + C.RESOURCES[to].name.toLowerCase() + (q.amount ? ': ' + fmt(q.amount) + ' → ' + fmt(q.got) : '');
+        return '<button class="btn ghost qk-btn" data-act="qk-ex" data-f="' + from + '" data-t="' + to + '"' + (q.ok ? '' : ' disabled') + ' title="' + tip + '">→ ' + ico(to) +
+          (fixed && q.got ? '<small>+' + fmt(q.got) + '</small>' : '') + '</button>';
+      }).join('') + '</div>').join('');
+    return '<div class="qk-sec"><div class="qk-head"><h3>' + ico('merchant') + 'Wymiana</h3><span class="chip">Kurs ' + Math.round(E.exchangeRate() * 100) + '%</span></div>' +
+      '<p class="muted qk-note">Natychmiast, do ' + fmt(E.exchangeMax(v)) + ' naraz (kupcy × udźwig).</p>' +
+      quickSeg(mode, QUICK_EX, 'qk-ex-mode', 'Ilość do wymiany') + '<div class="qk-rows">' + rows + '</div></div>';
+  }
+  function quickHtml(kind, v, s) {
+    if (!v) return '';
+    if (!((v.buildings.market || 0) > 0)) {
+      return '<p class="muted qk-none">Ta wioska nie ma Targowiska – zbuduj je, aby szybko wymieniać surowce i kupować monety.</p>' +
+        (kind === 'coins' ? '<button class="btn ghost qk-all" data-act="qk-coin-all">Maks. ze wszystkich wiosek</button>' + quickMsg(v) : '');
+    }
+    if (kind === 'coins') return quickCoinsHtml(v, s, true) + quickMsg(v);
+    return '<div class="qk-grid">' + quickCoinsHtml(v, s, false) + quickExchangeHtml(v) + '</div>' + quickMsg(v);
+  }
+  // Panel przebudowywany tylko, gdy zmieni się jego treść (co sekundę liczymy HTML, ale DOM ruszamy rzadko).
+  function renderQuick() {
+    const s = st(), v = cur();
+    document.querySelectorAll('[data-quick]').forEach(host => {
+      const html = quickHtml(host.dataset.quick, v, s);
+      if (host._qh === html) return;
+      host._qh = html; host.innerHTML = html;
+    });
+  }
+  // Po przebudowie ekranu fokus klawiatury wraca na ten sam przycisk szybkich akcji / Technologii.
+  const FOCUS_KEYS = ['m', 'r', 'f', 't', 'id'];
+  function focusDescriptor() {
+    const a = document.activeElement;
+    return a && a.dataset && /^(qk-|tech-)/.test(a.dataset.act || '') ? Object.assign({}, a.dataset) : null;
+  }
+  function restoreFocus(d) {
+    const a = document.activeElement;
+    if (!d || (a && a !== document.body && a.isConnected)) return;
+    const sel = '[data-act="' + d.act + '"]' + FOCUS_KEYS.map(k => d[k] ? '[data-' + k + '="' + d[k] + '"]' : '').join('');
+    const el = document.querySelector('.screen:not([hidden]) ' + sel);
+    if (el && !el.disabled) el.focus({ preventScroll: true });
+  }
+
   /* ---------- ekran: TECHNOLOGIA ---------- */
   const TECH_ICON = { drill: 'barracks', trade: 'market', store: 'hq', mint: 'coin', build: 'pick' };
   function techEffectText(n, lvl, next) {
@@ -429,37 +502,95 @@
     }
     return '';
   }
-  function techNodeHtml(n, depth) {
-    const s = st(), info = E.techInfo(s, n.id), coins = s.factions.player.coins || 0;
-    const locked = info.code === 'req';
+  const techIcon = n => n.effect.type === 'unit' ? n.effect.unit : (TECH_ICON[n.id] || 'scroll');
+  function techPips(n, level) {
     let pips = '';
-    for (let i = 1; i <= n.max; i++) pips += '<i class="' + (i <= info.level ? 'on' : '') + '"></i>';
-    const icon = n.effect.type === 'unit' ? n.effect.unit : (TECH_ICON[n.id] || 'scroll');
+    for (let i = 1; i <= n.max; i++) pips += '<i class="' + (i <= level ? 'on' : '') + '"></i>';
+    return '<span class="pips" style="grid-template-columns:repeat(' + n.max + ',1fr)" aria-hidden="true">' + pips + '</span>';
+  }
+  // Stan węzła: max – komplet poziomów, ok – można badać, coins – odblokowany, ale brakuje monet, locked – brak wymaganego węzła.
+  function techState(info) { return info.code === 'max' ? 'max' : info.ok ? 'ok' : info.code === 'coins' ? 'coins' : 'locked'; }
+
+  function techTile(n, pos, info, coins, sel) {
+    const state = techState(info);
+    let foot;
+    if (state === 'max') foot = '<span class="tt-st done">Maks.</span>';
+    else if (state === 'locked') foot = '<span class="tt-st lock">' + info.reason.replace('Wymaga: ', '🔒 ') + '</span>';
+    else foot = '<span class="chip' + (coins < info.cost ? ' lack' : '') + '">' + ico('coin') + fmt(info.cost) + '</span>' +
+      (state === 'ok' ? '<button class="btn tt-buy" data-act="tech-buy" data-id="' + n.id + '" title="Badaj poz. ' + info.target + ' za ' + fmt(info.cost) + ' monet">Badaj</button>' : '');
+    return '<div class="tcell" style="grid-row:' + (pos.row + 1) + ';grid-column:' + (pos.depth * 2 + 1) + '">' +
+      '<div class="tt s-' + state + (sel ? ' sel' : '') + '">' +
+      '<button class="tt-main" data-act="tech-sel" data-id="' + n.id + '" aria-pressed="' + sel + '"><span class="bicon">' + S.icon(techIcon(n)) + '</span>' +
+      '<span class="tt-txt"><span class="tt-top"><b>' + n.name + '</b><span class="lvl">' + info.level + '<small>/' + n.max + '</small></span></span>' + techPips(n, info.level) + '</span></button>' +
+      '<div class="tt-foot">' + foot + '</div></div></div>';
+  }
+  // Układ gałęzi: kolumna = głębokość w drzewku, wiersz = kolejny liść; rodzic stoi w wierszu pierwszego dziecka.
+  function techLayout(nodes) {
+    const pos = {}, kids = id => nodes.filter(n => (n.req ? n.req.id : null) === id);
+    let row = 0, depthMax = 0;
+    const place = (n, depth) => {
+      depthMax = Math.max(depthMax, depth);
+      const ch = kids(n.id);
+      ch.forEach(c => place(c, depth + 1));
+      pos[n.id] = { depth, row: ch.length ? pos[ch[0].id].row : row++ };
+    };
+    kids(null).forEach(n => place(n, 0));
+    return { pos, rows: row, depths: depthMax + 1 };
+  }
+  function techLink(n, pos, info) {
+    const p = pos[n.req.id], c = pos[n.id], top = Math.min(p.row, c.row), span = Math.abs(p.row - c.row) + 1;
+    const py = (p.row - top + .5) / span * 100, cy = (c.row - top + .5) / span * 100;
+    const on = info.req && info.req.have >= info.req.min;
+    return '<div class="tl' + (on ? ' on' : '') + '" style="grid-column:' + (c.depth * 2) + ';grid-row:' + (top + 1) + '/span ' + span + '" aria-hidden="true">' +
+      '<span class="a" style="top:' + py + '%"></span><span class="v" style="top:' + Math.min(py, cy) + '%;height:' + Math.abs(cy - py) + '%"></span><span class="b" style="top:' + cy + '%"></span></div>';
+  }
+  function techBranchHtml(branch, s, coins) {
+    const nodes = C.TECH.nodes.filter(n => n.branch === branch.id), L = techLayout(nodes);
+    const cols = new Array(L.depths).fill('minmax(168px,1fr)').join(' 30px ');
+    const infos = {}; nodes.forEach(n => { infos[n.id] = E.techInfo(s, n.id); });
+    const done = nodes.reduce((a, n) => a + infos[n.id].level, 0), all = nodes.reduce((a, n) => a + n.max, 0);
+    return '<section class="panel tech-branch"><h2>' + branch.name + '<small>' + done + '/' + all + ' poziomów</small></h2>' +
+      '<div class="tech-scroll"><div class="tech-tree" style="grid-template-columns:' + cols + ';grid-template-rows:repeat(' + L.rows + ',1fr)">' +
+      nodes.filter(n => n.req).map(n => techLink(n, L.pos, infos[n.id])).join('') +
+      nodes.map(n => techTile(n, L.pos[n.id], infos[n.id], coins, UI.techSel === n.id)).join('') + '</div></div></section>';
+  }
+  function techDetailHtml(s, coins) {
+    const n = E.techNode(UI.techSel), info = E.techInfo(s, n.id), state = techState(info);
+    const kids = C.TECH.nodes.filter(k => k.req && k.req.id === n.id);
+    let toMax = 0;
+    for (let l = info.level + 1; l <= n.max; l++) toMax += E.techCost(n, l);
+    let req = '';
+    if (info.req) {
+      const okReq = info.req.have >= info.req.min;
+      req = '<p class="td-req ' + (okReq ? 'good' : 'bad') + '">' + (okReq ? '✓' : '✗') + ' Wymaga: ' + info.req.name + ' poz. ' + info.req.min + ' (masz ' + info.req.have + ')</p>';
+    }
     let act;
-    if (info.code === 'max') act = '<p class="done">Maksymalny poziom</p>';
+    if (state === 'max') act = '<p class="done">Maksymalny poziom</p>';
     else act = '<div class="tn-buy"><span class="chip' + (coins < info.cost ? ' lack' : '') + '">' + ico('coin') + fmt(info.cost) + '</span>' +
       '<button class="btn" data-act="tech-buy" data-id="' + n.id + '"' + (info.ok ? '' : ' disabled') + '>Badaj poz. ' + info.target + '</button></div>' +
-      (locked ? '<p class="why">' + info.reason + '</p>' : '');
-    return '<article class="tnode' + (locked ? ' locked' : '') + '" style="--d:' + depth + '"><div class="bicon">' + S.icon(icon) + '</div><div class="tn-body">' +
-      '<h3>' + n.name + ' <span class="lvl">' + info.level + '<small>/' + n.max + '</small></span></h3>' +
-      '<span class="pips" style="grid-template-columns:repeat(' + n.max + ',1fr)" aria-hidden="true">' + pips + '</span>' +
-      '<p class="effect">' + techEffectText(n, info.level, info.code === 'max' ? 0 : info.target) + '</p>' + act + '</div></article>';
-  }
-  function techBranchHtml(branch) {
-    const nodes = C.TECH.nodes.filter(n => n.branch === branch.id);
-    const walk = (parent, depth) => nodes.filter(n => (n.req ? n.req.id : null) === parent).map(n => techNodeHtml(n, depth) + walk(n.id, depth + 1)).join('');
-    return '<section class="panel tech-branch"><h2>' + branch.name + '</h2><div class="tech-tree">' + walk(null, 0) + '</div></section>';
+      (state === 'coins' ? '<p class="why">Brakuje ' + fmt(info.cost - coins) + ' monet – kup je poniżej.</p>' : '') +
+      (state === 'locked' ? '<p class="why">' + info.reason + '</p>' : '');
+    return '<section class="panel tech-detail"><div class="td-top"><div class="bicon">' + S.icon(techIcon(n)) + '</div><div><h2>' + n.name +
+      ' <span class="lvl">' + info.level + '<small>/' + n.max + '</small></span></h2><p class="muted">' + n.desc + '</p></div></div>' + techPips(n, info.level) +
+      '<p class="effect">' + techEffectText(n, info.level, state === 'max' ? 0 : info.target) + '</p>' + req +
+      (kids.length ? '<p class="muted td-kids">Odblokowuje: ' + kids.map(k => k.name + ' (od poz. ' + k.req.min + ')').join(', ') + '</p>' : '') +
+      act + (state !== 'max' ? '<p class="muted td-total">Do maksimum: ' + ico('coin') + fmt(toMax) + ' monet</p>' : '') + '</section>';
   }
   function renderTech() {
-    const s = st(), el = $('#screen-tech'), f = s.factions.player;
-    const sig = JSON.stringify([f.coins, f.tech, f.upgrades, UI.vid]);
+    const s = st(), el = $('#screen-tech'), f = s.factions.player, coins = f.coins || 0;
+    if (!UI.techSel || !E.techNode(UI.techSel)) {
+      const first = C.TECH.nodes.find(n => E.techInfo(s, n.id).ok) || C.TECH.nodes[0];
+      UI.techSel = first.id;
+    }
+    const sig = JSON.stringify([f.coins, f.tech, f.upgrades, UI.techSel]);
     if (UI.sigs.tech === sig) return;
     UI.sigs.tech = sig;
     el.innerHTML = '<section class="panel tech-head"><div><h1>Technologia</h1>' +
-      '<p class="muted">Badania płacisz monetami, wspólnymi dla całego plemienia. Monety kupujesz w wiosce z Targowiskiem za nadmiar jednego surowca (1 moneta = ' + fmt(C.TECH.coinPrice) + ').</p></div>' +
-      '<div class="tech-coins"><span class="chip big">' + ico('coin') + fmt(f.coins || 0) + '</span>' +
-      '<button class="btn" data-act="coins-open">Kup monety</button></div></section>' +
-      C.TECH.branches.map(techBranchHtml).join('');
+      '<p class="muted">Badania płacisz monetami, wspólnymi dla całego plemienia. Kliknij węzeł, aby zobaczyć szczegóły; „Badaj” na kafelku kupuje od razu.</p></div>' +
+      '<div class="tech-coins"><span class="chip big">' + ico('coin') + fmt(coins) + '</span></div></section>' +
+      '<div class="tech-top">' + techDetailHtml(s, coins) +
+      '<section class="panel quick"><h2>Szybki zakup monet<small>aktywna wioska</small></h2><div data-quick="coins"></div></section></div>' +
+      C.TECH.branches.map(b => techBranchHtml(b, s, coins)).join('');
   }
 
   /* ---------- ekran: RAPORTY ---------- */
@@ -1260,6 +1391,7 @@
   function render() {
     const s = st();
     if (!s) return;
+    const kept = focusDescriptor();
     renderHeader();
     renderNav();
     const pb = $('#pausebar'); if (pb) pb.hidden = !s.paused;
@@ -1270,6 +1402,8 @@
     else if (UI.screen === 'tech') renderTech();
     else if (UI.screen === 'overview' && !(document.activeElement && document.activeElement.closest && document.activeElement.closest('#screen-overview'))) renderOverview();
     else if (UI.screen === 'map') renderMap(false);
+    renderQuick();
+    restoreFocus(kept);
     renderAside();
     updateTimers();
     if (UI.modal && UI.modal.type === 'attack') updateAttackSummary();
@@ -1497,9 +1631,47 @@
         break;
       }
       case 'tech-open': if (UI.modal) closeModal(); show('tech'); break;
+      case 'tech-sel': UI.techSel = b.dataset.id; UI.sigs.tech = null; render(); break;
       case 'tech-buy': {
+        UI.techSel = b.dataset.id;
         const r = G.action(s => E.researchTech(s, b.dataset.id, s.now));
         if (!r.ok) toast('bad', r.reason); else { invalidate(); render(); }
+        break;
+      }
+      case 'qk-ex-mode': UI.quick.ex = b.dataset.m; render(); break;
+      case 'qk-coin-mode': UI.quick.coin = b.dataset.m; render(); break;
+      case 'qk-ex': {
+        const v = cur(), f = b.dataset.f, t = b.dataset.t, mode = UI.quick.ex;
+        if (!v) break;
+        const r = G.action(s => {
+          const vv = s.villages[v.id];
+          E.tickVillage(s, vv, s.now);
+          const q = E.exchangeQuick(vv, f, t, mode);
+          return q.ok ? E.exchange(s, v.id, f, t, q.amount, s.now) : { ok: false, reason: 'Nie można wymienić tej ilości' };
+        });
+        if (r.ok) UI.quick.msg = { at: Date.now(), vid: v.id, text: 'Wymieniono ' + fmt(r.spent) + ' ' + RES_GEN[f] + ' na ' + fmt(r.got) + ' ' + RES_GEN[t] + '.' };
+        else if (r.reason && !/wstrzymana/.test(r.reason)) UI.quick.msg = { at: Date.now(), vid: v.id, text: r.reason };
+        render();
+        break;
+      }
+      case 'qk-coin': {
+        const v = cur(), res = b.dataset.r, mode = UI.quick.coin;
+        if (!v) break;
+        const r = G.action(s => {
+          const vv = s.villages[v.id];
+          E.tickVillage(s, vv, s.now);
+          const q = E.coinQuick(vv, res, mode, s.now);
+          return q.ok ? E.buyCoins(s, v.id, res, q.count, s.now) : { ok: false, reason: 'Limit zakupu lub zapas surowca jest za mały' };
+        });
+        if (r.ok) UI.quick.msg = { at: Date.now(), vid: v.id, text: 'Kupiono ' + r.coins + ' ' + plCoins(r.coins) + ' za ' + fmt(r.spent) + ' ' + RES_GEN[res] + '.' };
+        else if (r.reason && !/wstrzymana/.test(r.reason)) UI.quick.msg = { at: Date.now(), vid: v.id, text: r.reason };
+        render();
+        break;
+      }
+      case 'qk-coin-all': {
+        const r = G.action(s => E.buyCoinsAll(s, s.now));
+        if (!/wstrzymana/.test(r.reason || '')) UI.quick.msg = { at: Date.now(), vid: '*', text: r.ok ? 'Kupiono ' + r.coins + ' ' + plCoins(r.coins) + ' w ' + r.villages + ' ' + plVillages(r.villages) + ' (' + fmt(r.spent) + ' surowców).' : r.reason };
+        render();
         break;
       }
       case 'transport-open': UI.form = {}; openModal('transport', { target: b.dataset.id, from: UI.vid }); break;

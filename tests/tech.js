@@ -109,6 +109,49 @@ const re = DB.parse(DB.serialize(mig)).state;
 E.advance(re, re.now + 3600 * 1000);
 ok(true, 'zapis po migracji działa przez godzinę gry');
 
+/* ---------- szybkie przyciski (wymiana i monety) ---------- */
+const qs = E.newGame(0, 777, 'normal', 'small');
+const qv = E.villagesOf(qs, 'player')[0];
+E.useDifficulty(qs);
+qv.buildings.hq = 10; qv.buildings.market = 1;
+qv.res = { wood: 300, clay: 5000, iron: 4000 };
+let q = E.exchangeQuick(qv, 'clay', 'wood', '1000');
+ok(q.ok && q.amount === 1000 && q.got === 700, 'szybka wymiana 1000: oddaje 1000, daje 700');
+ok(!E.exchangeQuick(qv, 'wood', 'clay', '1000').ok, 'stała ilość większa niż zapas: przycisk nieaktywny');
+q = E.exchangeQuick(qv, 'clay', 'wood', 'half');
+ok(q.ok && q.amount === 1000 && q.got === 700, '50% zapasu jest przycinane do limitu kupców (' + E.exchangeMax(qv) + ')');
+qv.res.wood = E.storageCap(qv) - 100;
+q = E.exchangeQuick(qv, 'clay', 'wood', 'max');
+ok(q.ok && q.got <= 100 && q.amount > 0, 'maks. mieści się w magazynie celu (daje ' + q.got + ' przy 100 wolnego)');
+qv.res.wood = E.storageCap(qv);
+ok(!E.exchangeQuick(qv, 'clay', 'wood', 'max').ok, 'pełny magazyn celu: wymiana zablokowana');
+qv.res.wood = 0; qv.res.clay = 5000;
+q = E.exchangeQuick(qv, 'clay', 'wood', '5000');
+ok(q.amount === E.exchangeMax(qv) && q.ok === (q.amount <= 5000), 'stała ilość nie przekracza limitu kupców');
+r = E.exchange(qs, qv.id, 'clay', 'wood', E.exchangeQuick(qv, 'clay', 'wood', 'max').amount, 0);
+ok(r.ok, 'ilość z szybkiej wymiany przechodzi przez E.exchange');
+qv.buildings.market = 0;
+ok(!E.exchangeQuick(qv, 'clay', 'wood', '1000').ok && !E.coinQuick(qv, 'clay', '1', 0).ok, 'bez Targowiska szybkie przyciski są nieaktywne');
+
+qv.buildings.market = 3; qv.res = { wood: 20000, clay: 3000, iron: 100 }; qv.mint = null;
+const qlim = E.mintLimit(qv);
+let cq = E.coinQuick(qv, 'wood', '5', 0);
+ok(cq.ok === (5 <= qlim) && cq.count === 5 && cq.cost === 5 * T.coinPrice, 'szybki zakup 5 monet: koszt ' + cq.cost + ' (limit ' + qlim + ')');
+cq = E.coinQuick(qv, 'clay', 'max', 0);
+ok(cq.count === Math.min(qlim, 2) && cq.ok, 'maks. monet za glinę = min(limit, stać mnie) = ' + cq.count);
+ok(!E.coinQuick(qv, 'iron', 'max', 0).ok, 'brak surowca: maks. = 0, przycisk nieaktywny');
+r = E.buyCoins(qs, qv.id, 'clay', cq.count, 0);
+ok(r.ok && qs.factions.player.coins === cq.count, 'zakup z szybkiego przycisku przechodzi przez E.buyCoins');
+
+const all = E.newGame(0, 888, 'normal', 'small');
+const av = E.villagesOf(all, 'player')[0];
+E.useDifficulty(all);
+av.buildings.market = 2; av.res = { wood: 2000, clay: 9000, iron: 3000 }; av.mint = null;
+let ra = E.buyCoinsAll(all, 0);
+ok(ra.ok && all.factions.player.coins === ra.coins && ra.villages === 1, 'maks. ze wszystkich wiosek kupuje monety (' + ra.coins + ')');
+ok(av.res.clay < 9000 && av.res.wood === 2000 && av.res.iron === 3000, 'płaci najobfitszym surowcem (gliną)');
+ok(!E.buyCoinsAll(all, 0).ok, 'po wyczerpaniu limitu: brak zakupu');
+
 /* ---------- symulacja bez NaN ---------- */
 const sim = E.newGame(0, 31337, 'normal', 'small');
 const sv = E.villagesOf(sim, 'player')[0];
