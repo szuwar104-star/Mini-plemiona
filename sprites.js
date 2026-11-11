@@ -214,6 +214,9 @@
       '.kGkkGk..kGkkGk.',
       '.kGGGGk..kGGGGk.',
       '..kkkk....kkkk..'],
+    coin: [
+      '............', '...kkkkkk...', '..kyYYYYyk..', '.kyYyyyyyyk.', '.kYyykkyyyk.', '.kYykyyyyyk.',
+      '.kYykyyyyyk.', '.kYyykkyyyk.', '.kyYyyyyyyk.', '..kyyyyyyk..', '...kkkkkk...', '............'],
     market: [
       '............', 'kkkkkkkkkkkk', 'kRwRwRwRwRwk', 'kRwRwRwRwRwk', '.kkkkkkkkkk.', '.kb......bk.',
       '.kb.yyY..bk.', '.kbkkkkkkbk.', '.kbllllllbk.', '.kbllllllbk.', '.kbkkkkkkbk.', '............'],
@@ -266,6 +269,6 @@
 
   MP.Sprites = {
     icon, village, terrain,
-    building: { hq: 'hq', wood: 'wood', clay: 'clay', iron: 'pick', farm: 'farm', barracks: 'barracks', market: 'market', smithy: 'sword', wall: 'wall' }
+    building: { hq: 'hq', wood: 'wood', clay: 'clay', iron: 'pick', farm: 'farm', barracks: 'barracks', market: 'market', wall: 'wall' }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -132,9 +132,7 @@
       case 'farm': return 'Miejsca dla wojska: ' + fmt(B.pop[L]) + (next ? ' → ' + fmt(B.pop[next]) : '');
       case 'wall': return 'Obrona +' + Math.round(B.bonus[L] * 100) + '%' + (next ? ' → +' + Math.round(B.bonus[next] * 100) + '%' : '') +
         ', mur sam broni siłą ' + B.flat[L] + (next ? ' → ' + B.flat[next] : '');
-      case 'smithy': return L ? 'Ulepszenia jednostek do poz. ' + L + (next ? ' → ' + next : '') + '. Każdy poziom: +' + Math.round(C.SMITHY.bonusPerLevel * 100) + '% ataku i obrony'
-        : 'Odblokowuje ulepszenia jednostek: +' + Math.round(C.SMITHY.bonusPerLevel * 100) + '% ataku i obrony za poziom';
-      case 'market': return 'Wymiana surowców (' + Math.round(C.MARKET.exchangeRate * 100) + '%). Kupcy: ' + B.merchants[L] + (next ? ' → ' + B.merchants[next] : '') + ', każdy wiezie do ' + fmt(C.MERCHANT.capacity) + ' surowców';
+      case 'market': return 'Wymiana surowców (kurs ' + Math.round(E.exchangeRate() * 100) + '%) i zakup monet. Kupcy: ' + B.merchants[L] + (next ? ' → ' + B.merchants[next] : '') + ', każdy wiezie do ' + fmt(C.MERCHANT.capacity) + ' surowców';
       case 'barracks': {
         let t = 'Czas szkolenia ' + Math.round(B.recruitSpeed[L] * 100) + '%' + (next ? ' → ' + Math.round(B.recruitSpeed[next] * 100) + '%' : '');
         const unlock = next ? E.UNITS.filter(u => C.UNITS[u].barracks === next).map(u => C.UNITS[u].name) : [];
@@ -156,8 +154,7 @@
       const i = E.buildInfo(s, v, k);
       return i.code + i.target + (i.cost ? E.RES.map(r => Math.floor(v.res[r]) >= i.cost[r] ? 1 : 0).join('') : '');
     });
-    return JSON.stringify([v.id, v.name, v.buildings, v.buildQueue.map(e => e.id), infos, Math.floor(v.loyalty), v.units, v.owner, E.merchantsFree(s, v), Math.ceil(graceLeft(s) / 60000), s.difficulty,
-      v.upgrade, E.upgradesOf(s, 'player'), C.SMITHY.units.map(u => { const i = E.upgradeInfo(s, v, u); return i.code + i.target + (i.cost ? E.RES.map(r => Math.floor(v.res[r]) >= i.cost[r] ? 1 : 0).join('') : ''); })]);
+    return JSON.stringify([v.id, v.name, v.buildings, v.buildQueue.map(e => e.id), infos, Math.floor(v.loyalty), v.units, v.owner, E.merchantsFree(s, v), Math.ceil(graceLeft(s) / 60000), s.difficulty]);
   }
 
   function renderVillage() {
@@ -205,11 +202,7 @@
       } else {
         html += '<p class="done">Maksymalny poziom</p>';
       }
-      if (k === 'smithy' && lv > 0) {
-        if (v.upgrade) html += '<p class="effect">Badanie: ' + C.UNITS[v.upgrade.unit].name + ' → poz. ' + v.upgrade.level + ' <span class="timer" data-end="' + v.upgrade.end + '"></span></p>';
-        html += '<button class="btn ghost" data-act="smithy-open">' + ico(S.building.smithy) + 'Ulepszenia jednostek</button>';
-      }
-      if (k === 'market' && lv > 0) html += '<button class="btn ghost" data-act="exchange-open">' + ico('merchant') + 'Wymień surowce</button>';
+      if (k === 'market' && lv > 0) html += '<button class="btn ghost" data-act="exchange-open">' + ico('merchant') + 'Wymiana i monety</button>';
       html += '</div></article>';
     });
     el.innerHTML = html + '</div>';
@@ -410,13 +403,63 @@
       (inc.length ? '<span class="warn">Nadciągające ataki: ' + inc.length + '</span>' : '') + '</p>' +
       '<div class="actions left"><button class="btn" data-act="gather-open"' + (own.length > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"') + '>' + ico('merchant') + 'Zbierz / rozdziel surowce</button>' +
       '<button class="btn" data-act="troops-open"' + (own.length > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"') + '>' + ico('spear') + 'Zbierz / rozdziel wojsko</button>' +
-      '<button class="btn" data-act="mass-open">' + ico('barracks') + 'Szkol we wszystkich wioskach</button></div></div>' +
+      '<button class="btn" data-act="mass-open">' + ico('barracks') + 'Szkol we wszystkich wioskach</button>' +
+      '<button class="btn" data-act="tech-open">' + ico('scroll') + 'Technologia</button></div></div>' +
       '<div class="army-kpis ov-kpis">' + E.RES.map(r => '<div class="kpi"><small>' + C.RESOURCES[r].name + ' razem</small><b>' + fmt(total[r]) + '</b><small>+' + Math.round(prod[r]) + ' / min</small></div>').join('') +
       '<div class="kpi"><small>Wojsko w wioskach</small><b>' + fmt(army) + '</b></div>' +
       '<div class="kpi"><small>Moc konta</small><b>' + fmt(pw.total) + '</b><small>bud. ' + fmt(pw.buildings) + ' + woj. ' + fmt(pw.army) + '</small></div></div></section>' +
       '<section class="panel"><div class="tablewrap"><table class="units ov">' +
       '<thead><tr><th>Wioska</th><th>' + ico('wood') + 'Drewno</th><th>' + ico('clay') + 'Glina</th><th>' + ico('iron') + 'Żelazo</th><th>' + ico('pop') + 'Farma</th><th>Budowa</th><th>Rekrutacja</th><th>Wojsko</th><th>Ataki</th></tr></thead>' +
       '<tbody>' + rows + '</tbody></table></div></section>';
+  }
+
+  /* ---------- ekran: TECHNOLOGIA ---------- */
+  const TECH_ICON = { drill: 'barracks', trade: 'market', store: 'hq', mint: 'coin', build: 'pick' };
+  function techEffectText(n, lvl, next) {
+    const e = n.effect, pc = x => Math.round(x * 1000) / 10;
+    const cur = lvl, nxt = next;
+    const line = f => f(cur) + (nxt ? ' → ' + f(nxt) : '');
+    switch (e.type) {
+      case 'unit': return 'Atak i obrona ' + line(l => '+' + pc(l * C.TECH.unitBonus) + '%');
+      case 'recruit': return 'Czas szkolenia ' + line(l => '−' + pc(-e.per * l) + '%');
+      case 'build': return 'Czas budowy ' + line(l => '−' + pc(-e.per * l) + '%');
+      case 'storage': return 'Pojemność magazynów ' + line(l => '+' + pc(e.per * l) + '%');
+      case 'exchange': return 'Kurs wymiany ' + line(l => pc(C.MARKET.exchangeRate + e.per * l) + '%');
+      case 'mint': return 'Limit zakupu monet ' + line(l => '+' + (e.per * l) + '/h na wioskę');
+    }
+    return '';
+  }
+  function techNodeHtml(n, depth) {
+    const s = st(), info = E.techInfo(s, n.id), coins = s.factions.player.coins || 0;
+    const locked = info.code === 'req';
+    let pips = '';
+    for (let i = 1; i <= n.max; i++) pips += '<i class="' + (i <= info.level ? 'on' : '') + '"></i>';
+    const icon = n.effect.type === 'unit' ? n.effect.unit : (TECH_ICON[n.id] || 'scroll');
+    let act;
+    if (info.code === 'max') act = '<p class="done">Maksymalny poziom</p>';
+    else act = '<div class="tn-buy"><span class="chip' + (coins < info.cost ? ' lack' : '') + '">' + ico('coin') + fmt(info.cost) + '</span>' +
+      '<button class="btn" data-act="tech-buy" data-id="' + n.id + '"' + (info.ok ? '' : ' disabled') + '>Badaj poz. ' + info.target + '</button></div>' +
+      (locked ? '<p class="why">' + info.reason + '</p>' : '');
+    return '<article class="tnode' + (locked ? ' locked' : '') + '" style="--d:' + depth + '"><div class="bicon">' + S.icon(icon) + '</div><div class="tn-body">' +
+      '<h3>' + n.name + ' <span class="lvl">' + info.level + '<small>/' + n.max + '</small></span></h3>' +
+      '<span class="pips" style="grid-template-columns:repeat(' + n.max + ',1fr)" aria-hidden="true">' + pips + '</span>' +
+      '<p class="effect">' + techEffectText(n, info.level, info.code === 'max' ? 0 : info.target) + '</p>' + act + '</div></article>';
+  }
+  function techBranchHtml(branch) {
+    const nodes = C.TECH.nodes.filter(n => n.branch === branch.id);
+    const walk = (parent, depth) => nodes.filter(n => (n.req ? n.req.id : null) === parent).map(n => techNodeHtml(n, depth) + walk(n.id, depth + 1)).join('');
+    return '<section class="panel tech-branch"><h2>' + branch.name + '</h2><div class="tech-tree">' + walk(null, 0) + '</div></section>';
+  }
+  function renderTech() {
+    const s = st(), el = $('#screen-tech'), f = s.factions.player;
+    const sig = JSON.stringify([f.coins, f.tech, f.upgrades, UI.vid]);
+    if (UI.sigs.tech === sig) return;
+    UI.sigs.tech = sig;
+    el.innerHTML = '<section class="panel tech-head"><div><h1>Technologia</h1>' +
+      '<p class="muted">Badania płacisz monetami, wspólnymi dla całego plemienia. Monety kupujesz w wiosce z Targowiskiem za nadmiar jednego surowca (1 moneta = ' + fmt(C.TECH.coinPrice) + ').</p></div>' +
+      '<div class="tech-coins"><span class="chip big">' + ico('coin') + fmt(f.coins || 0) + '</span>' +
+      '<button class="btn" data-act="coins-open">Kup monety</button></div></section>' +
+      C.TECH.branches.map(techBranchHtml).join('');
   }
 
   /* ---------- ekran: RAPORTY ---------- */
@@ -760,47 +803,32 @@
       '</tbody></table></div><div id="formSummary" class="summary"></div>' +
       '<div class="actions"><button class="btn ghost" data-act="close">Anuluj</button><button class="btn" data-act="send-transport">Wyślij kupców</button></div>';
   }
-  /* ---------- okno: Kuźnia (ulepszenia jednostek) ---------- */
-  function smithyModal() {
-    const s = st(), v = s.villages[UI.modal.from];
-    E.tickVillage(s, v, s.now);
-    const ups = E.upgradesOf(s, 'player') || {}, pc = n => Math.round(n * C.SMITHY.bonusPerLevel * 100);
-    let h = '<h2>' + ico(S.building.smithy) + 'Kuźnia – ' + esc(v.name) + ' <small>poz. ' + v.buildings.smithy + '</small></h2>' +
-      '<p class="muted">Ulepszenia działają w całym plemieniu. Każdy poziom: +' + pc(1) + '% ataku i obrony. Jedno badanie naraz w wiosce.</p>';
-    if (v.upgrade) {
-      const e = v.upgrade;
-      h += '<ul class="queue"><li>' + ico(S.building.smithy) + '<span class="qname">' + C.UNITS[e.unit].name + ' – poz. ' + e.level + '</span>' +
-        '<span class="bar"><i data-ps="' + e.start + '" data-pe="' + e.end + '" style="width:' + pct(e.start, e.end) + '%"></i></span>' +
-        '<span class="timer" data-end="' + e.end + '"></span></li></ul>';
-    }
-    h += '<div class="upg-list">';
-    C.SMITHY.units.forEach(u => {
-      const info = E.upgradeInfo(s, v, u), lvl = ups[u] || 0;
-      h += '<div class="upg-row"><div class="bicon">' + S.icon(u) + '</div>' +
-        '<div class="upg-main"><b>' + C.UNITS[u].name + '</b><span class="lvl">' + lvl + '<small>/' + C.MAX_LEVEL + '</small></span>' +
-        '<span class="muted">+' + pc(lvl) + '%' + (info.code === 'max' ? '' : ' → +' + pc(info.target) + '%') + '</span></div>';
-      if (info.code === 'max') h += '<p class="done upg-cost">Maksymalny poziom</p>';
-      else {
-        h += '<div class="upg-cost">' + costChips(v, info.cost) + '</div>' +
-          '<button class="btn upg-btn" data-act="upgrade" data-u="' + u + '"' + (info.ok ? '' : ' disabled') + '>Ulepsz<small>' + dur(info.time) + '</small></button>';
-        if (!info.ok && !['busy', 'resources'].includes(info.code)) h += '<p class="why upg-why">' + info.reason + '</p>';
-      }
-      h += '</div>';
-    });
-    return h + '</div><div class="actions"><button class="btn ghost" data-act="close">Zamknij</button></div>';
-  }
-  /* ---------- okno: wymiana surowców (Targowisko) ---------- */
+  /* ---------- okno: Targowisko (wymiana surowców i zakup monet) ---------- */
   function exchangeModal() {
-    const s = st(), m = UI.modal, v = s.villages[m.from];
+    const s = st(), m = UI.modal, v = s.villages[m.from], f = UI.form;
     E.tickVillage(s, v, s.now);
-    const f = UI.form;
+    if (!f.tab) f.tab = 'res';
     if (!f.from) f.from = 'clay';
     if (!f.to) f.to = 'wood';
-    const pick = (w, cur) => E.RES.map(k => '<button class="btn' + (cur === k ? '' : ' ghost') + '" data-act="ex-pick" data-w="' + w + '" data-k="' + k + '">' + ico(k) + C.RESOURCES[k].name + '</button>').join('');
-    return '<h2>' + ico('merchant') + 'Wymiana surowców – ' + esc(v.name) + '</h2>' +
-      '<p>Za 100 surowca dostajesz ' + Math.round(100 * C.MARKET.exchangeRate) + '. Jednorazowo do ' + fmt(E.exchangeMax(v)) + ' (kupcy × udźwig).</p>' +
-      '<p class="muted">Oddajesz</p><div class="actions left">' + pick('from', f.from) + '</div>' +
-      '<p class="muted">Dostajesz</p><div class="actions left">' + pick('to', f.to) + '</div>' +
+    if (!f.pay) f.pay = 'clay';
+    const tabs = '<div class="seg"><button class="' + (f.tab === 'res' ? 'on' : '') + '" data-act="ex-tab" data-t="res">Wymiana surowców</button>' +
+      '<button class="' + (f.tab === 'coin' ? 'on' : '') + '" data-act="ex-tab" data-t="coin">' + ico('coin') + 'Monety</button></div>';
+    const pick = (w, cur, act) => E.RES.map(k => '<button class="btn' + (cur === k ? '' : ' ghost') + '" data-act="' + act + '" data-w="' + w + '" data-k="' + k + '">' + ico(k) + C.RESOURCES[k].name + '</button>').join('');
+    if (f.tab === 'coin') {
+      const have = Math.floor(E.mintTokens(v, s.now)), lim = E.mintLimit(v);
+      return '<h2>' + ico('merchant') + 'Targowisko – ' + esc(v.name) + '</h2>' + tabs +
+        '<p>1 moneta = ' + fmt(C.TECH.coinPrice) + ' wybranego surowca. Monety są wspólne dla całego plemienia i służą do badań w zakładce Technologia. Masz: <b>' + ico('coin') + fmt(s.factions.player.coins || 0) + '</b>.</p>' +
+        '<p class="muted">Płacisz</p><div class="actions left">' + pick('pay', f.pay, 'coin-pick') + '</div>' +
+        '<label class="field">Liczba monet (limit teraz: ' + have + ')<span class="inrow"><input type="number" inputmode="numeric" min="0" step="1" placeholder="0" data-fin="coins" value="' + esc(f.coins || '') + '">' +
+        '<button class="link" data-act="coin-max">maks.</button></span></label>' +
+        '<p class="muted">Limit zakupu w tej wiosce odnawia się o ' + lim + ' monet na godzinę (zapas do ' + lim * C.TECH.mint.bucketHours + '). Wyższy poziom Targowiska i badanie Mennica zwiększają limit.</p>' +
+        '<div id="formSummary" class="summary"></div>' +
+        '<div class="actions"><button class="btn ghost" data-act="close">Zamknij</button><button class="btn" data-act="coin-buy">Kup monety</button></div>';
+    }
+    return '<h2>' + ico('merchant') + 'Targowisko – ' + esc(v.name) + '</h2>' + tabs +
+      '<p>Za 100 surowca dostajesz ' + Math.round(100 * E.exchangeRate()) + '. Jednorazowo do ' + fmt(E.exchangeMax(v)) + ' (kupcy × udźwig).</p>' +
+      '<p class="muted">Oddajesz</p><div class="actions left">' + pick('from', f.from, 'ex-pick') + '</div>' +
+      '<p class="muted">Dostajesz</p><div class="actions left">' + pick('to', f.to, 'ex-pick') + '</div>' +
       '<label class="field">Ilość do oddania (masz ' + fmt(v.res[f.from]) + ')<span class="inrow"><input type="number" inputmode="numeric" min="0" step="100" placeholder="0" data-fin="amount" value="' + esc(f.amount || '') + '">' +
       '<button class="link" data-act="ex-max">maks.</button></span></label>' +
       '<div id="formSummary" class="summary"></div>' +
@@ -992,6 +1020,11 @@
         '<div><span>Czas drogi</span><b>' + dur(tt) + '</b></div><div><span>Dostawa</span><b>' + clock(s.now + tt) + '</b></div>' +
         (need > E.merchantsFree(s, from) ? '<p class="why">Za mało wolnych kupców.</p>' : '') +
         (E.RES.some(k => target.res[k] + r[k] > room) ? '<p class="muted">Magazyn celu mieści ' + fmt(room) + ' – nadwyżka przepadnie.</p>' : '');
+    } else if (m.type === 'exchange' && UI.form.tab === 'coin') {
+      const n = Math.max(0, Math.floor(Number(UI.form.coins) || 0)), pay = UI.form.pay || 'clay', have = Math.floor(E.mintTokens(from, s.now));
+      box.innerHTML = '<div><span>Koszt</span><b>' + fmt(n * C.TECH.coinPrice) + ' ' + C.RESOURCES[pay].name.toLowerCase() + '</b></div><div><span>W magazynie</span><b>' + fmt(from.res[pay]) + '</b></div>' +
+        (n > have ? '<p class="why">Limit zakupu w tej wiosce: teraz maksymalnie ' + have + '.</p>' : '') +
+        (n * C.TECH.coinPrice > Math.floor(from.res[pay]) ? '<p class="why">Za mało surowca.</p>' : '');
     } else if (m.type === 'exchange') {
       const amount = Math.max(0, Math.floor(Number(UI.form.amount) || 0)), got = E.exchangeGet(amount), room = E.storageCap(from) - Math.floor(from.res[UI.form.to]);
       box.innerHTML = '<div><span>Dostaniesz</span><b>' + fmt(got) + '</b></div><div><span>Miejsce w magazynie</span><b>' + fmt(Math.max(0, room)) + '</b></div>' +
@@ -1045,6 +1078,8 @@
     return '<h2>Menu</h2>' +
       '<section><h3>Cel gry</h3><p>Zdobądź ' + E.winVillages(s) + ' wiosek. Masz ' + own + '.</p>' +
       '<div class="goal"><i style="width:' + Math.min(100, own / E.winVillages(s) * 100) + '%"></i></div></section>' +
+      '<section><h3>Technologia</h3><p class="muted">Drzewko badań płatne monetami: ulepszenia wojska, magazyny, kurs wymiany.</p>' +
+      '<div class="actions left"><button class="btn" data-act="tech-open">' + ico('scroll') + 'Otwórz Technologię</button></div></section>' +
       powerSection(s) +
       rankingSection(s) +
       '<section><h3>Poziom trudności</h3>' + diffPicker(s.difficulty, 'set-diff') +
@@ -1063,6 +1098,7 @@
       '<li>Wolną osadę przejmujesz, wygrywając bitwę. Wioskę frakcji – Dowódcą podboju (Koszary 5).</li>' +
       '<li>Zwiadowcy odkrywają siłę obrony celu. Targowisko pozwala przewozić surowce, a Osadnik zakłada wioski na pustych równinach.</li>' +
       '<li>Mur obronny zwiększa obronę wioski, a tarany go burzą. Wsparcie broni innej Twojej wioski i możesz je odwołać na ekranie Wojsko.</li>' +
+      '<li>Technologia (Menu lub Przegląd): badania kupujesz monetami. Monety kupisz w Targowisku za nadmiar surowca.</li>' +
       '<li>Ekran Przegląd pokazuje wszystkie wioski naraz: surowce, kolejki, wojsko i nadciągające ataki.</li>' +
       '<li>Przez pierwsze ' + E.diff(s).graceMinutes + ' minut frakcje AI Cię nie atakują. ' + Math.round(E.diff(s).lootProtect * 100) + '% pojemności magazynu jest ukryte przed łupieżcami.</li></ul></section>' +
       '<section><h3>Nowa gra</h3><div class="actions left"><button class="btn danger" data-act="new-game">Zacznij od nowa</button></div></section>' +
@@ -1123,7 +1159,6 @@
     else if (UI.modal.type === 'spy') inner = spyModal();
     else if (UI.modal.type === 'transport') inner = transportModal();
     else if (UI.modal.type === 'exchange') inner = exchangeModal();
-    else if (UI.modal.type === 'smithy') inner = smithyModal();
     else if (UI.modal.type === 'support') inner = supportModal();
     else if (UI.modal.type === 'settle') inner = settleModal();
     else if (UI.modal.type === 'gather') inner = gatherModal();
@@ -1232,6 +1267,7 @@
     if (UI.screen === 'village') renderVillage();
     else if (UI.screen === 'army') renderArmy();
     else if (UI.screen === 'reports') renderReports();
+    else if (UI.screen === 'tech') renderTech();
     else if (UI.screen === 'overview' && !(document.activeElement && document.activeElement.closest && document.activeElement.closest('#screen-overview'))) renderOverview();
     else if (UI.screen === 'map') renderMap(false);
     renderAside();
@@ -1418,7 +1454,6 @@
         document.querySelectorAll('[data-fin]').forEach(i => { i.value = ''; });
         updateFormSummary();
         break;
-      case 'smithy-open': UI.form = {}; openModal('smithy', { from: UI.vid }); break;
       case 'exchange-open': UI.form = {}; openModal('exchange', { from: UI.vid }); break;
       case 'ex-pick': {
         const w = b.dataset.w, k = b.dataset.k, other = w === 'from' ? 'to' : 'from';
@@ -1440,10 +1475,31 @@
         else toast('bad', r.reason);
         break;
       }
-      case 'upgrade': {
-        const r = G.action(s => E.queueUpgrade(s, s.villages[UI.vid], b.dataset.u, s.now));
-        if (!r.ok) toast('bad', r.reason);
-        else if (UI.modal && UI.modal.type === 'smithy') { invalidate(); render(); renderModal(); }
+      case 'ex-tab': UI.form.tab = b.dataset.t; renderModal(); break;
+      case 'coin-pick': UI.form.pay = b.dataset.k; renderModal(); break;
+      case 'coin-max': {
+        const s0 = st(), v = s0.villages[UI.modal.from];
+        UI.form.coins = Math.max(0, Math.min(Math.floor(E.mintTokens(v, s0.now)), Math.floor(v.res[UI.form.pay] / C.TECH.coinPrice)));
+        renderModal();
+        break;
+      }
+      case 'coin-buy': {
+        const m = UI.modal, f = UI.form;
+        const r = G.action(s => E.buyCoins(s, m.from, f.pay, f.coins, s.now));
+        if (r.ok) { toast('info', 'Kupiono ' + r.coins + ' monet (' + fmt(r.spent) + ' surowca).'); f.coins = ''; invalidate(); render(); renderModal(); }
+        else toast('bad', r.reason);
+        break;
+      }
+      case 'coins-open': {
+        const v = cur();
+        if (!v || !(v.buildings.market > 0)) { toast('bad', 'Zbuduj Targowisko w tej wiosce, aby kupować monety.'); break; }
+        UI.form = { tab: 'coin' }; openModal('exchange', { from: v.id });
+        break;
+      }
+      case 'tech-open': if (UI.modal) closeModal(); show('tech'); break;
+      case 'tech-buy': {
+        const r = G.action(s => E.researchTech(s, b.dataset.id, s.now));
+        if (!r.ok) toast('bad', r.reason); else { invalidate(); render(); }
         break;
       }
       case 'transport-open': UI.form = {}; openModal('transport', { target: b.dataset.id, from: UI.vid }); break;

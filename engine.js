@@ -27,7 +27,7 @@
   function cleanUnits(u) { const o = emptyUnits(); UNITS.forEach(k => { o[k] = Math.max(0, Math.floor(Number(u && u[k]) || 0)); }); return o; }
   function sumUnits(u) { return UNITS.reduce((s, k) => s + (u[k] || 0), 0); }
   // Ulepszenia z Kuźni: `ups` = { jednostka: poziom } właściciela (albo null). Każdy poziom daje +bonusPerLevel do ataku i obrony.
-  function upgradeMult(ups, k) { return 1 + C.SMITHY.bonusPerLevel * ((ups && ups[k]) || 0); }
+  function upgradeMult(ups, k) { return 1 + C.TECH.unitBonus * ((ups && ups[k]) || 0); }
   function attackPower(u, ups) { return UNITS.reduce((s, k) => s + (u[k] || 0) * C.UNITS[k].att * upgradeMult(ups, k), 0); }
   // Ile "taranów" liczą jednostki przy burzeniu muru (Taran i Taran z bali mają wallPower w config.js).
   function ramCount(u) { return UNITS.reduce((s, k) => s + (u[k] || 0) * (C.UNITS[k].wallPower || 0), 0); }
@@ -117,7 +117,7 @@
       id: newId(state, 'v'), name: genName(state), x, y, owner,
       buildings: b, units: Object.assign(emptyUnits(), units || {}),
       res: Object.assign({ wood: 0, clay: 0, iron: 0 }, res || {}),
-      buildQueue: [], recruitQueue: [], upgrade: null, loyalty: C.LOYALTY.max, lastTick: now, support: {}
+      buildQueue: [], recruitQueue: [], loyalty: C.LOYALTY.max, lastTick: now, support: {}
     };
     state.villages[v.id] = v;
     const t = tileAt(state, x, y);
@@ -143,7 +143,7 @@
       difficulty: C.DIFFICULTY[difficulty] ? difficulty : C.DEFAULT_DIFFICULTY,
       stats: { battles: 0, conquests: 0 }
     };
-    state.factions.player = { id: 'player', name: C.PLAYER.name, color: C.PLAYER.color, ai: false, alive: true, killsAtt: 0, killsDef: 0, killUnits: 0 };
+    state.factions.player = { id: 'player', name: C.PLAYER.name, color: C.PLAYER.color, ai: false, alive: true, killsAtt: 0, killsDef: 0, killUnits: 0, coins: 0, tech: {}, upgrades: {} };
     aiFactions.forEach((f, i) => {
       state.factions[f.id] = {
         id: f.id, name: f.name, color: f.color, personality: f.personality, ai: true, alive: true,
@@ -219,13 +219,31 @@
       if (!s) break;
       neutral(s.x, s.y); made++;
     }
+    useDifficulty(state);
     return state;
   }
 
   /* ---------- ekonomia ---------- */
   // Mnożniki trudności ustawia advance()/newGame – produkcja nie potrzebuje wtedy dostępu do stanu.
   let D = C.DIFFICULTY[C.DEFAULT_DIFFICULTY];
-  function useDifficulty(state) { D = diff(state); }
+  // Efekty badań gracza (AI nie ma technologii) liczone przy każdym tiku świata – tak samo jak poziom trudności (D).
+  let FX = { storage: 1, exchange: C.MARKET.exchangeRate, build: 1, recruit: 1, mint: 0 };
+  function techNode(id) { return C.TECH.nodes.find(n => n.id === id) || null; }
+  function techLevel(f, node) {
+    if (!f) return 0;
+    return node.effect.type === 'unit' ? ((f.upgrades && f.upgrades[node.effect.unit]) || 0) : ((f.tech && f.tech[node.id]) || 0);
+  }
+  function techCost(node, level) { return Math.max(1, Math.round(node.base * Math.pow(node.factor, level - 1))); }
+  function techEffects(f) {
+    const fx = { storage: 1, exchange: C.MARKET.exchangeRate, build: 1, recruit: 1, mint: 0 };
+    C.TECH.nodes.forEach(n => {
+      const lvl = techLevel(f, n);
+      if (lvl && n.effect.type !== 'unit') fx[n.effect.type] += n.effect.per * lvl;
+    });
+    fx.build = Math.max(0.3, fx.build); fx.recruit = Math.max(0.3, fx.recruit);
+    return fx;
+  }
+  function useDifficulty(state) { D = diff(state); FX = techEffects(state.factions && state.factions.player); }
   function prodFactor(v) {
     if (v.owner === null) return C.NEUTRAL.prodFactor;
     return v.owner === 'player' ? D.playerProd : D.aiProd;
@@ -238,7 +256,10 @@
       iron: C.BUILDINGS.iron.prod[v.buildings.iron] * f
     };
   }
-  function storageCap(v) { return C.BUILDINGS.hq.storage[v.buildings.hq]; }
+  function storageCap(v) {
+    const base = C.BUILDINGS.hq.storage[v.buildings.hq];
+    return v.owner === 'player' ? Math.floor(base * FX.storage) : base;
+  }
   function popCap(v) { return C.BUILDINGS.farm.pop[v.buildings.farm]; }
   function popUsed(state, v) {
     let p = 0;
@@ -294,7 +315,7 @@
 
   /* ---------- budowa ---------- */
   function buildTime(v, key, level) {
-    return Math.round(C.BUILDINGS[key].time[level] * C.BUILDINGS.hq.buildSpeed[v.buildings.hq] * 1000);
+    return Math.round(C.BUILDINGS[key].time[level] * C.BUILDINGS.hq.buildSpeed[v.buildings.hq] * (v.owner === 'player' ? FX.build : 1) * 1000);
   }
   function buildInfo(state, v, key) {
     const B = C.BUILDINGS[key];
@@ -326,7 +347,7 @@
 
   /* ---------- rekrutacja ---------- */
   function recruitPer(v, unit) {
-    return Math.round(C.UNITS[unit].time * C.BUILDINGS.barracks.recruitSpeed[v.buildings.barracks] * 1000);
+    return Math.round(C.UNITS[unit].time * C.BUILDINGS.barracks.recruitSpeed[v.buildings.barracks] * (v.owner === 'player' ? FX.recruit : 1) * 1000);
   }
   function recruitInfo(state, v, unit) {
     const U = C.UNITS[unit];
@@ -358,44 +379,10 @@
     return info;
   }
 
-  /* ---------- Kuźnia: ulepszenia jednostek ---------- */
-  function roundTo5(x) { return Math.max(5, Math.round(x / 5) * 5); }
-  // Czy to plemię już bada tę jednostkę w jakiejś wiosce?
-  function upgradeBusyElsewhere(state, v, unit) {
-    return Object.values(state.villages).some(w => w.id !== v.id && w.owner === v.owner && w.upgrade && w.upgrade.unit === unit);
-  }
-  function upgradeInfo(state, v, unit) {
-    const S = C.SMITHY, U = C.UNITS[unit];
-    const info = { unit, level: 0, target: 0, cost: null, time: 0, ok: false, code: '', reason: '' };
-    if (!U || !S.units.includes(unit) || v.owner === null) { info.code = 'unit'; info.reason = 'Tej jednostki nie można ulepszać'; return info; }
-    const ups = upgradesOf(state, v.owner);
-    info.level = (ups && ups[unit]) || 0;
-    info.target = info.level + 1;
-    if (info.target > C.MAX_LEVEL) { info.code = 'max'; info.reason = 'Maksymalny poziom'; return info; }
-    info.cost = {};
-    RES.forEach(r => { info.cost[r] = roundTo5(U.cost[r] * S.costMult * Math.pow(S.costFactor, info.target - 1)); });
-    info.time = Math.round(S.baseTime * Math.pow(S.timeFactor, info.target - 1) * C.BUILDINGS.hq.buildSpeed[v.buildings.hq] * 1000);
-    if (!(v.buildings.smithy > 0)) { info.code = 'smithy'; info.reason = 'Zbuduj Kuźnię'; return info; }
-    if (v.buildings.smithy < info.target) { info.code = 'level'; info.reason = 'Wymaga Kuźni poz. ' + info.target; return info; }
-    if (v.upgrade) { info.code = 'busy'; info.reason = 'Kuźnia jest zajęta'; return info; }
-    if (upgradeBusyElsewhere(state, v, unit)) { info.code = 'busy'; info.reason = 'Ta jednostka jest już ulepszana w innej wiosce'; return info; }
-    if (RES.some(r => info.cost[r] > storageCap(v))) { info.code = 'storage'; info.reason = 'Za mały magazyn – rozbuduj Ratusz'; return info; }
-    if (!canAfford(v, info.cost)) { info.code = 'resources'; info.reason = 'Brak surowców'; return info; }
-    info.ok = true;
-    return info;
-  }
-  function queueUpgrade(state, v, unit, t) {
-    tickVillage(state, v, t);
-    const info = upgradeInfo(state, v, unit);
-    if (!info.ok) return info;
-    pay(v, info.cost);
-    v.upgrade = { unit, level: info.target, start: t, end: t + info.time };
-    return info;
-  }
-
   /* ---------- Targowisko: wymiana surowców ---------- */
   function exchangeMax(v) { return merchantsTotal(v) * C.MERCHANT.capacity; }
-  function exchangeGet(amount) { return Math.floor(amount * C.MARKET.exchangeRate + 1e-9); }
+  function exchangeRate() { return FX.exchange; }
+  function exchangeGet(amount) { return Math.floor(amount * FX.exchange + 1e-9); }
   function exchange(state, villageId, from, to, amount, t) {
     const v = state.villages[villageId];
     if (!v || v.owner === null) return { ok: false, reason: 'Nieznana wioska' };
@@ -412,6 +399,60 @@
     v.res[from] -= amount;
     v.res[to] += got;
     return { ok: true, spent: amount, got };
+  }
+
+  /* ---------- Technologia: monety i drzewko badań ---------- */
+  // Limit zakupu monet w wiosce: wiadro, które napełnia się z czasem (leniwie, bez zdarzeń).
+  function mintLimit(v) { return (v.buildings.market || 0) > 0 ? C.TECH.mint.perLevelPerHour * v.buildings.market + FX.mint : 0; }
+  function mintTokens(v, t) {
+    const lim = mintLimit(v), top = lim * C.TECH.mint.bucketHours;
+    if (!v.mint) return Math.min(top, lim);                 // pierwszy dostęp: zapas na godzinę
+    return Math.min(top, v.mint.tokens + lim * Math.max(0, t - v.mint.at) / 3600000);
+  }
+  function buyCoins(state, villageId, res, count, t) {
+    const v = state.villages[villageId], f = state.factions.player;
+    if (!v || v.owner !== 'player') return { ok: false, reason: 'Nieznana wioska' };
+    if (!RES.includes(res)) return { ok: false, reason: 'Wybierz surowiec' };
+    tickVillage(state, v, t);
+    if (!((v.buildings.market || 0) > 0)) return { ok: false, reason: 'Ta wioska nie ma Targowiska' };
+    count = Math.floor(Number(count) || 0);
+    if (count < 1) return { ok: false, reason: 'Podaj liczbę monet' };
+    const have = Math.floor(mintTokens(v, t));
+    if (count > have) return { ok: false, reason: 'Limit zakupu w tej wiosce: teraz maksymalnie ' + have };
+    const price = count * C.TECH.coinPrice;
+    if (Math.floor(v.res[res]) < price) return { ok: false, reason: 'Za mało surowca' };
+    v.res[res] -= price;
+    v.mint = { tokens: mintTokens(v, t) - count, at: t };
+    f.coins = (f.coins || 0) + count;
+    return { ok: true, coins: count, spent: price };
+  }
+  function techInfo(state, id) {
+    const node = techNode(id), f = state.factions.player;
+    const info = { id, level: 0, target: 0, cost: 0, ok: false, code: '', reason: '', req: null };
+    if (!node || !f) { info.code = 'unknown'; info.reason = 'Nieznane badanie'; return info; }
+    info.level = techLevel(f, node);
+    info.target = info.level + 1;
+    if (info.level >= node.max) { info.code = 'max'; info.reason = 'Maksymalny poziom'; return info; }
+    info.cost = techCost(node, info.target);
+    if (node.req) {
+      const parent = techNode(node.req.id);
+      info.req = { id: parent.id, name: parent.name, min: node.req.min, have: techLevel(f, parent) };
+      if (info.req.have < node.req.min) { info.code = 'req'; info.reason = 'Wymaga: ' + parent.name + ' poz. ' + node.req.min; return info; }
+    }
+    if ((f.coins || 0) < info.cost) { info.code = 'coins'; info.reason = 'Brakuje monet'; return info; }
+    info.ok = true;
+    return info;
+  }
+  function researchTech(state, id, t) {
+    const info = techInfo(state, id);
+    if (!info.ok) return info;
+    const node = techNode(id), f = state.factions.player;
+    f.coins -= info.cost;
+    if (node.effect.type === 'unit') { f.upgrades = f.upgrades || {}; f.upgrades[node.effect.unit] = info.target; }
+    else { f.tech = f.tech || {}; f.tech[id] = info.target; }
+    useDifficulty(state);
+    notice(state, t, 'info', 'Technologia: ' + node.name + ' – poziom ' + info.target);
+    return info;
   }
 
   /* ---------- ruchy wojsk ---------- */
@@ -1014,7 +1055,6 @@
     v.loyalty = C.LOYALTY.afterConquest;
     v.buildQueue = [];
     v.recruitQueue = [];
-    v.upgrade = null;
     v.lastTick = t;
     v.support = {};
     // wojska tej wioski stacjonujące gdzie indziej tracą dom i rozchodzą się
@@ -1071,7 +1111,6 @@
     for (const id in state.villages) {
       const v = state.villages[id];
       if (v.buildQueue.length) consider(v.buildQueue[0].end, 'build', id);
-      if (v.upgrade) consider(v.upgrade.end, 'upgrade', id);
     }
     for (const m of state.movements) consider(m.arrive, 'move', m.id);
     for (const fid in state.factions) {
@@ -1089,12 +1128,6 @@
       const e = v.buildQueue.shift();
       v.buildings[e.building] = e.level;
       if (v.owner === 'player') notice(state, t, 'info', C.BUILDINGS[e.building].name + ' w ' + v.name + ' – poziom ' + e.level);
-    } else if (ev.kind === 'upgrade') {
-      const v = state.villages[ev.ref], e = v.upgrade;
-      v.upgrade = null;
-      const f = state.factions[v.owner];
-      if (f) { f.upgrades = f.upgrades || {}; f.upgrades[e.unit] = Math.max(f.upgrades[e.unit] || 0, e.level); }
-      if (v.owner === 'player') notice(state, t, 'info', 'Kuźnia w ' + v.name + ': ' + C.UNITS[e.unit].name + ' – ulepszenie poz. ' + e.level);
     } else if (ev.kind === 'move') {
       const i = state.movements.findIndex(m => m.id === ev.ref);
       const m = state.movements.splice(i, 1)[0];
@@ -1152,7 +1185,7 @@
   MP.Engine = {
     RES, UNITS, BUILDINGS, ramCount, diff, useDifficulty, hiddenRes,
     rand, randInt, dist, emptyUnits, cleanUnits, sumUnits, attackPower, defensePower, upgradeMult, upgradesOf,
-    upgradeInfo, queueUpgrade, exchange, exchangeMax, exchangeGet,
+    exchange, exchangeMax, exchangeGet, exchangeRate, mintLimit, mintTokens, buyCoins, techInfo, researchTech, techNode, techLevel, techCost, techEffects,
     tileAt, villagesOf, points, unitPoints, armyOf, accountPower, addKills, killsOf, ranking, ownerName, ownerColor,
     newGame, worldOf, winVillages, productionPerMin, storageCap, popCap, popUsed, tickVillage,
     buildInfo, queueBuild, recruitInfo, queueRecruit, recruitPer,

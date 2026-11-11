@@ -23,7 +23,7 @@
   }
 
   MP.CONFIG = {
-    SAVE_VERSION: 7,
+    SAVE_VERSION: 8,
 
     // Poziomy trudności – mnożniki dla gracza i AI.
     // playerProd / aiProd: produkcja surowców; graceMinutes: ochrona gracza na starcie;
@@ -67,7 +67,7 @@
 
     START: {
       resources: { wood: 800, clay: 800, iron: 700 },
-      buildings: { hq: 1, wood: 1, clay: 1, iron: 1, farm: 1, barracks: 1, market: 0, smithy: 0, wall: 0 },
+      buildings: { hq: 1, wood: 1, clay: 1, iron: 1, farm: 1, barracks: 1, market: 0, wall: 0 },
       units: { spear: 12 }
     },
 
@@ -139,13 +139,6 @@
         time: series(6, 1.5, 1),
         merchants: [0, 1, 2, 3, 4, 6, 8, 10, 13, 16, 20]
       },
-      smithy: {
-        name: 'Kuźnia',
-        desc: 'Ulepsza jednostki dla całego plemienia. Poziom Kuźni ogranicza, do jakiego poziomu możesz ulepszać jednostki.',
-        start: 0,
-        cost: cost(75, 70, 95, 1.32),
-        time: series(7, 1.5, 1)
-      },
       wall: {
         name: 'Mur obronny',
         desc: 'Zwiększa obronę wioski. Tarany wroga mogą go burzyć.',
@@ -167,21 +160,38 @@
     // rate – ile surowca dostajesz za 1 oddany (0,7 = 30% prowizji); jednorazowo do (kupcy × udźwig) surowca.
     MARKET: { exchangeRate: 0.7 },
 
-    // Kuźnia: ulepszenia jednostek dla całego plemienia (poziom 1..MAX_LEVEL, nie wyżej niż poziom Kuźni).
-    // Każdy poziom daje +bonusPerLevel do ataku i obrony jednostki. Jedno badanie naraz w wiosce;
-    // tę samą jednostkę badamy jednocześnie tylko w jednej wiosce.
-    // Koszt poziomu L = koszt jednostki × costMult × costFactor^(L-1); czas = baseTime × timeFactor^(L-1) sekund (× szybkość Ratusza).
-    // Tarany, Zwiadowcy, Dowódcy i Osadnicy nie są ulepszani (ich koszt przekroczyłby magazyn).
-    SMITHY: {
-      units: ['spear', 'archer', 'guard', 'axe', 'light'],
-      bonusPerLevel: 0.05,
-      costMult: 7, costFactor: 1.3,
-      baseTime: 90, timeFactor: 1.4
+    // Technologia: drzewko badań plemienia, płatne MONETAMI (nie surowcami).
+    // Monety kupuje się w wiosce z Targowiskiem za JEDEN wybrany surowiec: coinPrice sztuk surowca = 1 moneta (tylko w jedną stronę).
+    // Limit zakupu na wioskę: (poziom Targowiska × perLevelPerHour + bonus z badania Mennica) monet na godzinę;
+    // niewykorzystany limit odkłada się do bucketHours godzin.
+    // Węzeł: max poziomów, koszt poziomu L = base × factor^(L-1) monet, req = węzeł nadrzędny i jego minimalny poziom.
+    // effect: unit – +unitBonus ataku i obrony jednostki na poziom; pozostałe typy działają jako suma per × poziom
+    // (storage, build, recruit – mnożnik wokół 1; exchange – dodatek do kursu wymiany; mint – dodatkowe monety/h na wioskę).
+    TECH: {
+      unitBonus: 0.05,
+      coinPrice: 1500,
+      mint: { perLevelPerHour: 3, bucketHours: 6 },
+      branches: [
+        { id: 'war', name: 'Wojsko' },
+        { id: 'eco', name: 'Gospodarka' }
+      ],
+      nodes: [
+        { id: 'drill', branch: 'war', name: 'Musztra', desc: 'Szybsze szkolenie wojska.', max: 5, base: 10, factor: 1.3, req: null, effect: { type: 'recruit', per: -0.04 } },
+        { id: 'u_spear', branch: 'war', name: 'Pikinier', desc: 'Atak i obrona Pikiniera.', max: 10, base: 10, factor: 1.25, req: { id: 'drill', min: 1 }, effect: { type: 'unit', unit: 'spear' } },
+        { id: 'u_archer', branch: 'war', name: 'Łucznik', desc: 'Atak i obrona Łucznika.', max: 10, base: 10, factor: 1.25, req: { id: 'drill', min: 1 }, effect: { type: 'unit', unit: 'archer' } },
+        { id: 'u_guard', branch: 'war', name: 'Tarczownik', desc: 'Atak i obrona Tarczownika.', max: 10, base: 10, factor: 1.25, req: { id: 'u_spear', min: 3 }, effect: { type: 'unit', unit: 'guard' } },
+        { id: 'u_axe', branch: 'war', name: 'Topornik', desc: 'Atak i obrona Topornika.', max: 10, base: 10, factor: 1.25, req: { id: 'drill', min: 2 }, effect: { type: 'unit', unit: 'axe' } },
+        { id: 'u_light', branch: 'war', name: 'Lekka kawaleria', desc: 'Atak i obrona Lekkiej kawalerii.', max: 10, base: 10, factor: 1.25, req: { id: 'u_axe', min: 3 }, effect: { type: 'unit', unit: 'light' } },
+        { id: 'trade', branch: 'eco', name: 'Kupiectwo', desc: 'Lepszy kurs wymiany surowców w Targowisku.', max: 5, base: 10, factor: 1.3, req: null, effect: { type: 'exchange', per: 0.02 } },
+        { id: 'store', branch: 'eco', name: 'Magazyny', desc: 'Większa pojemność magazynów we wszystkich wioskach.', max: 10, base: 12, factor: 1.25, req: { id: 'trade', min: 1 }, effect: { type: 'storage', per: 0.10 } },
+        { id: 'mint', branch: 'eco', name: 'Mennica', desc: 'Większy limit zakupu monet w każdej wiosce (monet na godzinę).', max: 5, base: 15, factor: 1.3, req: { id: 'trade', min: 2 }, effect: { type: 'mint', per: 2 } },
+        { id: 'build', branch: 'eco', name: 'Budownictwo', desc: 'Krótszy czas budowy.', max: 10, base: 15, factor: 1.25, req: { id: 'store', min: 3 }, effect: { type: 'build', per: -0.03 } }
+      ]
     },
 
     // Nowa wioska założona przez Osadnika
     SETTLE: {
-      buildings: { hq: 1, wood: 1, clay: 1, iron: 1, farm: 1, barracks: 0, market: 0, smithy: 0, wall: 0 },
+      buildings: { hq: 1, wood: 1, clay: 1, iron: 1, farm: 1, barracks: 0, market: 0, wall: 0 },
       resources: { wood: 300, clay: 300, iron: 200 },
       minDistance: 1.5                           // minimalna odległość od innej wioski
     },

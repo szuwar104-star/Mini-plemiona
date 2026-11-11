@@ -120,6 +120,19 @@
       Object.values(s.factions || {}).forEach(f => { if (!f.upgrades) f.upgrades = {}; });
       s.version = 7;
       return s;
+    },
+    // v7 → v8: Kuźnia zastąpiona drzewkiem Technologii (monety); poziomy ulepszeń jednostek zostają
+    7: s => {
+      Object.values(s.villages || {}).forEach(v => {
+        if (v.buildings) delete v.buildings.smithy;
+        delete v.upgrade;
+        v.buildQueue = (v.buildQueue || []).filter(e => e.building !== 'smithy');
+      });
+      Object.values(s.intel || {}).forEach(i => { if (i.buildings) delete i.buildings.smithy; });
+      const pf = s.factions && s.factions.player;
+      if (pf) { if (typeof pf.coins !== 'number') pf.coins = 0; if (!pf.tech) pf.tech = {}; if (!pf.upgrades) pf.upgrades = {}; }
+      s.version = 8;
+      return s;
     }
   };
 

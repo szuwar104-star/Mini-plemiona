@@ -277,16 +277,26 @@ table.ov .timer { color: var(--muted); font-weight: 700; margin-left: .3rem; }
 .bcard h3 { display: flex; justify-content: space-between; align-items: center; gap: .5rem; margin-bottom: .45rem; font-size: 1.02rem; }
 .lvl { padding: .05rem .5rem; border-radius: 999px; background: rgba(232, 182, 76, .14); color: var(--gold-2); font-size: .85rem; font-weight: 800; white-space: nowrap; }
 .lvl small { color: var(--muted); font-weight: 600; }
-/* Kuźnia: zwarta lista ulepszeń w oknie */
-.upg-list { display: grid; gap: .5rem; margin: .8rem 0; }
-.upg-row { display: grid; grid-template-columns: 44px 1fr auto; gap: .15rem .7rem; align-items: center; padding: .55rem .65rem; background: var(--bg-2); border-radius: var(--r-sm); }
-.upg-row .bicon { grid-row: 1 / span 2; width: 44px; height: 44px; padding: 7px; border-radius: 11px; }
-.upg-main { display: flex; flex-wrap: wrap; align-items: baseline; gap: .1rem .55rem; grid-column: 2; }
-.upg-cost { grid-column: 2; margin: 0; }
-.upg-cost .cost { margin: 0; }
-.upg-row .upg-btn { grid-column: 3; grid-row: 1 / span 2; flex-direction: column; gap: 0; min-height: 44px; padding: .35rem .9rem; line-height: 1.15; }
-.upg-row .upg-btn small { font-weight: 700; opacity: .75; }
-.upg-why { grid-column: 2 / -1; margin: .1rem 0 0; font-size: .8rem; }
+/* Technologia: drzewko badań */
+.tech-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .8rem 1.2rem; }
+.tech-head h1 { margin: 0 0 .2rem; }
+.tech-head p { margin: 0; }
+.tech-coins { display: flex; align-items: center; gap: .7rem; }
+.chip.big { font-size: 1.2rem; padding: .25rem .8rem .25rem .5rem; }
+.tech-branch h2 { margin-top: 0; }
+.tech-tree { display: grid; gap: .55rem; }
+.tnode { display: grid; grid-template-columns: 48px 1fr; gap: .2rem .8rem; align-items: start; padding: .65rem .75rem; margin-left: calc(var(--d, 0) * 1.1rem);
+  background: var(--bg-2); border-radius: var(--r-sm); border-left: 3px solid var(--gold); }
+.tnode.locked { opacity: .6; border-left-color: var(--line-2); }
+.tnode .bicon { width: 48px; height: 48px; padding: 8px; border-radius: 12px; }
+.tnode h3 { margin: 0 0 .3rem; font-size: 1rem; }
+.tnode .pips { margin-bottom: .45rem; }
+.tnode .effect { margin: 0 0 .5rem; }
+.tn-buy { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.tn-buy .btn { min-height: 38px; padding: .4rem .9rem; }
+.tnode .why { margin: .35rem 0 0; font-size: .8rem; }
+.tnode .done { margin: 0; }
+@media (max-width: 760px) { .tnode { margin-left: calc(var(--d, 0) * .7rem); gap: .2rem .6rem; } }
 .pips { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; margin-bottom: .6rem; }
 .pips i { height: 4px; border-radius: 2px; background: var(--surface-3); }
 .pips i.on { background: var(--gold); }

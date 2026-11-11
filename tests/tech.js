@@ -1,0 +1,121 @@
+/* Test Technologii: monety (limit zakupu), drzewko badań, efekty, wymiana surowców i migracja zapisu v7 → v8: node tests/tech.js */
+'use strict';
+require('../config.js'); require('../engine.js'); require('../ai.js'); require('../database.js');
+const E = MP.Engine, C = MP.CONFIG, DB = MP.DB, T = C.TECH;
+let fails = 0;
+const ok = (c, msg) => { if (!c) { fails++; console.error('BŁĄD: ' + msg); } else console.log('ok: ' + msg); };
+
+const st = E.newGame(0, 12345, 'normal', 'small');
+const f = st.factions.player;
+const v = E.villagesOf(st, 'player')[0];
+E.useDifficulty(st);
+
+/* ---------- struktura drzewka ---------- */
+const ids = T.nodes.map(n => n.id);
+ok(new Set(ids).size === ids.length, 'identyfikatory węzłów są unikalne');
+ok(T.nodes.every(n => !n.req || ids.indexOf(n.req.id) >= 0 && ids.indexOf(n.req.id) < ids.indexOf(n.id)), 'każdy węzeł ma rodzica wcześniej w liście (drzewko bez cykli)');
+ok(T.nodes.every(n => n.effect.type !== 'unit' || C.UNITS[n.effect.unit]), 'węzły jednostek wskazują istniejące jednostki');
+ok(!C.BUILDINGS.smithy, 'budynek Kuźni usunięty');
+
+/* ---------- wymiana surowców ---------- */
+v.buildings.hq = 10;
+v.res = { wood: 1000, clay: 5000, iron: 1000 };
+ok(!E.exchange(st, v.id, 'clay', 'wood', 1000, 0).ok, 'bez Targowiska wymiana jest zablokowana');
+v.buildings.market = 1;
+let r = E.exchange(st, v.id, 'clay', 'wood', 1000, 0);
+ok(r.ok && r.got === 700, 'wymiana 1000 gliny daje 700 drewna (kurs ' + E.exchangeRate() + ')');
+ok(!E.exchange(st, v.id, 'clay', 'wood', 1500, 0).ok, 'powyżej limitu kupców: odmowa');
+ok(!E.exchange(st, v.id, 'iron', 'iron', 100, 0).ok, 'ten sam surowiec: odmowa');
+v.res.wood = 10000; v.res.clay = 0;
+const a = E.exchange(st, v.id, 'wood', 'clay', 1000, 0).got, b = E.exchange(st, v.id, 'clay', 'wood', a, 0).got;
+ok(b < 1000, 'wymiana tam i z powrotem nie daje zysku (' + b + ' < 1000)');
+
+/* ---------- monety ---------- */
+v.buildings.market = 0; v.res = { wood: 14000, clay: 14000, iron: 14000 };
+ok(!E.buyCoins(st, v.id, 'clay', 1, 0).ok, 'bez Targowiska: brak zakupu monet');
+v.buildings.market = 2;
+ok(E.mintLimit(v) === 2 * T.mint.perLevelPerHour, 'limit zakupu = poziom Targowiska × ' + T.mint.perLevelPerHour + ' monet/h');
+const lim = E.mintLimit(v);
+ok(!E.buyCoins(st, v.id, 'clay', lim + 1, 0).ok, 'zakup ponad limit: odmowa');
+r = E.buyCoins(st, v.id, 'clay', lim, 0);
+ok(r.ok && f.coins === lim && v.res.clay === 14000 - lim * T.coinPrice, 'zakup ' + lim + ' monet kosztuje ' + lim * T.coinPrice + ' gliny');
+ok(!E.buyCoins(st, v.id, 'clay', 1, 0).ok, 'po wyczerpaniu limitu: odmowa');
+ok(E.buyCoins(st, v.id, 'iron', 1, 3600 * 1000).ok, 'po godzinie limit się odnawia');
+v.mint = { tokens: 0, at: 0 };
+ok(Math.floor(E.mintTokens(v, 100 * 3600 * 1000)) === lim * T.mint.bucketHours, 'zapas limitu ma sufit ' + T.mint.bucketHours + ' h');
+ok(E.buyCoins(st, v.id, 'wood', 1, 7200 * 1000).ok, 'zakup monet za inny surowiec działa');
+
+/* ---------- badania ---------- */
+f.coins = 0;
+ok(E.techInfo(st, 'u_spear').code === 'req', 'Pikinier wymaga Musztry');
+ok(E.techInfo(st, 'drill').code === 'coins', 'bez monet: badanie zablokowane');
+f.coins = 1000;
+const c1 = E.techInfo(st, 'drill').cost;
+r = E.researchTech(st, 'drill', 0);
+ok(r.ok && f.tech.drill === 1 && f.coins === 1000 - c1, 'Musztra poz. 1 kupiona za ' + c1 + ' monet');
+const recBefore = E.recruitPer(v, 'spear');
+E.researchTech(st, 'drill', 0); E.researchTech(st, 'drill', 0);
+ok(E.recruitPer(v, 'spear') < recBefore, 'Musztra skraca szkolenie');
+ok(E.techInfo(st, 'u_spear').ok, 'po Musztrze 1 można badać Pikiniera');
+const atk0 = E.attackPower({ spear: 10 }, null);
+E.researchTech(st, 'u_spear', 0);
+ok(f.upgrades.spear === 1, 'badanie Pikiniera zapisuje poziom w ulepszeniach plemienia');
+ok(Math.abs(E.attackPower({ spear: 10 }, E.upgradesOf(st, 'player')) - atk0 * 1.05) < 1e-9, 'atak +5% na poziom');
+ok(E.techInfo(st, 'u_guard').code === 'req', 'Tarczownik wymaga Pikiniera poz. 3');
+f.coins = 100000;
+for (let i = 0; i < 12; i++) E.researchTech(st, 'u_spear', 0);
+ok(f.upgrades.spear === 10 && E.techInfo(st, 'u_spear').code === 'max', 'poziom maksymalny 10 i dalej zablokowany');
+// gospodarka
+ok(E.techInfo(st, 'store').code === 'req', 'Magazyny wymagają Kupiectwa');
+E.researchTech(st, 'trade', 0);
+const cap0 = E.storageCap(v);
+for (let i = 0; i < 3; i++) E.researchTech(st, 'store', 0);
+ok(E.storageCap(v) === Math.floor(cap0 * 1.3), 'Magazyny +30%: ' + cap0 + ' → ' + E.storageCap(v));
+const ai = Object.values(st.villages).find(x => x.owner && x.owner !== 'player');
+ok(E.storageCap(ai) === C.BUILDINGS.hq.storage[ai.buildings.hq], 'AI nie dostaje bonusu do magazynu');
+E.researchTech(st, 'trade', 0);
+ok(Math.abs(E.exchangeRate() - 0.74) < 1e-9, 'Kupiectwo poz. 2: kurs ' + E.exchangeRate());
+const lim0 = E.mintLimit(v);
+E.researchTech(st, 'trade', 0); E.researchTech(st, 'mint', 0);
+ok(E.mintLimit(v) === lim0 + 2, 'Mennica poz. 1: limit +2 monety/h');
+const bt0 = E.buildInfo(st, v, 'farm').time;
+E.researchTech(st, 'build', 0);   // wymaga Magazynów 3 (są)
+ok(E.buildInfo(st, v, 'farm').time < bt0, 'Budownictwo skraca czas budowy (' + bt0 + ' → ' + E.buildInfo(st, v, 'farm').time + ' ms)');
+// koszt najwyższego poziomu jest rozsądny
+ok(T.nodes.every(n => E.techCost(n, n.max) > 0 && Number.isFinite(E.techCost(n, n.max))), 'koszty wszystkich poziomów są skończone');
+const total = T.nodes.reduce((s, n) => { for (let l = 1; l <= n.max; l++) s += E.techCost(n, l); return s; }, 0);
+console.log('   (całe drzewko: ' + total + ' monet = ' + (total * T.coinPrice / 1e6).toFixed(1) + ' mln surowców)');
+
+/* ---------- walka uwzględnia badania ---------- */
+const st2 = E.newGame(0, 777, 'normal', 'small');
+E.useDifficulty(st2);
+const pv = E.villagesOf(st2, 'player')[0];
+pv.units = E.emptyUnits(); pv.units.spear = 10;
+const D0 = E.villageDefense(pv, null, E.upgradesOf(st2, 'player'));
+st2.factions.player.upgrades.spear = 4;
+ok(E.villageDefense(pv, null, E.upgradesOf(st2, 'player')) > D0, 'obrona rośnie po badaniu jednostki');
+ok(E.accountPower(st2, 'player').defense > 0, 'moc konta liczy się z badaniami');
+
+/* ---------- migracja v7 → v8 ---------- */
+const old = JSON.parse(JSON.stringify(E.newGame(0, 99, 'normal', 'small')));
+old.version = 7;
+Object.values(old.villages).forEach(x => { x.buildings.smithy = 2; x.upgrade = null; });
+old.factions.player.upgrades = { axe: 3 }; delete old.factions.player.coins; delete old.factions.player.tech;
+const mig = DB.migrate(old);
+ok(mig.version === C.SAVE_VERSION, 'zapis v7 migruje do v' + C.SAVE_VERSION);
+ok(Object.values(mig.villages).every(x => x.buildings.smithy === undefined && x.upgrade === undefined), 'migracja usuwa Kuźnię');
+ok(mig.factions.player.coins === 0 && mig.factions.player.upgrades.axe === 3, 'poziomy ulepszeń jednostek zostają, monety = 0');
+const re = DB.parse(DB.serialize(mig)).state;
+E.advance(re, re.now + 3600 * 1000);
+ok(true, 'zapis po migracji działa przez godzinę gry');
+
+/* ---------- symulacja bez NaN ---------- */
+const sim = E.newGame(0, 31337, 'normal', 'small');
+const sv = E.villagesOf(sim, 'player')[0];
+sv.buildings.market = 5; sim.factions.player.coins = 5000;
+['drill', 'u_axe', 'u_axe', 'u_axe', 'trade', 'store', 'store', 'store', 'mint'].forEach(id => E.researchTech(sim, id, sim.now));
+for (let i = 0; i < 24; i++) { sv.res = { wood: 14000, clay: 14000, iron: 14000 }; E.buyCoins(sim, sv.id, 'clay', 3, sim.now); E.advance(sim, sim.now + 3600 * 1000); }
+ok(Object.values(sim.villages).every(x => E.RES.every(k => Number.isFinite(x.res[k]) && x.res[k] >= 0)), 'brak NaN i wartości ujemnych po symulacji');
+
+console.log(fails ? '\nBŁĘDÓW: ' + fails : '\nWszystkie testy Technologii przeszły.');
+process.exit(fails ? 1 : 0);
