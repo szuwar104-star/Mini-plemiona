@@ -582,17 +582,14 @@
   }
   function renderTech() {
     const s = st(), el = $('#screen-tech'), f = s.factions.player, coins = f.coins || 0;
-    if (!UI.techSel || !E.techNode(UI.techSel)) {
-      const first = C.TECH.nodes.find(n => E.techInfo(s, n.id).ok) || C.TECH.nodes[0];
-      UI.techSel = first.id;
-    }
+    if (UI.techSel && !E.techNode(UI.techSel)) UI.techSel = null; // szczegóły tylko po kliknięciu węzła – bez domyślnego wyboru
     const sig = JSON.stringify([f.coins, f.tech, f.upgrades, UI.techSel]);
     if (UI.sigs.tech === sig) return;
     UI.sigs.tech = sig;
     el.innerHTML = '<section class="panel tech-head"><div><h1>Technologia</h1>' +
       '<p class="muted">Badania płacisz monetami, wspólnymi dla całego plemienia. Kliknij węzeł, aby zobaczyć szczegóły; „Badaj” na kafelku kupuje od razu.</p></div>' +
       '<div class="tech-coins"><span class="chip big">' + ico('coin') + fmt(coins) + '</span></div></section>' +
-      '<div class="tech-top">' + techDetailHtml(s, coins) +
+      '<div class="tech-top">' + (UI.techSel ? techDetailHtml(s, coins) : '') +
       '<section class="panel quick"><h2>Szybki zakup monet<small>aktywna wioska</small></h2><div data-quick="coins"></div></section></div>' +
       C.TECH.branches.map(b => techBranchHtml(b, s, coins)).join('');
   }
@@ -1651,7 +1648,7 @@
         break;
       }
       case 'tech-open': if (UI.modal) closeModal(); show('tech'); break;
-      case 'tech-sel': UI.techSel = b.dataset.id; UI.sigs.tech = null; render(); break;
+      case 'tech-sel': UI.techSel = UI.techSel === b.dataset.id ? null : b.dataset.id; UI.sigs.tech = null; render(); break;
       case 'tech-buy': {
         UI.techSel = b.dataset.id;
         const r = G.action(s => E.researchTech(s, b.dataset.id, s.now));
