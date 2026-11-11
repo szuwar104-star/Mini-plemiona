@@ -996,14 +996,14 @@
     const s = st(), g = UI.gather, spread = g.mode === 'spread', T = s.villages[g.target];
     const plan = E.planGather(s, g.target, gatherArgs(g), s.now);
     const sendable = plan.rows.filter(r => !r.skip && r.total > 0);
-    let html = '<div class="selbar"><button class="btn ghost" data-act="sel-all" data-w="g" data-on="1">Zaznacz wszystkie</button><button class="btn ghost" data-act="sel-all" data-w="g" data-on="0">Odznacz wszystkie</button></div>' + '<div class="tablewrap"><table class="units gather"><thead><tr><th></th><th>' + (spread ? 'Do wioski' : 'Z wioski') + '</th><th>Surowce</th><th>Kupcy</th><th>Droga</th></tr></thead><tbody>' +
+    let html = '<div class="tablewrap"><table class="units gather"><thead><tr><th></th><th>' + (spread ? 'Do wioski' : 'Z wioski') + '</th><th>Surowce</th><th>Kupcy</th><th>Droga</th></tr></thead><tbody>' +
       plan.rows.map(r => {
         const v = s.villages[r.villageId];
         return '<tr class="' + (r.skip ? 'skipped' : '') + '"><td class="g-chk"><input type="checkbox" data-gsrc="' + v.id + '"' + (r.off ? '' : ' checked') + '></td>' +
           '<td class="g-name">' + esc(v.name) + '<small>' + E.dist(v, T).toFixed(1) + ' pola</small></td>' +
           '<td class="g-res">' + (r.skip ? '<span class="muted">' + esc(r.skip) + '</span>' : resLine(r.res)) + '</td>' +
           '<td class="num g-merch" data-l="Kupcy">' + (r.merchants || '') + '</td><td class="num g-time" data-l="Droga">' + (r.skip ? '' : dur(r.time)) + '</td></tr>';
-      }).join('') + '</tbody></table></div>';
+      }).join('') + '</tbody></table></div>' + '<div class="selbar"><button type="button" class="btn ghost" data-act="sel-all" data-w="g" data-on="1">Zaznacz wszystkie wioski</button><button type="button" class="btn ghost" data-act="sel-all" data-w="g" data-on="0">Odznacz wszystkie wioski</button></div>';
     html += '<div class="summary"><div><span>Razem surowców</span><b>' + fmt(plan.total) + '</b></div>' +
       '<div><span>Kupców</span><b>' + plan.merchants + '</b></div>' +
       '<div><span>Transportów</span><b>' + sendable.length + '</b></div>' +
@@ -1036,7 +1036,7 @@
       '<label class="field">Rodzaj wysyłki <select data-tstay>' +
         '<option value="0"' + (g.stay ? '' : ' selected') + '>Wsparcie (można odwołać)</option>' +
         '<option value="1"' + (g.stay ? ' selected' : '') + '>Przeniesienie na stałe (zajmuje farmę)</option></select></label>' +
-      '<div class="gopts"><div class="field">Jednostki<span class="selbar"><button type="button" class="btn ghost" data-act="tunits-all" data-on="1">Zaznacz wszystkie</button><button type="button" class="btn ghost" data-act="tunits-all" data-on="0">Odznacz wszystkie</button></span><span class="gres ugrid">' + E.UNITS.map(k => '<label class="chk"><input type="checkbox" data-tunit="' + k + '"' + (g.units[k] ? ' checked' : '') + '>' + ico(k) + C.UNITS[k].name + '</label>').join('') + '</span></div>' +
+      '<div class="gopts"><div class="field">Jednostki<span class="selbar"><button type="button" class="btn ghost" data-act="tunits-all" data-on="1">Zaznacz wszystkie jednostki</button><button type="button" class="btn ghost" data-act="tunits-all" data-on="0">Odznacz wszystkie jednostki</button></span><span class="gres ugrid">' + E.UNITS.map(k => '<label class="chk"><input type="checkbox" data-tunit="' + k + '"' + (g.units[k] ? ' checked' : '') + '>' + ico(k) + C.UNITS[k].name + '</label>').join('') + '</span></div>' +
       '<label class="field">Zostaw w wiosce wysyłającej (% wojska)<input type="number" inputmode="numeric" min="0" max="100" step="5" data-treserve value="' + esc(g.reserve) + '"></label></div>' +
       (g.stay ? '<label class="chk"><input type="checkbox" data-tcap' + (g.capToRoom ? ' checked' : '') + '>Nie wysyłaj więcej, niż mieści farma ' + (spread ? 'celów' : 'celu') + '</label>' : '') +
       '<div id="troopsPlan"></div>' +
@@ -1048,14 +1048,14 @@
     const s = st(), g = UI.troops, spread = g.mode === 'spread', T = s.villages[g.target];
     const plan = E.planTroops(s, g.target, troopsArgs(g), s.now);
     const sendable = plan.rows.filter(r => !r.skip && r.total > 0);
-    let html = '<div class="selbar"><button class="btn ghost" data-act="sel-all" data-w="t" data-on="1">Zaznacz wszystkie</button><button class="btn ghost" data-act="sel-all" data-w="t" data-on="0">Odznacz wszystkie</button></div>' + '<div class="tablewrap"><table class="units gather"><thead><tr><th></th><th>' + (spread ? 'Do wioski' : 'Z wioski') + '</th><th>Wojsko</th><th>Droga</th></tr></thead><tbody>' +
+    let html = '<div class="tablewrap"><table class="units gather"><thead><tr><th></th><th>' + (spread ? 'Do wioski' : 'Z wioski') + '</th><th>Wojsko</th><th>Droga</th></tr></thead><tbody>' +
       plan.rows.map(r => {
         const v = s.villages[r.villageId];
         return '<tr class="' + (r.skip ? 'skipped' : '') + '"><td class="g-chk"><input type="checkbox" data-tsrc="' + v.id + '"' + (r.off ? '' : ' checked') + '></td>' +
           '<td class="g-name">' + esc(v.name) + '<small>' + E.dist(v, T).toFixed(1) + ' pola</small></td>' +
           '<td class="g-res">' + (r.skip ? '<span class="muted">' + esc(r.skip) + '</span>' : unitsLine(r.units)) + '</td>' +
           '<td class="num g-time" data-l="Droga">' + (r.skip ? '' : dur(r.time)) + '</td></tr>';
-      }).join('') + '</tbody></table></div>';
+      }).join('') + '</tbody></table></div>' + '<div class="selbar"><button type="button" class="btn ghost" data-act="sel-all" data-w="t" data-on="1">Zaznacz wszystkie wioski</button><button type="button" class="btn ghost" data-act="sel-all" data-w="t" data-on="0">Odznacz wszystkie wioski</button></div>';
     html += '<div class="summary"><div><span>Razem jednostek</span><b>' + fmt(plan.total) + '</b></div>' +
       '<div><span>Oddziałów</span><b>' + sendable.length + '</b></div>' +
       (sendable.length ? '<div><span>Pierwsze przybycie za</span><b>' + dur(Math.min.apply(null, sendable.map(r => r.time))) + '</b></div>' +
@@ -1088,13 +1088,13 @@
     const s = st(), g = UI.mass, U = C.UNITS[g.unit];
     const plan = E.planRecruitAll(s, g.unit, { count: g.count, max: g.max, off: g.off }, s.now);
     const active = plan.rows.filter(r => r.n > 0);
-    box.innerHTML = '<div class="selbar"><button class="btn ghost" data-act="sel-all" data-w="m" data-on="1">Zaznacz wszystkie</button><button class="btn ghost" data-act="sel-all" data-w="m" data-on="0">Odznacz wszystkie</button></div>' + '<div class="tablewrap"><table class="units gather"><thead><tr><th></th><th>Wioska</th><th>Zrekrutuje</th></tr></thead><tbody>' +
+    box.innerHTML = '<div class="tablewrap"><table class="units gather"><thead><tr><th></th><th>Wioska</th><th>Zrekrutuje</th></tr></thead><tbody>' +
       plan.rows.map(r => {
         const v = s.villages[r.villageId];
         return '<tr class="' + (r.skip && !r.off ? 'skipped' : '') + '"><td class="g-chk"><input type="checkbox" data-msrc="' + v.id + '"' + (r.off ? '' : ' checked') + '></td>' +
           '<td class="g-name">' + esc(v.name) + '<small>' + xy(v.x, v.y) + '</small></td>' +
           '<td class="g-res">' + (r.n > 0 ? '<b>' + fmt(r.n) + '</b> × ' + U.name + (r.short ? ' <small class="muted">(tyle możesz)</small>' : '') : '<span class="muted">' + esc(r.skip) + '</span>') + '</td></tr>';
-      }).join('') + '</tbody></table></div>' +
+      }).join('') + '</tbody></table></div>' + '<div class="selbar"><button type="button" class="btn ghost" data-act="sel-all" data-w="m" data-on="1">Zaznacz wszystkie wioski</button><button type="button" class="btn ghost" data-act="sel-all" data-w="m" data-on="0">Odznacz wszystkie wioski</button></div>' +
       '<div class="summary"><div><span>Razem jednostek</span><b>' + fmt(plan.total) + '</b></div><div><span>Wiosek</span><b>' + active.length + '</b></div>' +
       (plan.total ? '<div class="wide"><span>Koszt</span><b>' + E.RES.map(r => ico(r) + fmt(plan.cost[r])).join(' ') + '</b></div>' : '') + '</div>';
     const btn = $('#massGo'); if (btn) btn.disabled = !active.length;
