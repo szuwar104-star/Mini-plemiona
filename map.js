@@ -184,11 +184,12 @@
   }
 
   /* ---------- trasy wojsk ---------- */
-  // Każdy marsz ma własny, trwały element SVG (klucz = id marszu). Co sekundę przesuwamy tylko znaczniki;
-  // dodajemy nowe i usuwamy zakończone trasy, nie dotykając pozostałych. Dzięki temu nie restartuje się
-  // animacja przerywanej linii (to było miganie) i nie przebudowujemy całego SVG przy każdym wyjściu/przybyciu.
+  // Marsze na tym samym odcinku (ten sam kierunek i rodzaj) dzielą jedną linię; każdy marsz ma tylko swój znacznik.
+  // Elementy SVG są trwałe (klucz = odcinek / id marszu), co tick przesuwamy znaczniki – animacja linii się nie
+  // restartuje (to było miganie), a dodanie lub zakończenie marszu nie przebudowuje reszty.
+  // Przy tłoku (>MANY_ROUTES odcinków) linie są cienkie i półprzezroczyste, bez obwódek i okręgów celu.
   const SVG_NS = 'http://www.w3.org/2000/svg';
-  const MANY_ROUTES = 14;   // powyżej tylu tras wyłączamy animację linii (każda klatka przemalowuje całą warstwę)
+  const MANY_ROUTES = 14;
   function renderMoves(state, list) {
     if (!layers) return;
     if (!layers.routes) layers.routes = new Map();
@@ -207,24 +208,34 @@
       const ang = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
       const tf = 'translate(' + px.toFixed(1) + ' ' + py.toFixed(1) + ') rotate(' + ang.toFixed(1) + ')';
       const id = m.id || (m.type + ':' + m.from + ':' + m.to + ':' + m.start);
-      const sig = kind + '|' + a.x + ',' + a.y + '|' + b.x + ',' + b.y;
-      let r = routes.get(id);
-      if (r && r.sig !== sig) { r.g.remove(); routes.delete(id); r = null; }
+      const seg = kind + '|' + a.x + ',' + a.y + '|' + b.x + ',' + b.y;
+      let r = routes.get(seg);
       if (!r) {
         const g = document.createElementNS(SVG_NS, 'g');
         g.setAttribute('class', 'route ' + kind);
         g.innerHTML = '<line class="trail" x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '"/>' +
           '<line class="path" x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '"/>' +
-          '<circle class="dest" cx="' + b.x + '" cy="' + b.y + '" r="22"/>' +
-          '<g class="mk"><circle class="marker" r="9"/><path class="arrow" d="M-4,-4 L5,0 L-4,4 Z"/></g>';
+          '<circle class="dest" cx="' + b.x + '" cy="' + b.y + '" r="22"/>';
         layers.moves.appendChild(g);
-        r = { g, mk: g.querySelector('.mk'), sig, tf: null };
-        routes.set(id, r);
+        r = { g, marks: new Map() };
+        routes.set(seg, r);
       }
-      if (r.tf !== tf) { r.tf = tf; r.mk.setAttribute('transform', tf); }
-      seen.add(id);
+      let mk = r.marks.get(id);
+      if (!mk) {
+        const el = document.createElementNS(SVG_NS, 'g');
+        el.setAttribute('class', 'mk');
+        el.innerHTML = '<circle class="marker" r="9"/><path class="arrow" d="M-4,-4 L5,0 L-4,4 Z"/>';
+        r.g.appendChild(el);
+        mk = { el, tf: null };
+        r.marks.set(id, mk);
+      }
+      if (mk.tf !== tf) { mk.tf = tf; mk.el.setAttribute('transform', tf); }
+      seen.add(seg + '#' + id);
     });
-    routes.forEach((r, id) => { if (!seen.has(id)) { r.g.remove(); routes.delete(id); } });
+    routes.forEach((r, seg) => {
+      r.marks.forEach((mk, id) => { if (!seen.has(seg + '#' + id)) { mk.el.remove(); r.marks.delete(id); } });
+      if (!r.marks.size) { r.g.remove(); routes.delete(seg); }
+    });
     layers.moves.classList.toggle('many', routes.size > MANY_ROUTES);
   }
 
