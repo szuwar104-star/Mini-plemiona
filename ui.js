@@ -1304,6 +1304,7 @@
     box.innerHTML = '<div class="dialog" role="dialog" aria-modal="true">' + inner + '</div>';
     box.hidden = false;
     document.body.classList.add('modal-open');
+    fitModal();
     if (UI.modal.type === 'attack') updateAttackSummary();
     updateFormSummary();
     updateGatherPlan();
@@ -1311,6 +1312,20 @@
     updateMassPlan();
     const first = box.querySelector('input:not([disabled]), button');
     if (first && !['attack', 'spy', 'transport', 'settle', 'support', 'gather', 'troops', 'mass'].includes(UI.modal.type)) first.focus({ preventScroll: true });
+  }
+  // Okno ma zawsze zajmować dokładnie to, co widać na ekranie. Gdy układ strony jest szerszy niż widoczny
+  // obszar (przeglądarka w telefonie po powiększeniu / przy poziomym przepełnieniu strony), przypinamy je do visualViewport.
+  function fitModal() {
+    const box = $('#modal'); if (!box) return;
+    const vv = window.visualViewport;
+    const off = !box.hidden && vv && (Math.abs(vv.width - document.documentElement.clientWidth) > 1.5 || vv.scale > 1.02);
+    if (off) {
+      box.style.right = 'auto'; box.style.bottom = 'auto';
+      box.style.left = vv.offsetLeft + 'px'; box.style.top = vv.offsetTop + 'px';
+      box.style.width = vv.width + 'px'; box.style.height = vv.height + 'px';
+    } else {
+      box.style.left = box.style.top = box.style.right = box.style.bottom = box.style.width = box.style.height = '';
+    }
   }
   function closeModal() {
     const wasEnd = UI.modal && UI.modal.type === 'end';
@@ -1858,6 +1873,8 @@
     if (root.ResizeObserver) {
       new ResizeObserver(() => { if (UI.screen === 'map' && MP.Map.view.fitted) { MP.Map.clamp(); MP.Map.apply(); } }).observe($('#mapViewport'));
     }
+    if (window.visualViewport) { window.visualViewport.addEventListener('resize', fitModal); window.visualViewport.addEventListener('scroll', fitModal); }
+    window.addEventListener('resize', fitModal);
     window.addEventListener('resize', () => { if (UI.screen === 'map') { MP.Map.clamp(); MP.Map.apply(); } invalidate(); render(); });
   }
 

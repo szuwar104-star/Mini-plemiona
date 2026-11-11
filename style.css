@@ -869,3 +869,15 @@ table.units.pw { table-layout: auto; }
 table.units.pw td { white-space: normal; padding: .5rem .4rem; }
 table.units.pw td.num { white-space: nowrap; }
 table.units.pw td.num small { display: block; font-size: .72rem; font-weight: 400; white-space: normal; }
+
+/* ---------- okna: nigdy szersze niż ekran (poprawka rozjechanego widoku na telefonie) ---------- */
+html, body { max-width: 100%; overflow-x: clip; }
+.modal { width: 100%; max-width: 100%; overflow: hidden; box-sizing: border-box; }
+.dialog { box-sizing: border-box; max-width: 100%; min-width: 0; }
+.dialog > *, .dialog .tablewrap, .dialog .summary, .dialog .field { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.dialog select, .dialog input[type=number], .dialog input[type=text] { max-width: 100%; min-width: 0; box-sizing: border-box; }
+@media (max-width: 760px) {
+  .dialog { width: 100%; }
+  .summary { grid-template-columns: repeat(auto-fit, minmax(min(120px, 100%), 1fr)); }
+  .summary b { overflow-wrap: anywhere; }
+}
