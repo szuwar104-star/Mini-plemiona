@@ -400,7 +400,7 @@
         '<td>' + (bq ? ico(S.building[bq.building]) + C.BUILDINGS[bq.building].name + ' ' + bq.level + ' <span class="timer" data-end="' + bq.end + '"></span>' +
           (v.buildQueue.length > 1 ? ' <small class="muted">+' + (v.buildQueue.length - 1) + '</small>' : '') : '<span class="idle">wolne</span>') + '</td>' +
         '<td>' + (rq ? ico(rq.unit) + (rq.count - rq.done) + ' <span class="timer" data-end="' + (rq.start + rq.count * rq.per) + '"></span>' : '<span class="idle">wolne</span>') + '</td>' +
-        '<td class="units-cell">' + unitsLine(v.units) + '</td>' +
+        '<td class="units-cell"><span class="units-wrap">' + unitsLine(v.units) + '</span></td>' +
         '<td>' + (attacks.length ? '<span class="alert">' + ico('sword') + attacks.length + ' <span class="timer" data-end="' + attacks[0].arrive + '"></span></span>' : '') + '</td></tr>';
     }).join('');
     el.innerHTML = '<section class="ov-head panel"><div><h1>Przegląd wiosek</h1><p class="tags"><span>' + own.length + ' z ' + E.winVillages(s) + ' wiosek</span>' +
@@ -996,7 +996,7 @@
     const s = st(), g = UI.gather, spread = g.mode === 'spread', T = s.villages[g.target];
     const plan = E.planGather(s, g.target, gatherArgs(g), s.now);
     const sendable = plan.rows.filter(r => !r.skip && r.total > 0);
-    let html = '<div class="tablewrap"><table class="units gather"><thead><tr><th></th><th>' + (spread ? 'Do wioski' : 'Z wioski') + '</th><th>Surowce</th><th>Kupcy</th><th>Droga</th></tr></thead><tbody>' +
+    let html = '<div class="selbar"><button class="btn ghost" data-act="sel-all" data-w="g" data-on="1">Zaznacz wszystkie</button><button class="btn ghost" data-act="sel-all" data-w="g" data-on="0">Odznacz wszystkie</button></div>' + '<div class="tablewrap"><table class="units gather"><thead><tr><th></th><th>' + (spread ? 'Do wioski' : 'Z wioski') + '</th><th>Surowce</th><th>Kupcy</th><th>Droga</th></tr></thead><tbody>' +
       plan.rows.map(r => {
         const v = s.villages[r.villageId];
         return '<tr class="' + (r.skip ? 'skipped' : '') + '"><td class="g-chk"><input type="checkbox" data-gsrc="' + v.id + '"' + (r.off ? '' : ' checked') + '></td>' +
@@ -1048,7 +1048,7 @@
     const s = st(), g = UI.troops, spread = g.mode === 'spread', T = s.villages[g.target];
     const plan = E.planTroops(s, g.target, troopsArgs(g), s.now);
     const sendable = plan.rows.filter(r => !r.skip && r.total > 0);
-    let html = '<div class="tablewrap"><table class="units gather"><thead><tr><th></th><th>' + (spread ? 'Do wioski' : 'Z wioski') + '</th><th>Wojsko</th><th>Droga</th></tr></thead><tbody>' +
+    let html = '<div class="selbar"><button class="btn ghost" data-act="sel-all" data-w="t" data-on="1">Zaznacz wszystkie</button><button class="btn ghost" data-act="sel-all" data-w="t" data-on="0">Odznacz wszystkie</button></div>' + '<div class="tablewrap"><table class="units gather"><thead><tr><th></th><th>' + (spread ? 'Do wioski' : 'Z wioski') + '</th><th>Wojsko</th><th>Droga</th></tr></thead><tbody>' +
       plan.rows.map(r => {
         const v = s.villages[r.villageId];
         return '<tr class="' + (r.skip ? 'skipped' : '') + '"><td class="g-chk"><input type="checkbox" data-tsrc="' + v.id + '"' + (r.off ? '' : ' checked') + '></td>' +
@@ -1088,7 +1088,7 @@
     const s = st(), g = UI.mass, U = C.UNITS[g.unit];
     const plan = E.planRecruitAll(s, g.unit, { count: g.count, max: g.max, off: g.off }, s.now);
     const active = plan.rows.filter(r => r.n > 0);
-    box.innerHTML = '<div class="tablewrap"><table class="units gather"><thead><tr><th></th><th>Wioska</th><th>Zrekrutuje</th></tr></thead><tbody>' +
+    box.innerHTML = '<div class="selbar"><button class="btn ghost" data-act="sel-all" data-w="m" data-on="1">Zaznacz wszystkie</button><button class="btn ghost" data-act="sel-all" data-w="m" data-on="0">Odznacz wszystkie</button></div>' + '<div class="tablewrap"><table class="units gather"><thead><tr><th></th><th>Wioska</th><th>Zrekrutuje</th></tr></thead><tbody>' +
       plan.rows.map(r => {
         const v = s.villages[r.villageId];
         return '<tr class="' + (r.skip && !r.off ? 'skipped' : '') + '"><td class="g-chk"><input type="checkbox" data-msrc="' + v.id + '"' + (r.off ? '' : ' checked') + '></td>' +
@@ -1721,6 +1721,12 @@
         break;
       }
       case 'troops-open': UI.troops = troopsDefaults(UI.vid || (cur() && cur().id)); openModal('troops'); break;
+      case 'sel-all': {
+        const w = b.dataset.w, on = b.dataset.on === '1', O = w === 'g' ? UI.gather : w === 'm' ? UI.mass : UI.troops;
+        document.querySelectorAll('[data-' + w + 'src]').forEach(i => { if (on) delete O.off[i.dataset[w + 'src']]; else O.off[i.dataset[w + 'src']] = true; });
+        (w === 'g' ? updateGatherPlan : w === 'm' ? updateMassPlan : updateTroopsPlan)();
+        break;
+      }
       case 'troops-mode': UI.troops.mode = b.dataset.m; renderModal(); break;
       case 'troops-send': {
         const g = UI.troops;

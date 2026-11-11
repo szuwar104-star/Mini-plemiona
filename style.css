@@ -835,6 +835,9 @@ table.gather td small { color: var(--muted); margin-left: .35rem; }
   table.ov td:nth-child(8)::before { content: "Wojsko"; }
   table.ov td:nth-child(9)::before { content: "Ataki"; }
   table.ov td:nth-child(9):empty { display: none; }
+  table.ov td:nth-child(n+5) { min-width: 0; }
+  table.ov td.units-cell { align-items: flex-start; }
+  table.ov .units-wrap { display: flex; flex: 1 1 0; flex-wrap: wrap; gap: .25rem 0; min-width: 0; }
 }
 
 /* Ranking: kolumna z nazwą frakcji jest wyrównana do lewej i może się zawijać */
@@ -881,3 +884,6 @@ html, body { max-width: 100%; overflow-x: clip; }
   .summary { grid-template-columns: repeat(auto-fit, minmax(min(120px, 100%), 1fr)); }
   .summary b { overflow-wrap: anywhere; }
 }
+
+.selbar { display: flex; flex-wrap: wrap; gap: .4rem; margin: .5rem 0; }
+.selbar .btn { padding: .35rem .7rem; font-size: .85rem; }
