@@ -47,6 +47,16 @@
   const homeDefTarget = (v, P) => E.points(v) * P.homeDef;
   const incomingOn = (state, v) => state.movements.filter(m => m.type === 'attack' && m.to === v.id && m.owner !== v.owner);
 
+  // Limit wiosek frakcji: bazowy (osobowość × poziom trudności) rośnie z czasem gry o C.AI.growth.perStep co everyHours,
+  // ale nie ponad ceilingShare celu zwycięstwa świata (nigdy poniżej bazowego). Dzięki temu AI nie zatrzymuje się na ok. 9 wioskach.
+  function villageCap(state, P, t, settle) {
+    const X = E.diff(state).aiExpand, G = C.AI.growth;
+    const base = Math.ceil((settle ? (P.settleMax || P.maxVillages) : P.maxVillages) * X);
+    const hours = Math.max(0, (t - state.created) / 3600000);
+    const bonus = Math.round(Math.floor(hours / G.everyHours) * G.perStep * X);
+    return Math.max(base, Math.min(base + bonus, Math.ceil(E.winVillages(state) * G.ceilingShare)));
+  }
+
   /* ---------- 1. gospodarka ---------- */
   // Zwraca koszt budynku, na który wioska oszczędza (albo null, gdy coś zakolejkowała / nie ma czego budować).
   function manageBuild(state, v, P, t) {
@@ -73,18 +83,17 @@
   /* ---------- 2. wojsko ---------- */
   function manageRecruit(state, v, P, t, reserve, owned) {
     if (v.recruitQueue.length >= T().recruitQueue) return;
-    const X = E.diff(state).aiExpand;
     const full = storeRatio(v) > T().storeSpend;
 
     // dowódca podboju
-    if (P.nobles && v.buildings.barracks >= C.UNITS.noble.barracks && noblesOf(state, v) === 0 && owned < Math.ceil(P.maxVillages * X) &&
+    if (P.nobles && v.buildings.barracks >= C.UNITS.noble.barracks && noblesOf(state, v) === 0 && owned < villageCap(state, P, t) &&
         E.villageDefense(v, null, E.upgradesOf(state, v.owner)) >= homeDefTarget(v, P) * 0.6) {
       const ri = E.recruitInfo(state, v, 'noble');
       if (ri.ok && ri.max >= 1) { E.queueRecruit(state, v, 'noble', 1, t); return; }
       if (ri.code === 'resources' && !full && E.rand(state) < 0.5) return; // odkłada surowce na dowódcę
     }
     // osadnik: rozrost na wolne ziemie
-    if (P.settle && v.buildings.hq >= C.UNITS.settler.hq && owned < Math.ceil((P.settleMax || P.maxVillages) * X) && settlersOf(state, v) === 0 &&
+    if (P.settle && v.buildings.hq >= C.UNITS.settler.hq && owned < villageCap(state, P, t, true) && settlersOf(state, v) === 0 &&
         !state.movements.some(m => m.type === 'settle' && m.owner === v.owner) && E.rand(state) < T().settleChance) {
       const si = E.recruitInfo(state, v, 'settler');
       if (si.ok && si.max >= 1) { E.queueRecruit(state, v, 'settler', 1, t); return; }
@@ -225,7 +234,7 @@
     const minutes = (t - state.created) / 60000;
     const grace = minutes < D.graceMinutes;
     const cooldown = D.hitCooldownMin * 60000;
-    const cap = Math.ceil(P.maxVillages * D.aiExpand);
+    const cap = villageCap(state, P, t);
     const canTakeAny = P.targets === 'any' || minutes >= P.anyAfterMin;
     const busy = new Set(state.movements.filter(m => m.type === 'attack' && m.owner === v.owner).map(m => m.to));
     let best = null;
