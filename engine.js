@@ -227,7 +227,7 @@
   // Mnożniki trudności ustawia advance()/newGame – produkcja nie potrzebuje wtedy dostępu do stanu.
   let D = C.DIFFICULTY[C.DEFAULT_DIFFICULTY];
   // Efekty badań gracza (AI nie ma technologii) liczone przy każdym tiku świata – tak samo jak poziom trudności (D).
-  let FX = { storage: 1, exchange: C.MARKET.exchangeRate, build: 1, recruit: 1, mint: 0, prod: 1, prodWood: 1, prodClay: 1, prodIron: 1, carry: 1, hide: 0 };
+  let FX = { storage: 1, exchange: C.MARKET.exchangeRate, build: 1, recruit: 1, mint: 0, prod: 1, prodWood: 1, prodClay: 1, prodIron: 1, carry: 1, hide: 0, pop: 1 };
   function techNode(id) { return C.TECH.nodes.find(n => n.id === id) || null; }
   function techLevel(f, node) {
     if (!f) return 0;
@@ -235,7 +235,7 @@
   }
   function techCost(node, level) { return Math.max(1, Math.round(node.base * Math.pow(node.factor, level - 1))); }
   function techEffects(f) {
-    const fx = { storage: 1, exchange: C.MARKET.exchangeRate, build: 1, recruit: 1, mint: 0, prod: 1, prodWood: 1, prodClay: 1, prodIron: 1, carry: 1, hide: 0 };
+    const fx = { storage: 1, exchange: C.MARKET.exchangeRate, build: 1, recruit: 1, mint: 0, prod: 1, prodWood: 1, prodClay: 1, prodIron: 1, carry: 1, hide: 0, pop: 1 };
     C.TECH.nodes.forEach(n => {
       const lvl = techLevel(f, n);
       if (lvl && n.effect.type !== 'unit') fx[n.effect.type] += n.effect.per * lvl;
@@ -262,7 +262,11 @@
     const base = C.BUILDINGS.hq.storage[v.buildings.hq];
     return v.owner === 'player' ? Math.floor(base * FX.storage) : base;
   }
-  function popCap(v) { return C.BUILDINGS.farm.pop[v.buildings.farm]; }
+  function popMult() { return FX.pop; }
+  function popCap(v) {
+    const base = C.BUILDINGS.farm.pop[v.buildings.farm];
+    return v.owner === 'player' ? Math.floor(base * FX.pop) : base;
+  }
   function popUsed(state, v) {
     let p = 0;
     const add = u => { UNITS.forEach(k => { p += (u[k] || 0) * C.UNITS[k].pop; }); };
@@ -1229,7 +1233,7 @@
     rand, randInt, dist, emptyUnits, cleanUnits, sumUnits, attackPower, defensePower, upgradeMult, upgradesOf,
     exchange, exchangeMax, exchangeGet, exchangeRate, exchangeQuick, coinQuick, buyCoinsAll, mintLimit, mintTokens, buyCoins, techInfo, researchTech, techNode, techLevel, techCost, techEffects,
     tileAt, villagesOf, points, unitPoints, armyOf, accountPower, addKills, killsOf, ranking, ownerName, ownerColor,
-    newGame, worldOf, winVillages, productionPerMin, storageCap, popCap, popUsed, tickVillage,
+    newGame, worldOf, winVillages, productionPerMin, storageCap, popCap, popMult, popUsed, tickVillage,
     buildInfo, queueBuild, recruitInfo, queueRecruit, recruitPer,
     travelTime, slowest, sendAttack, sendSpy, advance, nextEvent, gameClock, pauseGame, resumeGame,
     unitsPop, supportRoom, sendSupport, withdrawSupport, defenders, defenseFrom, villageDefense,
