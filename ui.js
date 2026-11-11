@@ -2217,7 +2217,21 @@
     }
     if (window.visualViewport) { window.visualViewport.addEventListener('resize', fitModal); window.visualViewport.addEventListener('scroll', fitModal); }
     window.addEventListener('resize', fitModal);
-    window.addEventListener('resize', () => { if (UI.screen === 'map') { MP.Map.clamp(); MP.Map.apply(); } invalidate(); render(); });
+    // Klawiatura ekranowa (Android) zmienia tylko wysokość okna, i to w kilku krokach. Przebudowa całego UI przy każdym takim
+    // zdarzeniu powodowała, że okno ataku „skakało” przy wpisywaniu liczby jednostek. Pełne odświeżenie robimy tylko przy zmianie
+    // szerokości (obrót ekranu, próg układu mobilnego/komputerowego), a samo zdarzenie scalamy do jednej klatki.
+    let lastW = window.innerWidth, rzFrame = 0;
+    window.addEventListener('resize', () => {
+      if (rzFrame) return;
+      rzFrame = requestAnimationFrame(() => {
+        rzFrame = 0;
+        if (UI.screen === 'map') { MP.Map.clamp(); MP.Map.apply(); }
+        const w = window.innerWidth;
+        if (w === lastW) return;
+        lastW = w;
+        invalidate(); render();
+      });
+    });
   }
 
   MP.UI = { init, render, show, toast, drainNotices, invalidate, state: UI, closeModal };
