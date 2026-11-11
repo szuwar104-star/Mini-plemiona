@@ -118,6 +118,7 @@
     ensureBoard(state);
     A.territory(state, layers.territory);
     A.villages(state, layers.villages);
+    layers.movesKey = null;
     layers.tiles.innerHTML = state.map.tiles.map(t => tileHtml(state, t, ctx)).join('');
     miniBase = A.minimap(state, layers.terrain, layers.territory, MINI * 2);
     drawMini();
@@ -138,6 +139,7 @@
     const now = state.now;
     const c = v => ({ x: (v.x + 0.5) * TILE, y: (v.y + 0.5) * TILE });
     let svg = '';
+    const tf = [];
     list.forEach(m => {
       const from = state.villages[m.from], to = m.to ? state.villages[m.to] : { x: m.x, y: m.y };
       let a = c(from), b = c(to), kind;
@@ -150,9 +152,19 @@
       svg += '<g class="route ' + kind + '"><line class="trail" x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '"/>' +
         '<line class="path" x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '"/>' +
         '<circle class="dest" cx="' + b.x + '" cy="' + b.y + '" r="22"/>' +
-        '<g transform="translate(' + px.toFixed(1) + ' ' + py.toFixed(1) + ') rotate(' + ang.toFixed(1) + ')">' +
+        '<g class="mk" transform="translate(' + px.toFixed(1) + ' ' + py.toFixed(1) + ') rotate(' + ang.toFixed(1) + ')">' +
         '<circle class="marker" r="9"/><path class="arrow" d="M-4,-4 L5,0 L-4,4 Z"/></g></g>';
+      tf.push('translate(' + px.toFixed(1) + ' ' + py.toFixed(1) + ') rotate(' + ang.toFixed(1) + ')');
     });
+    // Przebudowa SVG co sekundę restartowała animację przerywanej linii (miganie mapy).
+    // Gdy zmienił się tylko postęp marszu, przesuwamy same znaczniki i nie ruszamy reszty.
+    const key = svg.replace(/class="mk" transform="[^"]*"/g, 'class="mk"');
+    if (layers.movesKey === key) {
+      const mk = layers.moves.querySelectorAll('.mk');
+      mk.forEach((el, i) => { if (tf[i]) el.setAttribute('transform', tf[i]); });
+      return;
+    }
+    layers.movesKey = key;
     layers.moves.innerHTML = svg;
   }
 

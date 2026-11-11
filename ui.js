@@ -78,7 +78,7 @@
       sel.dataset.sig = optSig;
     }
     sel.disabled = own.length === 0;
-    if (!v) { $('#resbar').innerHTML = '<span class="muted">Brak wiosek</span>'; return; }
+    if (!v) { const b0 = $('#resbar'); b0._html = null; b0.innerHTML = '<span class="muted">Brak wiosek</span>'; return; }
     const cap = E.storageCap(v), p = E.productionPerMin(v);
     const plaque = (icon, val, max, title, extra) => {
       const pct = Math.min(100, val / max * 100);
@@ -89,7 +89,9 @@
     let html = E.RES.map(r => plaque(r, v.res[r], cap, C.RESOURCES[r].name + ': +' + Math.round(p[r]) + '/min, magazyn ' + fmt(cap) + (hid ? ', ukryte przed łupieżcami: ' + fmt(hid) : ''), '+' + Math.round(p[r]) + '/min')).join('');
     const used = E.popUsed(s, v), pc = E.popCap(v);
     html += plaque('pop', used, pc, 'Farma: zajęte ' + fmt(used) + ' z ' + fmt(pc) + ' miejsc', 'z ' + fmt(pc));
-    $('#resbar').innerHTML = html;
+    // Pasek surowców przebudowujemy tylko, gdy zmieniła się jego treść (inaczej miga co sekundę).
+    const bar = $('#resbar');
+    if (bar._html !== html) { bar._html = html; bar.innerHTML = html; }
   }
 
   function renderNav() {
