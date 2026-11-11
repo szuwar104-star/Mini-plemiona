@@ -35,6 +35,8 @@ Serwer jest potrzebny do działania jako PWA (Service Worker, instalacja, tryb o
 8. **Wsparcie i przenoszenie wojska** – na mapie wybierz swoją wioskę i kliknij „Wyślij tu wojsko” (albo użyj przycisków na ekranie Wojsko). Do wyboru:
    - **Wsparcie** – jednostki bronią celu, ale należą do wioski macierzystej (zajmują jej farmę). Na ekranie Wojsko możesz je odwołać albo odesłać. W bitwie straty dzielą się proporcjonalnie między wszystkie oddziały.
    - **Przeniesienie na stałe** – jednostki przechodzą do wioski docelowej i muszą zmieścić się na jej farmie.
+9a. **Wymiana surowców** – w wiosce z Targowiskiem kliknij „Wymień surowce”: oddajesz jeden surowiec, dostajesz inny po kursie 100 → 70 (parametr `MARKET.exchangeRate`). Jednorazowo do (liczba kupców × 1000); wymiana jest natychmiastowa i działa w obrębie jednej wioski. Dobre ujście nadwyżki, np. gliny na brakujące drewno.
+9b. **Kuźnia** – ulepsza jednostki dla całego plemienia: Pikinier, Łucznik, Tarczownik, Topornik i Lekka kawaleria (poz. 1–10, nie wyżej niż poziom Kuźni). Każdy poziom daje +5% ataku i obrony jednostki. W wiosce trwa jedno badanie naraz, a tę samą jednostkę badasz tylko w jednej wiosce. Koszt poziomu L = koszt jednostki × 7 × 1,3^(L−1). Parametry w `SMITHY` w `config.js`. AI nie korzysta z Kuźni.
 9. **Mur obronny i tarany** – mur dodaje stałą obronę i procentowy bonus (do +70% na poziomie 10). Tarany (Koszary 4) w bitwie obniżają mur o 1 poziom na każde 8 sztuk, a po wygranej ocalałe tarany burzą go na stałe (1 poziom na 4 tarany).
 10. **Szybkie przełączanie wiosek** – dwuklik (na telefonie podwójne stuknięcie) na swojej wiosce na mapie ustawia ją jako aktywną, a na obcej otwiera okno ataku z aktywnej wioski. Z każdego ekranu przełączysz wioski strzałkami ‹ › obok listy w górnym pasku albo klawiszami `[` i `]`.
 11. **Przegląd** – wszystkie wioski w jednej tabeli: surowce z zapełnieniem magazynu, farma, bieżąca budowa i rekrutacja, wojsko i nadciągające ataki.
@@ -128,4 +130,4 @@ Edytuj `config.js` i odśwież stronę. Po zmianie plików gry podnieś wersję 
 
 
 
-Zapisy z poprzedniej wersji są automatycznie uzupełniane o Targowisko i nowe jednostki (migracje zapisu v1 → v2 → v3 → v4; stare gry dostają poziom Normalny).
+Zapisy z poprzedniej wersji są automatycznie uzupełniane o Targowisko i nowe jednostki (migracje zapisu v1 → … → v7, m.in. Kuźnia; stare gry dostają poziom Normalny).

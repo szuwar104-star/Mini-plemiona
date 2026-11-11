@@ -132,7 +132,9 @@
       case 'farm': return 'Miejsca dla wojska: ' + fmt(B.pop[L]) + (next ? ' → ' + fmt(B.pop[next]) : '');
       case 'wall': return 'Obrona +' + Math.round(B.bonus[L] * 100) + '%' + (next ? ' → +' + Math.round(B.bonus[next] * 100) + '%' : '') +
         ', mur sam broni siłą ' + B.flat[L] + (next ? ' → ' + B.flat[next] : '');
-      case 'market': return 'Kupcy: ' + B.merchants[L] + (next ? ' → ' + B.merchants[next] : '') + ', każdy wiezie do ' + fmt(C.MERCHANT.capacity) + ' surowców';
+      case 'smithy': return L ? 'Ulepszenia jednostek do poz. ' + L + (next ? ' → ' + next : '') + '. Każdy poziom: +' + Math.round(C.SMITHY.bonusPerLevel * 100) + '% ataku i obrony'
+        : 'Odblokowuje ulepszenia jednostek: +' + Math.round(C.SMITHY.bonusPerLevel * 100) + '% ataku i obrony za poziom';
+      case 'market': return 'Wymiana surowców (' + Math.round(C.MARKET.exchangeRate * 100) + '%). Kupcy: ' + B.merchants[L] + (next ? ' → ' + B.merchants[next] : '') + ', każdy wiezie do ' + fmt(C.MERCHANT.capacity) + ' surowców';
       case 'barracks': {
         let t = 'Czas szkolenia ' + Math.round(B.recruitSpeed[L] * 100) + '%' + (next ? ' → ' + Math.round(B.recruitSpeed[next] * 100) + '%' : '');
         const unlock = next ? E.UNITS.filter(u => C.UNITS[u].barracks === next).map(u => C.UNITS[u].name) : [];
@@ -154,7 +156,8 @@
       const i = E.buildInfo(s, v, k);
       return i.code + i.target + (i.cost ? E.RES.map(r => Math.floor(v.res[r]) >= i.cost[r] ? 1 : 0).join('') : '');
     });
-    return JSON.stringify([v.id, v.name, v.buildings, v.buildQueue.map(e => e.id), infos, Math.floor(v.loyalty), v.units, v.owner, E.merchantsFree(s, v), Math.ceil(graceLeft(s) / 60000), s.difficulty]);
+    return JSON.stringify([v.id, v.name, v.buildings, v.buildQueue.map(e => e.id), infos, Math.floor(v.loyalty), v.units, v.owner, E.merchantsFree(s, v), Math.ceil(graceLeft(s) / 60000), s.difficulty,
+      v.upgrade, E.upgradesOf(s, 'player'), C.SMITHY.units.map(u => { const i = E.upgradeInfo(s, v, u); return i.code + i.target + (i.cost ? E.RES.map(r => Math.floor(v.res[r]) >= i.cost[r] ? 1 : 0).join('') : ''); })]);
   }
 
   function renderVillage() {
@@ -202,9 +205,38 @@
       } else {
         html += '<p class="done">Maksymalny poziom</p>';
       }
+      if (k === 'market' && lv > 0) html += '<button class="btn ghost" data-act="exchange-open">' + ico('merchant') + 'Wymień surowce</button>';
       html += '</div></article>';
     });
-    el.innerHTML = html + '</div>';
+    el.innerHTML = html + '</div>' + smithyPanel(v);
+  }
+
+  function smithyPanel(v) {
+    const s = st();
+    if (!(v.buildings.smithy > 0)) return '';
+    const ups = E.upgradesOf(s, 'player') || {};
+    let h = '<section class="panel" id="smithy-panel"><h2>' + ico(S.building.smithy) + 'Kuźnia – ulepszenia jednostek <small>poz. ' + v.buildings.smithy + '</small></h2>';
+    if (v.upgrade) {
+      const e = v.upgrade;
+      h += '<ul class="queue"><li>' + ico(S.building.smithy) + '<span class="qname">' + C.UNITS[e.unit].name + ' – ulepszenie poz. ' + e.level + '</span>' +
+        '<span class="bar"><i data-ps="' + e.start + '" data-pe="' + e.end + '" style="width:' + pct(e.start, e.end) + '%"></i></span>' +
+        '<span class="timer" data-end="' + e.end + '"></span></li></ul>';
+    } else h += '<p class="muted">Kuźnia jest wolna. Ulepszenia działają w całym plemieniu.</p>';
+    h += '<div class="bgrid">';
+    C.SMITHY.units.forEach(u => {
+      const info = E.upgradeInfo(s, v, u), lvl = ups[u] || 0, U = C.UNITS[u];
+      h += '<article class="bcard panel"><div class="bicon">' + S.icon(u) + '</div><div class="bbody"><h3>' + U.name + ' <span class="lvl">' + lvl + '<small>/' + C.MAX_LEVEL + '</small></span></h3>' +
+        '<p class="effect">Atak i obrona +' + Math.round(lvl * C.SMITHY.bonusPerLevel * 100) + '%' +
+        (info.code === 'max' ? '' : ' → +' + Math.round(info.target * C.SMITHY.bonusPerLevel * 100) + '%') + '</p>';
+      if (info.code === 'max') h += '<p class="done">Maksymalny poziom</p>';
+      else {
+        h += costChips(v, info.cost) + '<button class="btn" data-act="upgrade" data-u="' + u + '"' + (info.ok ? '' : ' disabled') + '>' +
+          'Ulepsz do poz. ' + info.target + ' <small>' + dur(info.time) + '</small></button>';
+        if (!info.ok) h += '<p class="why">' + info.reason + '</p>';
+      }
+      h += '</div></article>';
+    });
+    return h + '</div></section>';
   }
 
   function noVillages() {
@@ -296,8 +328,8 @@
       '<div class="army-kpis">' +
       '<div class="kpi"><small>W wiosce</small><b>' + fmt(totalHome) + '</b></div>' +
       '<div class="kpi"><small>Poza wioską</small><b>' + fmt(totalAway) + '</b></div>' +
-      '<div class="kpi"><small>Siła ataku</small><b>' + fmt(E.attackPower(v.units)) + '</b></div>' +
-      '<div class="kpi" title="Wojsko w wiosce, wsparcie i mur"><small>Obrona wioski</small><b>' + fmt(E.villageDefense(v)) + '</b></div>' +
+      '<div class="kpi"><small>Siła ataku</small><b>' + fmt(E.attackPower(v.units, E.upgradesOf(s, v.owner))) + '</b></div>' +
+      '<div class="kpi" title="Wojsko w wiosce, wsparcie i mur"><small>Obrona wioski</small><b>' + fmt(E.villageDefense(v, null, E.upgradesOf(s, v.owner))) + '</b></div>' +
       '<div class="kpi" title="Punkty za zniszczone jednostki wroga"><small>Pokonani wrogowie</small><b>' + fmt(Math.round(E.killsOf(s, 'player').total)) + '</b></div>' +
       '<div class="kpi wide"><small>Farma</small><b>' + fmt(used) + ' / ' + fmt(cap) + '</b><span class="meter"><i style="width:' + Math.min(100, used / cap * 100).toFixed(1) + '%"></i></span></div>' +
       '</div></section>';
@@ -709,7 +741,7 @@
       const wall = Math.max(0, wallKnown - Math.floor(E.ramCount(u) / C.RAM.fightPerLevel));
       est = fmt(E.defenseFrom(I.units, wall)) + (I.buildings ? (wallKnown ? ' (mur ' + wall + ')' : '') : ' (mur nieznany)');
     }
-    box.innerHTML = '<div><span>Siła ataku</span><b>' + fmt(E.attackPower(u)) + '</b></div>' +
+    box.innerHTML = '<div><span>Siła ataku</span><b>' + fmt(E.attackPower(u, E.upgradesOf(s, 'player'))) + '</b></div>' +
       '<div><span>Obrona celu' + (I ? ' (zwiad ' + ago(I.time) + ')' : '') + '</span><b>' + est + '</b></div>' +
       '<div><span>Czas marszu</span><b>' + dur(tt) + '</b></div>' +
       '<div><span>Przybycie</span><b>' + clock(s.now + tt) + '</b></div>' +
@@ -751,6 +783,23 @@
         '<td><input type="number" inputmode="numeric" min="0" step="100" placeholder="0" data-fin="' + k + '" value="' + esc(UI.form[k] || '') + '"></td></tr>').join('') +
       '</tbody></table></div><div id="formSummary" class="summary"></div>' +
       '<div class="actions"><button class="btn ghost" data-act="close">Anuluj</button><button class="btn" data-act="send-transport">Wyślij kupców</button></div>';
+  }
+  /* ---------- okno: wymiana surowców (Targowisko) ---------- */
+  function exchangeModal() {
+    const s = st(), m = UI.modal, v = s.villages[m.from];
+    E.tickVillage(s, v, s.now);
+    const f = UI.form;
+    if (!f.from) f.from = 'clay';
+    if (!f.to) f.to = 'wood';
+    const pick = (w, cur) => E.RES.map(k => '<button class="btn' + (cur === k ? '' : ' ghost') + '" data-act="ex-pick" data-w="' + w + '" data-k="' + k + '">' + ico(k) + C.RESOURCES[k].name + '</button>').join('');
+    return '<h2>' + ico('merchant') + 'Wymiana surowców – ' + esc(v.name) + '</h2>' +
+      '<p>Za 100 surowca dostajesz ' + Math.round(100 * C.MARKET.exchangeRate) + '. Jednorazowo do ' + fmt(E.exchangeMax(v)) + ' (kupcy × udźwig).</p>' +
+      '<p class="muted">Oddajesz</p><div class="actions left">' + pick('from', f.from) + '</div>' +
+      '<p class="muted">Dostajesz</p><div class="actions left">' + pick('to', f.to) + '</div>' +
+      '<label class="field">Ilość do oddania (masz ' + fmt(v.res[f.from]) + ')<span class="inrow"><input type="number" inputmode="numeric" min="0" step="100" placeholder="0" data-fin="amount" value="' + esc(f.amount || '') + '">' +
+      '<button class="link" data-act="ex-max">maks.</button></span></label>' +
+      '<div id="formSummary" class="summary"></div>' +
+      '<div class="actions"><button class="btn ghost" data-act="close">Zamknij</button><button class="btn" data-act="ex-do">Wymień</button></div>';
   }
   /* ---------- okno: zbieranie / rozdzielanie surowców ---------- */
   function gatherDefaults(target) {
@@ -938,6 +987,12 @@
         '<div><span>Czas drogi</span><b>' + dur(tt) + '</b></div><div><span>Dostawa</span><b>' + clock(s.now + tt) + '</b></div>' +
         (need > E.merchantsFree(s, from) ? '<p class="why">Za mało wolnych kupców.</p>' : '') +
         (E.RES.some(k => target.res[k] + r[k] > room) ? '<p class="muted">Magazyn celu mieści ' + fmt(room) + ' – nadwyżka przepadnie.</p>' : '');
+    } else if (m.type === 'exchange') {
+      const amount = Math.max(0, Math.floor(Number(UI.form.amount) || 0)), got = E.exchangeGet(amount), room = E.storageCap(from) - Math.floor(from.res[UI.form.to]);
+      box.innerHTML = '<div><span>Dostaniesz</span><b>' + fmt(got) + '</b></div><div><span>Miejsce w magazynie</span><b>' + fmt(Math.max(0, room)) + '</b></div>' +
+        (got > room ? '<p class="why">Magazyn nie pomieści tyle – zmniejsz ilość.</p>' : '') +
+        (amount > E.exchangeMax(from) ? '<p class="why">Jednorazowo maksymalnie ' + fmt(E.exchangeMax(from)) + '.</p>' : '') +
+        (amount > Math.floor(from.res[UI.form.from]) ? '<p class="why">Za mało surowca.</p>' : '');
     } else if (m.type === 'support') {
       const target = s.villages[m.target], u = formUnits();
       if (!E.sumUnits(u)) { box.innerHTML = '<p class="muted">Wpisz liczbę jednostek albo kliknij liczbę dostępnych.</p>'; return; }
@@ -947,7 +1002,7 @@
       const combined = E.defenders(target);
       E.UNITS.forEach(k => { combined[k] += u[k]; });
       box.innerHTML = '<div><span>Czas marszu</span><b>' + dur(tt) + '</b></div><div><span>Przybycie</span><b>' + clock(s.now + tt) + '</b></div>' +
-        (stay ? '<div><span>Miejsce na farmie celu</span><b>' + fmt(need) + ' / ' + fmt(Math.max(0, room)) + '</b></div>' : '<div><span>Obrona celu po przybyciu</span><b>' + fmt(E.defenseFrom(combined, target.buildings.wall)) + '</b></div>') +
+        (stay ? '<div><span>Miejsce na farmie celu</span><b>' + fmt(need) + ' / ' + fmt(Math.max(0, room)) + '</b></div>' : '<div><span>Obrona celu po przybyciu</span><b>' + fmt(E.defenseFrom(combined, target.buildings.wall, E.upgradesOf(s, target.owner))) + '</b></div>') +
         (stay && need > room ? '<p class="why">Za mało miejsca na farmie w ' + esc(target.name) + '. Rozbuduj tam Farmę albo wyślij mniej.</p>' : '') +
         (over ? '<p class="why">Wpisano więcej jednostek, niż jest w wiosce.</p>' : '');
     } else if (m.type === 'settle') {
@@ -1062,6 +1117,7 @@
     if (UI.modal.type === 'attack') inner = attackModal();
     else if (UI.modal.type === 'spy') inner = spyModal();
     else if (UI.modal.type === 'transport') inner = transportModal();
+    else if (UI.modal.type === 'exchange') inner = exchangeModal();
     else if (UI.modal.type === 'support') inner = supportModal();
     else if (UI.modal.type === 'settle') inner = settleModal();
     else if (UI.modal.type === 'gather') inner = gatherModal();
@@ -1356,6 +1412,32 @@
         document.querySelectorAll('[data-fin]').forEach(i => { i.value = ''; });
         updateFormSummary();
         break;
+      case 'exchange-open': UI.form = {}; openModal('exchange', { from: UI.vid }); break;
+      case 'ex-pick': {
+        const w = b.dataset.w, k = b.dataset.k, other = w === 'from' ? 'to' : 'from';
+        if (UI.form[other] === k) UI.form[other] = UI.form[w];
+        UI.form[w] = k;
+        renderModal();
+        break;
+      }
+      case 'ex-max': {
+        const v = st().villages[UI.modal.from];
+        UI.form.amount = Math.min(Math.floor(v.res[UI.form.from]), E.exchangeMax(v));
+        renderModal();
+        break;
+      }
+      case 'ex-do': {
+        const m = UI.modal, f = UI.form;
+        const r = G.action(s => E.exchange(s, m.from, f.from, f.to, f.amount, s.now));
+        if (r.ok) { toast('info', 'Wymieniono ' + fmt(r.spent) + ' na ' + fmt(r.got) + '.'); f.amount = ''; invalidate(); render(); renderModal(); }
+        else toast('bad', r.reason);
+        break;
+      }
+      case 'upgrade': {
+        const r = G.action(s => E.queueUpgrade(s, s.villages[UI.vid], b.dataset.u, s.now));
+        if (!r.ok) toast('bad', r.reason);
+        break;
+      }
       case 'transport-open': UI.form = {}; openModal('transport', { target: b.dataset.id, from: UI.vid }); break;
       case 'gather-open': UI.gather = gatherDefaults(UI.vid || (cur() && cur().id)); openModal('gather'); break;
       case 'gather-mode': UI.gather.mode = b.dataset.m; renderModal(); break;

@@ -109,6 +109,17 @@
     5: s => {
       s.version = 6;
       return s;
+    },
+    // v6 → v7: Kuźnia (budynek smithy) i ulepszenia jednostek na frakcjach
+    6: s => {
+      Object.values(s.villages || {}).forEach(v => {
+        if (v.buildings && v.buildings.smithy == null) v.buildings.smithy = 0;
+        if (v.upgrade === undefined) v.upgrade = null;
+      });
+      Object.values(s.intel || {}).forEach(i => { if (i.buildings && i.buildings.smithy == null) i.buildings.smithy = 0; });
+      Object.values(s.factions || {}).forEach(f => { if (!f.upgrades) f.upgrades = {}; });
+      s.version = 7;
+      return s;
     }
   };
 

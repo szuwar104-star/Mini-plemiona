@@ -140,7 +140,7 @@
       if (grace && target.owner === null && playerVs.some(pv => E.dist(pv, target) < d)) continue;
       E.tickVillage(state, target, t);
       const wall = Math.max(0, target.buildings.wall - Math.floor(E.ramCount(send) / C.RAM.fightPerLevel));
-      const Dv = E.villageDefense(target, wall);
+      const Dv = E.villageDefense(target, wall, E.upgradesOf(state, target.owner));
       if (A < Dv * P.attackRatio * (target.owner === 'player' ? D.aiCaution : 1)) continue;
       let w = 1 / (1 + d);
       if (target.owner === null) w *= P.neutralBias;

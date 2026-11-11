@@ -266,6 +266,6 @@
 
   MP.Sprites = {
     icon, village, terrain,
-    building: { hq: 'hq', wood: 'wood', clay: 'clay', iron: 'pick', farm: 'farm', barracks: 'barracks', market: 'market', wall: 'wall' }
+    building: { hq: 'hq', wood: 'wood', clay: 'clay', iron: 'pick', farm: 'farm', barracks: 'barracks', market: 'market', smithy: 'sword', wall: 'wall' }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

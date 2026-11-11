@@ -23,7 +23,7 @@
   }
 
   MP.CONFIG = {
-    SAVE_VERSION: 6,
+    SAVE_VERSION: 7,
 
     // Poziomy trudności – mnożniki dla gracza i AI.
     // playerProd / aiProd: produkcja surowców; graceMinutes: ochrona gracza na starcie;
@@ -67,7 +67,7 @@
 
     START: {
       resources: { wood: 800, clay: 800, iron: 700 },
-      buildings: { hq: 1, wood: 1, clay: 1, iron: 1, farm: 1, barracks: 1, market: 0, wall: 0 },
+      buildings: { hq: 1, wood: 1, clay: 1, iron: 1, farm: 1, barracks: 1, market: 0, smithy: 0, wall: 0 },
       units: { spear: 12 }
     },
 
@@ -139,6 +139,13 @@
         time: series(6, 1.5, 1),
         merchants: [0, 1, 2, 3, 4, 6, 8, 10, 13, 16, 20]
       },
+      smithy: {
+        name: 'Kuźnia',
+        desc: 'Ulepsza jednostki dla całego plemienia. Poziom Kuźni ogranicza, do jakiego poziomu możesz ulepszać jednostki.',
+        start: 0,
+        cost: cost(75, 70, 95, 1.32),
+        time: series(7, 1.5, 1)
+      },
       wall: {
         name: 'Mur obronny',
         desc: 'Zwiększa obronę wioski. Tarany wroga mogą go burzyć.',
@@ -156,9 +163,25 @@
 
     MERCHANT: { capacity: 1000, speed: 10 },   // udźwig jednego kupca; sekundy na pole
 
+    // Wymiana surowców w Targowisku (natychmiast, w obrębie jednej wioski).
+    // rate – ile surowca dostajesz za 1 oddany (0,7 = 30% prowizji); jednorazowo do (kupcy × udźwig) surowca.
+    MARKET: { exchangeRate: 0.7 },
+
+    // Kuźnia: ulepszenia jednostek dla całego plemienia (poziom 1..MAX_LEVEL, nie wyżej niż poziom Kuźni).
+    // Każdy poziom daje +bonusPerLevel do ataku i obrony jednostki. Jedno badanie naraz w wiosce;
+    // tę samą jednostkę badamy jednocześnie tylko w jednej wiosce.
+    // Koszt poziomu L = koszt jednostki × costMult × costFactor^(L-1); czas = baseTime × timeFactor^(L-1) sekund (× szybkość Ratusza).
+    // Tarany, Zwiadowcy, Dowódcy i Osadnicy nie są ulepszani (ich koszt przekroczyłby magazyn).
+    SMITHY: {
+      units: ['spear', 'archer', 'guard', 'axe', 'light'],
+      bonusPerLevel: 0.05,
+      costMult: 7, costFactor: 1.3,
+      baseTime: 90, timeFactor: 1.4
+    },
+
     // Nowa wioska założona przez Osadnika
     SETTLE: {
-      buildings: { hq: 1, wood: 1, clay: 1, iron: 1, farm: 1, barracks: 0, market: 0, wall: 0 },
+      buildings: { hq: 1, wood: 1, clay: 1, iron: 1, farm: 1, barracks: 0, market: 0, smithy: 0, wall: 0 },
       resources: { wood: 300, clay: 300, iron: 200 },
       minDistance: 1.5                           // minimalna odległość od innej wioski
     },

@@ -26,10 +26,12 @@
   function emptyUnits() { const u = {}; UNITS.forEach(k => { u[k] = 0; }); return u; }
   function cleanUnits(u) { const o = emptyUnits(); UNITS.forEach(k => { o[k] = Math.max(0, Math.floor(Number(u && u[k]) || 0)); }); return o; }
   function sumUnits(u) { return UNITS.reduce((s, k) => s + (u[k] || 0), 0); }
-  function attackPower(u) { return UNITS.reduce((s, k) => s + (u[k] || 0) * C.UNITS[k].att, 0); }
+  // Ulepszenia z Kuźni: `ups` = { jednostka: poziom } właściciela (albo null). Każdy poziom daje +bonusPerLevel do ataku i obrony.
+  function upgradeMult(ups, k) { return 1 + C.SMITHY.bonusPerLevel * ((ups && ups[k]) || 0); }
+  function attackPower(u, ups) { return UNITS.reduce((s, k) => s + (u[k] || 0) * C.UNITS[k].att * upgradeMult(ups, k), 0); }
   // Ile "taranów" liczą jednostki przy burzeniu muru (Taran i Taran z bali mają wallPower w config.js).
   function ramCount(u) { return UNITS.reduce((s, k) => s + (u[k] || 0) * (C.UNITS[k].wallPower || 0), 0); }
-  function defensePower(u) { return UNITS.reduce((s, k) => s + (u[k] || 0) * C.UNITS[k].def, 0); }
+  function defensePower(u, ups) { return UNITS.reduce((s, k) => s + (u[k] || 0) * C.UNITS[k].def * upgradeMult(ups, k), 0); }
   // Wszystkie jednostki broniące wioski: własne + wsparcie z innych wiosek.
   function defenders(v) {
     const u = Object.assign(emptyUnits(), v.units);
@@ -37,11 +39,12 @@
     return u;
   }
   // Siła obrony wioski z murem (poziom muru można podać, np. po uderzeniu taranów).
-  function defenseFrom(units, wallLevel) {
+  function defenseFrom(units, wallLevel, ups) {
     const W = C.BUILDINGS.wall, L = Math.max(0, Math.min(C.MAX_LEVEL, wallLevel || 0));
-    return (defensePower(units) + C.COMBAT.baseDefense + W.flat[L]) * (1 + W.bonus[L]);
+    return (defensePower(units, ups) + C.COMBAT.baseDefense + W.flat[L]) * (1 + W.bonus[L]);
   }
-  function villageDefense(v, wallLevel) { return defenseFrom(defenders(v), wallLevel == null ? v.buildings.wall : wallLevel); }
+  function villageDefense(v, wallLevel, ups) { return defenseFrom(defenders(v), wallLevel == null ? v.buildings.wall : wallLevel, ups); }
+  function upgradesOf(state, owner) { const f = state.factions[owner]; return (f && f.upgrades) || null; }
   function newId(state, prefix) { return prefix + (state.nextId++); }
   function tileAt(state, x, y) { return state.map.tiles[y * state.map.size + x]; }
   function villagesOf(state, owner) { return Object.values(state.villages).filter(v => v.owner === owner); }
@@ -64,7 +67,7 @@
     const buildings = vs.reduce((a, v) => a + points(v), 0);
     const armyPts = Math.round(unitPoints(army));
     return { villages: vs.length, buildings, army: armyPts, total: buildings + armyPts,
-      units: sumUnits(army), attack: attackPower(army), defense: defensePower(army) };
+      units: sumUnits(army), attack: attackPower(army, upgradesOf(state, owner)), defense: defensePower(army, upgradesOf(state, owner)) };
   }
   /* ---------- punkty za zniszczone jednostki i ranking ---------- */
   // Punkty za pokonane jednostki wroga = ich koszt / SCORE.costDivisor (tak samo jak punkty wojska).
@@ -114,7 +117,7 @@
       id: newId(state, 'v'), name: genName(state), x, y, owner,
       buildings: b, units: Object.assign(emptyUnits(), units || {}),
       res: Object.assign({ wood: 0, clay: 0, iron: 0 }, res || {}),
-      buildQueue: [], recruitQueue: [], loyalty: C.LOYALTY.max, lastTick: now, support: {}
+      buildQueue: [], recruitQueue: [], upgrade: null, loyalty: C.LOYALTY.max, lastTick: now, support: {}
     };
     state.villages[v.id] = v;
     const t = tileAt(state, x, y);
@@ -353,6 +356,62 @@
     const start = last ? Math.max(t, last.start + last.count * last.per) : t;
     v.recruitQueue.push({ id: newId(state, 'q'), unit, count, done: 0, per: info.per, start });
     return info;
+  }
+
+  /* ---------- Kuźnia: ulepszenia jednostek ---------- */
+  function roundTo5(x) { return Math.max(5, Math.round(x / 5) * 5); }
+  // Czy to plemię już bada tę jednostkę w jakiejś wiosce?
+  function upgradeBusyElsewhere(state, v, unit) {
+    return Object.values(state.villages).some(w => w.id !== v.id && w.owner === v.owner && w.upgrade && w.upgrade.unit === unit);
+  }
+  function upgradeInfo(state, v, unit) {
+    const S = C.SMITHY, U = C.UNITS[unit];
+    const info = { unit, level: 0, target: 0, cost: null, time: 0, ok: false, code: '', reason: '' };
+    if (!U || !S.units.includes(unit) || v.owner === null) { info.code = 'unit'; info.reason = 'Tej jednostki nie można ulepszać'; return info; }
+    const ups = upgradesOf(state, v.owner);
+    info.level = (ups && ups[unit]) || 0;
+    info.target = info.level + 1;
+    if (info.target > C.MAX_LEVEL) { info.code = 'max'; info.reason = 'Maksymalny poziom'; return info; }
+    info.cost = {};
+    RES.forEach(r => { info.cost[r] = roundTo5(U.cost[r] * S.costMult * Math.pow(S.costFactor, info.target - 1)); });
+    info.time = Math.round(S.baseTime * Math.pow(S.timeFactor, info.target - 1) * C.BUILDINGS.hq.buildSpeed[v.buildings.hq] * 1000);
+    if (!(v.buildings.smithy > 0)) { info.code = 'smithy'; info.reason = 'Zbuduj Kuźnię'; return info; }
+    if (v.buildings.smithy < info.target) { info.code = 'level'; info.reason = 'Wymaga Kuźni poz. ' + info.target; return info; }
+    if (v.upgrade) { info.code = 'busy'; info.reason = 'Kuźnia jest zajęta'; return info; }
+    if (upgradeBusyElsewhere(state, v, unit)) { info.code = 'busy'; info.reason = 'Ta jednostka jest już ulepszana w innej wiosce'; return info; }
+    if (RES.some(r => info.cost[r] > storageCap(v))) { info.code = 'storage'; info.reason = 'Za mały magazyn – rozbuduj Ratusz'; return info; }
+    if (!canAfford(v, info.cost)) { info.code = 'resources'; info.reason = 'Brak surowców'; return info; }
+    info.ok = true;
+    return info;
+  }
+  function queueUpgrade(state, v, unit, t) {
+    tickVillage(state, v, t);
+    const info = upgradeInfo(state, v, unit);
+    if (!info.ok) return info;
+    pay(v, info.cost);
+    v.upgrade = { unit, level: info.target, start: t, end: t + info.time };
+    return info;
+  }
+
+  /* ---------- Targowisko: wymiana surowców ---------- */
+  function exchangeMax(v) { return merchantsTotal(v) * C.MERCHANT.capacity; }
+  function exchangeGet(amount) { return Math.floor(amount * C.MARKET.exchangeRate + 1e-9); }
+  function exchange(state, villageId, from, to, amount, t) {
+    const v = state.villages[villageId];
+    if (!v || v.owner === null) return { ok: false, reason: 'Nieznana wioska' };
+    if (!RES.includes(from) || !RES.includes(to) || from === to) return { ok: false, reason: 'Wybierz dwa różne surowce' };
+    tickVillage(state, v, t);
+    amount = Math.floor(Number(amount) || 0);
+    if (!merchantsTotal(v)) return { ok: false, reason: 'Ta wioska nie ma Targowiska' };
+    if (amount < 1) return { ok: false, reason: 'Podaj ilość surowca' };
+    if (amount > exchangeMax(v)) return { ok: false, reason: 'Jednorazowo możesz wymienić maksymalnie ' + exchangeMax(v) };
+    if (Math.floor(v.res[from]) < amount) return { ok: false, reason: 'Za mało surowca' };
+    const got = exchangeGet(amount), room = storageCap(v) - Math.floor(v.res[to]);
+    if (got < 1) return { ok: false, reason: 'Za mała ilość' };
+    if (got > room) return { ok: false, reason: 'Za mało miejsca w magazynie (zmieści się jeszcze ' + Math.max(0, room) + ')' };
+    v.res[from] -= amount;
+    v.res[to] += got;
+    return { ok: true, spent: amount, got };
   }
 
   /* ---------- ruchy wojsk ---------- */
@@ -844,8 +903,8 @@
     const wallBefore = target.buildings.wall || 0;
     const wallFight = Math.max(0, wallBefore - Math.floor(ramCount(attUnits) / C.RAM.fightPerLevel));
     const luck = 1 + (rand(state) * 2 - 1) * C.COMBAT.luck;
-    const A = attackPower(attUnits) * luck;
-    const D = defenseFrom(defUnits, wallFight);
+    const A = attackPower(attUnits, upgradesOf(state, m.owner)) * luck;
+    const D = defenseFrom(defUnits, wallFight, upgradesOf(state, defOwner));
     const attLoss = emptyUnits(), defLoss = emptyUnits();
     const attackerWon = A > D;
     // obrońcy: własne wojsko i każdy oddział wsparcia tracą tę samą część
@@ -955,6 +1014,7 @@
     v.loyalty = C.LOYALTY.afterConquest;
     v.buildQueue = [];
     v.recruitQueue = [];
+    v.upgrade = null;
     v.lastTick = t;
     v.support = {};
     // wojska tej wioski stacjonujące gdzie indziej tracą dom i rozchodzą się
@@ -1011,6 +1071,7 @@
     for (const id in state.villages) {
       const v = state.villages[id];
       if (v.buildQueue.length) consider(v.buildQueue[0].end, 'build', id);
+      if (v.upgrade) consider(v.upgrade.end, 'upgrade', id);
     }
     for (const m of state.movements) consider(m.arrive, 'move', m.id);
     for (const fid in state.factions) {
@@ -1028,6 +1089,12 @@
       const e = v.buildQueue.shift();
       v.buildings[e.building] = e.level;
       if (v.owner === 'player') notice(state, t, 'info', C.BUILDINGS[e.building].name + ' w ' + v.name + ' – poziom ' + e.level);
+    } else if (ev.kind === 'upgrade') {
+      const v = state.villages[ev.ref], e = v.upgrade;
+      v.upgrade = null;
+      const f = state.factions[v.owner];
+      if (f) { f.upgrades = f.upgrades || {}; f.upgrades[e.unit] = Math.max(f.upgrades[e.unit] || 0, e.level); }
+      if (v.owner === 'player') notice(state, t, 'info', 'Kuźnia w ' + v.name + ': ' + C.UNITS[e.unit].name + ' – ulepszenie poz. ' + e.level);
     } else if (ev.kind === 'move') {
       const i = state.movements.findIndex(m => m.id === ev.ref);
       const m = state.movements.splice(i, 1)[0];
@@ -1084,7 +1151,8 @@
 
   MP.Engine = {
     RES, UNITS, BUILDINGS, ramCount, diff, useDifficulty, hiddenRes,
-    rand, randInt, dist, emptyUnits, cleanUnits, sumUnits, attackPower, defensePower,
+    rand, randInt, dist, emptyUnits, cleanUnits, sumUnits, attackPower, defensePower, upgradeMult, upgradesOf,
+    upgradeInfo, queueUpgrade, exchange, exchangeMax, exchangeGet,
     tileAt, villagesOf, points, unitPoints, armyOf, accountPower, addKills, killsOf, ranking, ownerName, ownerColor,
     newGame, worldOf, winVillages, productionPerMin, storageCap, popCap, popUsed, tickVillage,
     buildInfo, queueBuild, recruitInfo, queueRecruit, recruitPer,
