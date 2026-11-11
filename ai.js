@@ -54,7 +54,7 @@
     const base = Math.ceil((settle ? (P.settleMax || P.maxVillages) : P.maxVillages) * X);
     const hours = Math.max(0, (t - state.created) / 3600000);
     const bonus = Math.round(Math.floor(hours / G.everyHours) * G.perStep * X);
-    return Math.max(base, Math.min(base + bonus, Math.ceil(E.winVillages(state) * G.ceilingShare)));
+    return Math.max(base, Math.min(base + bonus, Math.ceil(E.winVillages(state) * (state.race ? G.ceilingShareRace : G.ceilingShare))));
   }
 
   /* ---------- 1. gospodarka ---------- */
@@ -313,5 +313,5 @@
     }
   }
 
-  MP.AI = { think };
+  MP.AI = { think, villageCap };
 })(typeof window !== 'undefined' ? window : globalThis);

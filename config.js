@@ -32,6 +32,9 @@
     // gracza ukryta przed łupieniem; hitCooldownMin: przerwa między atakami AI na tę samą wioskę gracza;
     // aiTech: tempo automatycznych ulepszeń jednostek AI (1 = poziom co AI.tech.minutesPerLevel minut gry);
     // aiExpand: mnożnik limitu wiosek AI; playerZone: promień (w polach) wokół wiosek gracza, w którym AI nie zajmuje wolnych osad ani pól.
+    // Tryb Wyścig (state.race, wybierany przy nowej grze i w Menu): frakcja AI, która pierwsza zdobędzie cel wiosek świata, wygrywa.
+    // warnShare: od jakiej części celu gracz dostaje ostrzeżenie o frakcji zbliżającej się do zwycięstwa.
+    RACE: { warnShare: 0.8 },
     DEFAULT_DIFFICULTY: 'normal',
     DIFFICULTY: {
       easy:   { label: 'Łatwy',    desc: 'Spokojny rozwój. AI rzadko atakuje i wolniej rośnie.',
@@ -356,7 +359,8 @@
       // Każdy poziom = +TECH.unitBonus ataku i obrony, jak u gracza. Frakcja najpierw ulepsza jednostki, których używa najchętniej.
       tech: { minutesPerLevel: 45, startAfterMin: 30, max: 10 },
       // Limit wiosek AI rośnie z czasem: +perStep co everyHours (× mnożnik aiExpand trudności), do ceilingShare celu zwycięstwa świata.
-      growth: { everyHours: 3, perStep: 1, ceilingShare: 0.5 },
+      // ceilingShareRace: sufit w trybie Wyścig (AI może dojść do celu zwycięstwa).
+      growth: { everyHours: 3, perStep: 1, ceilingShare: 0.5, ceilingShareRace: 1 },
       // Taktyka wspólna dla wszystkich frakcji (ai.js)
       tactics: {
         buildQueue: 2,           // ile budów AI trzyma w kolejce
