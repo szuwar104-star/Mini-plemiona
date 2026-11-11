@@ -431,9 +431,23 @@
     return playerWon ? 'win' : 'loss';
   }
 
+  function filteredReports(s) {
+    return s.reports.filter(r => UI.filter === 'all' || r.kind === UI.filter || (UI.filter === 'spy' && r.kind === 'spydef'));
+  }
+  // Przejście do sąsiedniego raportu bez zamykania okna (d = -1 nowszy, +1 starszy).
+  function stepReport(d) {
+    if (!UI.modal || UI.modal.type !== 'report') return;
+    const list = filteredReports(st()), i = list.findIndex(r => r.id === UI.modal.id), n = list[i + d];
+    if (!n) return;
+    G.action(s => { const r = s.reports.find(x => x.id === n.id); if (r) r.read = true; });
+    openModal('report', { id: n.id });
+    const dlg = document.querySelector('#modal .dialog');
+    if (dlg) dlg.scrollTop = 0;
+  }
+
   function renderReports() {
     const s = st(), el = $('#screen-reports');
-    const list = s.reports.filter(r => UI.filter === 'all' || r.kind === UI.filter || (UI.filter === 'spy' && r.kind === 'spydef'));
+    const list = filteredReports(s);
     const sig = JSON.stringify([UI.filter, s.reports.length, s.reports[0] && s.reports[0].id, s.reports.filter(r => !r.read).length]);
     if (UI.sigs.reports === sig) return;
     UI.sigs.reports = sig;
@@ -520,8 +534,13 @@
       if (r.intel) html += intelHtml(r.intel);
       if (r.conquered) html += '<p class="big">' + (r.attacker === 'player' ? 'Wioska należy teraz do Ciebie.' : 'Wioska została utracona.') + '</p>';
     }
+    const list = filteredReports(s), idx = list.findIndex(x => x.id === r.id);
+    const nav = '<div class="rnav"><button class="btn ghost" data-act="report-prev"' + (idx > 0 ? '' : ' disabled') + ' aria-label="Nowszy raport">‹ Nowszy</button>' +
+      '<span class="muted">' + (idx + 1) + ' / ' + list.length + '</span>' +
+      '<button class="btn ghost" data-act="report-next"' + (idx >= 0 && idx < list.length - 1 ? '' : ' disabled') + ' aria-label="Starszy raport">Starszy ›</button></div>';
+    html = nav + html;
     html += '<div class="actions"><button class="btn ghost" data-act="show-on-map" data-x="' + r.toX + '" data-y="' + r.toY + '">Pokaż na mapie</button>' +
-      '<button class="btn" data-act="close">Zamknij</button></div>';
+      '<button class="btn" data-act="close">Zamknij</button></div>' + nav;
     return html;
   }
 
@@ -1222,6 +1241,8 @@
         openModal('report', { id });
         break;
       }
+      case 'report-prev': stepReport(-1); break;
+      case 'report-next': stepReport(1); break;
       case 'show-on-map':
         closeModal();
         UI.sel = { x: Number(b.dataset.x), y: Number(b.dataset.y) };
@@ -1405,6 +1426,7 @@
   function onKey(e) {
     const typing = e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName);
     if (!typing && !UI.modal && (e.key === '[' || e.key === ']')) { stepVillage(e.key === ']' ? 1 : -1); return; }
+    if (!typing && UI.modal && UI.modal.type === 'report' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { stepReport(e.key === 'ArrowRight' ? 1 : -1); e.preventDefault(); return; }
     if (e.key === 'Escape' && UI.modal && UI.modal.type !== 'end') closeModal();
     if (e.key === 'Enter' && e.target.dataset && e.target.dataset.rin) {
       const btn = document.querySelector('[data-act="recruit"][data-u="' + e.target.dataset.rin + '"]');
@@ -1419,6 +1441,15 @@
     document.addEventListener('input', onInput);
     document.addEventListener('change', onChange);
     document.addEventListener('keydown', onKey);
+    // przesunięcie palcem w oknie raportu: w lewo = starszy, w prawo = nowszy
+    let tx = null, ty = null;
+    $('#modal').addEventListener('touchstart', e => { tx = e.touches[0].clientX; ty = e.touches[0].clientY; }, { passive: true });
+    $('#modal').addEventListener('touchend', e => {
+      if (tx == null || !UI.modal || UI.modal.type !== 'report') { tx = null; return; }
+      const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty;
+      tx = null;
+      if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) stepReport(dx < 0 ? 1 : -1);
+    }, { passive: true });
     $('#modal').addEventListener('click', e => { if (e.target.id === 'modal' && UI.modal.type !== 'end') closeModal(); });
     MP.Map.mount($('#mapViewport'), $('#mapWorld'), $('#minimap'), sel => {
       UI.sel = sel;

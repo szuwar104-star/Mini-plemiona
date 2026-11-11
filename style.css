@@ -744,3 +744,9 @@ table.gather td small { color: var(--muted); margin-left: .35rem; }
 .units.rank th:nth-child(2), .units.rank td:nth-child(2) { text-align: left; white-space: normal; }
 .units.rank td small { font-weight: 400; }
 .units.rank td:first-child, .units.rank th:first-child { text-align: center; width: 2rem; padding-left: .3rem; padding-right: .3rem; }
+
+/* ---------- raporty: nawigacja między raportami ---------- */
+.rnav { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin: .25rem 0 .75rem; }
+.rnav .btn { flex: 0 0 auto; }
+.rnav .muted { flex: 1; text-align: center; }
+.dialog > .actions + .rnav { margin: .75rem 0 0; }
