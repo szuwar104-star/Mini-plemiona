@@ -199,6 +199,10 @@ Moduł `diplomacy.js` (parametry w `DIPLO` i `diplo` każdej osobowości w `conf
 
 Test: `node tests/diplomacy.js` (pakty, blokada, zawracanie wojska, dary, oferty, zdrada, lider, migracja v8 → v9, symulacja 24 h na mapie Dużej). Zapis ma teraz numer wersji 9 (migracja dodaje pustą dyplomację).
 
+## Limit wiosek AI rośnie z czasem
+
+Limit wiosek frakcji (osobowość × poziom trudności) zatrzymywał AI na ok. 9 wioskach, a większość wolnych osad na dużych mapach zostawała pusta. Teraz limit rośnie o `C.AI.growth.perStep` (1) co `everyHours` (3 h gry), pomnożony przez mnożnik trudności `aiExpand`, aż do `ceilingShare` (50%) celu zwycięstwa świata (Mała 10, Średnia 15, Duża 20, Ogromna 25); nigdy nie jest niższy niż dotychczasowy bazowy. Poniżej limitu frakcje podbijają osady i szkolą Osadników i Dowódców, powyżej tylko grabią. Wynik na świecie Średnim po 24 h: średnio 11,8 wiosek na frakcję zamiast 8,5. Test: `node tests/expansion.js`.
+
 ## Ulepszenia jednostek AI
 
 Frakcje AI nie kupują badań, ale ich jednostki same zyskują ulepszenia (jak gracz w gałęzi Wojsko: +5% ataku i obrony na poziom). Pierwszy poziom po 30 minutach gry, kolejne co 45 minut × tempo poziomu trudności (`aiTech`: Łatwy 0,5, Normalny 0,8, Trudny 1). Maksimum: poziom 10 (+50%) – na Normalnym po ok. 10 h, na Trudnym po ok. 8 h, na Łatwym po ok. 15 h. Ulubione jednostki frakcji dostają pełny poziom, pozostałe o 2 niższy. Panel „Frakcje” pokazuje najwyższe ulepszenie każdej frakcji (np. „+30%”). Parametry: `AI.tech` i `DIFFICULTY.*.aiTech` w `config.js`. Stare zapisy: AI od razu dostaje poziom odpowiadający czasowi gry.

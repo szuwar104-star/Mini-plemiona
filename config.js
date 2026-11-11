@@ -355,6 +355,8 @@
       // Ulepszenia jednostek AI (odpowiednik badań gracza): rosną same z czasem gry, tempo × DIFFICULTY.aiTech.
       // Każdy poziom = +TECH.unitBonus ataku i obrony, jak u gracza. Frakcja najpierw ulepsza jednostki, których używa najchętniej.
       tech: { minutesPerLevel: 45, startAfterMin: 30, max: 10 },
+      // Limit wiosek AI rośnie z czasem: +perStep co everyHours (× mnożnik aiExpand trudności), do ceilingShare celu zwycięstwa świata.
+      growth: { everyHours: 3, perStep: 1, ceilingShare: 0.5 },
       // Taktyka wspólna dla wszystkich frakcji (ai.js)
       tactics: {
         buildQueue: 2,           // ile budów AI trzyma w kolejce
