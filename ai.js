@@ -47,14 +47,40 @@
   const homeDefTarget = (v, P) => E.points(v) * P.homeDef;
   const incomingOn = (state, v) => state.movements.filter(m => m.type === 'attack' && m.to === v.id && m.owner !== v.owner);
 
+  // Największa liczba wiosek w rękach jednej frakcji (z graczem) – liczona raz na moment, nie dla każdej wioski.
+  const leaderCache = new WeakMap();
+  function leaderVillages(state, t) {
+    const c = leaderCache.get(state);
+    if (c && c.t === t) return c.n;
+    const cnt = {};
+    let n = 0;
+    for (const id in state.villages) { const o = state.villages[id].owner; if (o) { cnt[o] = (cnt[o] || 0) + 1; if (cnt[o] > n) n = cnt[o]; } }
+    leaderCache.set(state, { t, n });
+    return n;
+  }
+
   // Limit wiosek frakcji: bazowy (osobowość × poziom trudności) rośnie z czasem gry o C.AI.growth.perStep co everyHours,
   // ale nie ponad ceilingShare celu zwycięstwa świata (nigdy poniżej bazowego). Dzięki temu AI nie zatrzymuje się na ok. 9 wioskach.
+  // Doganianie: gdy lider (zwykle gracz) ma dużo więcej wiosek, limit podnosi się do aiCatchUp × wioski lidera (też pod sufitem).
   function villageCap(state, P, t, settle) {
-    const X = E.diff(state).aiExpand, G = C.AI.growth;
+    const D = E.diff(state), X = D.aiExpand, G = C.AI.growth;
     const base = Math.ceil((settle ? (P.settleMax || P.maxVillages) : P.maxVillages) * X);
     const hours = Math.max(0, (t - state.created) / 3600000);
     const bonus = Math.round(Math.floor(hours / G.everyHours) * G.perStep * X);
-    return Math.max(base, Math.min(base + bonus, Math.ceil(E.winVillages(state) * (state.race ? G.ceilingShareRace : G.ceilingShare))));
+    const ceiling = Math.ceil(E.winVillages(state) * (state.race ? G.ceilingShareRace : G.ceilingShare));
+    const timed = Math.max(base, Math.min(base + bonus, ceiling));
+    const catchUp = Math.min(ceiling, Math.ceil(leaderVillages(state, t) * (D.aiCatchUp || 0)));
+    return Math.max(timed, catchUp);
+  }
+
+  // Strefa ochronna wokół wiosek gracza jest tylko na początek gry: z czasem słabnie do zera,
+  // żeby rozrośnięty gracz nie odcinał AI od wolnej ziemi.
+  function playerZoneNow(state, t) {
+    const z = E.diff(state).playerZone || 0;
+    const fade = C.AI.growth.zoneFadeHours;
+    if (!z || !fade) return z;
+    const hours = Math.max(0, (t - state.created) / 3600000);
+    return Math.floor(z * Math.max(0, 1 - hours / fade));
   }
 
   /* ---------- 1. gospodarka ---------- */
@@ -177,7 +203,7 @@
   function trySettle(state, v, t) {
     if (v.units.settler < 1) return;
     const N = state.map.size;
-    const zone = E.diff(state).playerZone, players = E.villagesOf(state, 'player');
+    const zone = playerZoneNow(state, t), players = E.villagesOf(state, 'player');
     const R = Math.ceil(T().settleRange); // tylko okno wokół wioski – nie cała mapa (wydajność na dużych światach)
     // wioski w pobliżu liczone raz, zamiast przeglądać wszystkie dla każdego pola
     const near = Object.values(state.villages).filter(o => Math.abs(o.x - v.x) <= R + 3 && Math.abs(o.y - v.y) <= R + 3);
@@ -235,6 +261,7 @@
     const grace = minutes < D.graceMinutes;
     const cooldown = D.hitCooldownMin * 60000;
     const cap = villageCap(state, P, t);
+    const zone = playerZoneNow(state, t);
     const canTakeAny = P.targets === 'any' || minutes >= P.anyAfterMin;
     const busy = new Set(state.movements.filter(m => m.type === 'attack' && m.owner === v.owner).map(m => m.to));
     let best = null;
@@ -248,7 +275,7 @@
       // limit wiosek osiągnięty: wolne osady już tylko grabi (łup bez przejęcia)
       const raid = target.owner === null && owned >= cap;
       if (raid && !P.raids) continue;
-      if (target.owner === null && D.playerZone && playerAll.some(pv => E.dist(pv, target) <= D.playerZone)) continue;
+      if (target.owner === null && zone && playerAll.some(pv => E.dist(pv, target) <= zone)) continue;
       if (target.owner === 'player' && (grace || (state.lastHit && t - (state.lastHit[target.id] || -1e15) < cooldown))) continue;
       const d = E.dist(v, target);
       if (d > P.range) continue;
@@ -313,5 +340,5 @@
     }
   }
 
-  MP.AI = { think, villageCap };
+  MP.AI = { think, villageCap, playerZoneNow };
 })(typeof window !== 'undefined' ? window : globalThis);

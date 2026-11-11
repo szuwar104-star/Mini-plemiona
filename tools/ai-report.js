@@ -2,8 +2,8 @@
    Kolumny: wioski, suma poziomów budynków, całe wojsko (z marszami), zapełnienie magazynu i farmy, liczba ataków, osadników, budów i zrekrutowanych jednostek. */
 require('../config.js'); require('../engine.js'); require('../diplomacy.js'); require('../ai.js');
 const E = MP.Engine, C = MP.CONFIG;
-const diff = process.argv[2] || 'normal', hours = +(process.argv[3] || 6), seed = +(process.argv[4] || 1);
-const s = E.newGame(0, seed, diff, 'small');
+const diff = process.argv[2] || 'normal', hours = +(process.argv[3] || 6), seed = +(process.argv[4] || 1), world = process.argv[5] || 'small';
+const s = E.newGame(0, seed, diff, world);
 // licz zdarzenia
 let atk = {}, settle = {}, recruited = {}, built = {};
 const oSendAttack = E.sendAttack, oSettler = E.sendSettler, oQR = E.queueRecruit, oQB = E.queueBuild;
@@ -14,7 +14,7 @@ E.queueBuild = function (st, v) { built[v.owner] = (built[v.owner] || 0) + 1; re
 const rows = [];
 for (let h = 1; h <= hours; h++) {
   E.advance(s, h * 3600e3);
-  if (h === hours || h % 2 === 0) {
+  if (h === hours || h % 12 === 0) {
     for (const f of Object.values(s.factions).filter(f => f.ai)) {
       const vs = E.villagesOf(s, f.id);
       const bl = vs.reduce((a, v) => a + Object.values(v.buildings).reduce((x, y) => x + y, 0), 0);
