@@ -41,10 +41,15 @@
   // Siła obrony wioski z murem (poziom muru można podać, np. po uderzeniu taranów).
   function defenseFrom(units, wallLevel, ups) {
     const W = C.BUILDINGS.wall, L = Math.max(0, Math.min(C.MAX_LEVEL, wallLevel || 0));
-    return (defensePower(units, ups) + C.COMBAT.baseDefense + W.flat[L]) * (1 + W.bonus[L]);
+    return (defensePower(units, ups) + C.COMBAT.baseDefense + W.flat[L]) * (1 + W.bonus[L] * (1 + ((ups && ups.__fort) || 0)));
   }
   function villageDefense(v, wallLevel, ups) { return defenseFrom(defenders(v), wallLevel == null ? v.buildings.wall : wallLevel, ups); }
-  function upgradesOf(state, owner) { const f = state.factions[owner]; return (f && f.upgrades) || null; }
+  function upgradesOf(state, owner) {
+    const f = state.factions[owner];
+    if (!f) return null;
+    const fort = f.tech && f.tech.fort ? f.tech.fort * techNode('fort').effect.per : 0;
+    return fort ? Object.assign({}, f.upgrades, { __fort: fort }) : (f.upgrades || null);
+  }
   function newId(state, prefix) { return prefix + (state.nextId++); }
   function tileAt(state, x, y) { return state.map.tiles[y * state.map.size + x]; }
   function villagesOf(state, owner) { return Object.values(state.villages).filter(v => v.owner === owner); }
@@ -234,14 +239,20 @@
     if (!f) return 0;
     return node.effect.type === 'unit' ? ((f.upgrades && f.upgrades[node.effect.unit]) || 0) : ((f.tech && f.tech[node.id]) || 0);
   }
+  function queueMax(v, kind) {
+    const base = kind === 'build' ? C.BUILD_QUEUE_MAX : C.RECRUIT_QUEUE_MAX;
+    return base + (v && v.owner === 'player' ? FX.queue : 0);
+  }
   function techCost(node, level) { return Math.max(1, Math.round(node.base * Math.pow(node.factor, level - 1))); }
   function techEffects(f) {
-    const fx = { storage: 1, exchange: C.MARKET.exchangeRate, build: 1, recruit: 1, mint: 0, prod: 1, prodWood: 1, prodClay: 1, prodIron: 1, carry: 1, hide: 0, pop: 1 };
+    const fx = { storage: 1, exchange: C.MARKET.exchangeRate, build: 1, recruit: 1, mint: 0, prod: 1, prodWood: 1, prodClay: 1, prodIron: 1, carry: 1, hide: 0, pop: 1,
+      queue: 0, march: 1, heal: 0, fort: 0, command: 0, faith: 0 };
     C.TECH.nodes.forEach(n => {
       const lvl = techLevel(f, n);
       if (lvl && n.effect.type !== 'unit') fx[n.effect.type] += n.effect.per * lvl;
     });
     fx.build = Math.max(0.3, fx.build); fx.recruit = Math.max(0.3, fx.recruit);
+    fx.march = Math.max(0.5, fx.march); fx.heal = Math.min(0.3, fx.heal); fx.faith = Math.min(0.4, fx.faith);
     return fx;
   }
   // Część magazynu ukryta przed łupieżcami: ochrona z poziomu trudności + badanie Skrytki (maks. 90%).
@@ -283,7 +294,34 @@
 
   // Nalicza produkcję, poparcie i ukończoną rekrutację do chwili t.
   // Rekrutacja nie wpływa na produkcję, więc może być liczona "leniwie".
+  // Wolne osady same się rozwijają: co NEUTRAL.growEveryMin minut +1 poziom budynku i większa stała załoga.
+  // Produkcję do chwili rozbudowy liczymy po starej stawce, więc wynik nie zależy od tego, w ilu krokach liczono czas.
   function tickVillage(state, v, t) {
+    if (v.owner === null && C.NEUTRAL.growEveryMin) {
+      const I = C.NEUTRAL.growEveryMin * 60000;
+      if (!v.growNext) v.growNext = v.lastTick + I;           // stare zapisy: pierwszy rozwój za jeden okres
+      while (v.growNext <= t) {
+        const at = v.growNext;
+        tickCore(state, v, at);
+        growNeutral(v);
+        v.growNext = at + I;
+      }
+    }
+    tickCore(state, v, t);
+  }
+  function growNeutral(v) {
+    const G = C.NEUTRAL.growMax;
+    const k = Object.keys(G).filter(b => (v.buildings[b] || 0) < G[b])
+      .sort((a, b) => (v.buildings[a] || 0) / G[a] - (v.buildings[b] || 0) / G[b])[0];
+    if (!k) return;
+    v.buildings[k] = (v.buildings[k] || 0) + 1;
+    v.grown = (v.grown || 0) + 1;
+    if (!v.garrison) v.garrison = Object.assign(emptyUnits(), v.units);
+    if (!v.garrison0) v.garrison0 = Object.assign(emptyUnits(), v.garrison);
+    const f = 1 + C.NEUTRAL.garrisonPerLevel * v.grown;
+    UNITS.forEach(u => { v.garrison[u] = Math.round((v.garrison0[u] || 0) * f); });
+  }
+  function tickCore(state, v, t) {
     if (t <= v.lastTick) return;
     useDifficulty(state);
     // Arytmetyka całkowita: przyrost = tempo × czas, reszta (ułamek jednostki) czeka w v.acc.
@@ -315,10 +353,12 @@
         if (v.units[k] >= g) v.acc.g[k] = 0;
       });
     }
-    if (v.owner !== null && v.loyalty < C.LOYALTY.max) {
-      const total = v.acc.loyalty + Math.round(C.LOYALTY.regenPerMin * 10) * dt;
-      const whole = Math.floor(total / 600000);
-      v.acc.loyalty = total - whole * 600000;
+    if (v.loyalty < C.LOYALTY.max) {
+      // wolne osady odzyskują poparcie wolniej (NEUTRAL.loyaltyRegenPerMin), skala ×100 dla ułamków
+      const neutral = v.owner === null, S = neutral ? 6000000 : 600000;
+      const total = v.acc.loyalty + Math.round((neutral ? C.NEUTRAL.loyaltyRegenPerMin * 100 : C.LOYALTY.regenPerMin * 10)) * dt;
+      const whole = Math.floor(total / S);
+      v.acc.loyalty = total - whole * S;
       v.loyalty = Math.min(C.LOYALTY.max, v.loyalty + whole);
       if (v.loyalty >= C.LOYALTY.max) v.acc.loyalty = 0;
     }
@@ -350,7 +390,7 @@
     if (key !== 'hq' && v.buildings.hq < target - C.HQ_LEVEL_GAP) {
       info.code = 'hq'; info.reason = 'Wymaga Ratusza poz. ' + (target - C.HQ_LEVEL_GAP); return info;
     }
-    if (v.buildQueue.length >= C.BUILD_QUEUE_MAX) { info.code = 'queue'; info.reason = 'Kolejka jest pełna'; return info; }
+    if (v.buildQueue.length >= queueMax(v, 'build')) { info.code = 'queue'; info.reason = 'Kolejka jest pełna'; return info; }
     if (RES.some(r => info.cost[r] > storageCap(v))) { info.code = 'storage'; info.reason = 'Za mały magazyn – rozbuduj Ratusz'; return info; }
     if (!canAfford(v, info.cost)) { info.code = 'resources'; info.reason = 'Brak surowców'; return info; }
     info.ok = true;
@@ -380,7 +420,7 @@
     const byRes = Math.min.apply(null, RES.map(r => U.cost[r] > 0 ? Math.floor(v.res[r] / U.cost[r]) : Infinity));
     const byPop = Math.floor((popCap(v) - popUsed(state, v)) / U.pop);
     info.max = Math.max(0, Math.min(byRes, byPop));
-    if (v.recruitQueue.length >= C.RECRUIT_QUEUE_MAX) { info.code = 'queue'; info.reason = 'Kolejka jest pełna'; info.max = 0; return info; }
+    if (v.recruitQueue.length >= queueMax(v, 'recruit')) { info.code = 'queue'; info.reason = 'Kolejka jest pełna'; info.max = 0; return info; }
     if (byPop < 1) { info.code = 'pop'; info.reason = 'Brak miejsca na farmie'; return info; }
     if (byRes < 1) { info.code = 'resources'; info.reason = 'Brak surowców'; return info; }
     info.ok = true;
@@ -523,7 +563,8 @@
     UNITS.forEach(k => { if (units[k] > 0) s = Math.max(s, C.UNITS[k].speed); });
     return s;
   }
-  function travelTime(a, b, units) { return Math.round(dist(a, b) * slowest(units) * 1000); }
+  // owner – właściciel wojska (badanie Trakty przyspiesza tylko gracza)
+  function travelTime(a, b, units, owner) { return Math.round(dist(a, b) * slowest(units) * 1000 * (owner === 'player' ? FX.march : 1)); }
 
   // opts.raid – grabież wolnej osady: zwycięstwo daje łup, ale osada zostaje wolna.
   function sendAttack(state, fromId, toId, units, t, type, opts) {
@@ -546,7 +587,7 @@
     UNITS.forEach(k => { from.units[k] -= u[k]; });
     const m = {
       id: newId(state, 'm'), type, owner: from.owner, from: from.id, to: to.id,
-      units: u, loot: null, start: t, arrive: t + travelTime(from, to, u)
+      units: u, loot: null, start: t, arrive: t + travelTime(from, to, u, from.owner)
     };
     if (type === 'attack' && opts && opts.raid && to.owner === null) m.raid = true;
     state.movements.push(m);
@@ -586,7 +627,7 @@
     }
     UNITS.forEach(k => { from.units[k] -= u[k]; });
     const m = { id: newId(state, 'm'), type: 'support', stay, owner: from.owner, from: from.id, to: to.id,
-      units: u, loot: null, start: t, arrive: t + travelTime(from, to, u) };
+      units: u, loot: null, start: t, arrive: t + travelTime(from, to, u, from.owner) };
     state.movements.push(m);
     return { ok: true, movement: m };
   }
@@ -606,7 +647,7 @@
       }
     } else {
       state.movements.push({ id: newId(state, 'm'), type: 'return', owner: m.owner, from: m.from, to: m.to,
-        units: m.units, loot: null, start: t, arrive: t + travelTime(to, from, m.units) });
+        units: m.units, loot: null, start: t, arrive: t + travelTime(to, from, m.units, m.owner) });
       if (m.owner === 'player') notice(state, t, 'bad', 'Wioska ' + to.name + ' nie jest już Twoja – wojsko zawraca.');
     }
   }
@@ -618,7 +659,7 @@
     if (!u || !origin) return { ok: false, reason: 'Brak takiego wsparcia' };
     delete host.support[originId];
     const m = { id: newId(state, 'm'), type: 'return', owner: origin.owner, from: originId, to: hostId,
-      units: Object.assign(emptyUnits(), u), loot: null, start: t, arrive: t + travelTime(host, origin, u) };
+      units: Object.assign(emptyUnits(), u), loot: null, start: t, arrive: t + travelTime(host, origin, u, origin.owner) };
     state.movements.push(m);
     return { ok: true, movement: m };
   }
@@ -764,6 +805,89 @@
       first: Math.min.apply(null, sent.map(m => m.arrive)) };
   }
 
+  /* ---------- budowa w wielu wioskach naraz ---------- */
+  // items: [[budynek, docelowy poziom], ...]. Plan bez skutków ubocznych: dla każdej wioski gracza lista budów,
+  // które zmieszczą się w kolejce i na które starczy surowców (koszty liczone po kolei), albo powód pominięcia.
+  function planBuildAll(state, items, t, off) {
+    const rows = [];
+    villagesOf(state, 'player').sort((a, b) => a.name.localeCompare(b.name, 'pl')).forEach(v => {
+      tickVillage(state, v, t);
+      const sim = { owner: v.owner, buildings: v.buildings, res: Object.assign({}, v.res),
+        buildQueue: v.buildQueue.map(e => ({ building: e.building })) };
+      const row = { villageId: v.id, items: [], skip: '', off: !!(off && off[v.id]) };
+      if (row.off) { row.skip = 'pominięta'; rows.push(row); return; }
+      let last = '';
+      for (;;) {
+        const lvl = k => sim.buildings[k] + sim.buildQueue.filter(e => e.building === k).length;
+        const cand = items.filter(([k, max]) => C.BUILDINGS[k] && lvl(k) < Math.min(max, C.MAX_LEVEL))
+          .sort((a, b) => lvl(a[0]) / a[1] - lvl(b[0]) / b[1]);
+        if (!cand.length) { last = last || 'cel osiągnięty'; break; }
+        let done = false;
+        for (const [k] of cand) {
+          const info = buildInfo(state, sim, k);
+          if (info.ok) {
+            RES.forEach(r => { sim.res[r] -= info.cost[r]; });
+            sim.buildQueue.push({ building: k });
+            row.items.push({ key: k, level: info.target, cost: info.cost });
+            done = true; break;
+          }
+          if (!last || info.code === 'queue') last = info.reason;
+        }
+        if (!done) break;
+      }
+      if (!row.items.length) row.skip = last || 'nic do zbudowania';
+      rows.push(row);
+    });
+    return { rows, total: rows.reduce((a, r) => a + r.items.length, 0) };
+  }
+  function buildAll(state, items, t, off) {
+    const plan = planBuildAll(state, items, t, off);
+    let queued = 0, villages = 0;
+    plan.rows.forEach(r => {
+      const v = state.villages[r.villageId]; let any = false;
+      r.items.forEach(it => { if (queueBuild(state, v, it.key, t).ok) { queued++; any = true; } });
+      if (any) villages++;
+    });
+    return queued ? { ok: true, queued, villages } : { ok: false, reason: 'Żadna wioska nie może teraz nic zbudować' };
+  }
+
+  /* ---------- konwoje: automatyczne odsyłanie nadwyżek do wioski centralnej ---------- */
+  // state.auto = { on, hub, high (% magazynu, od którego wioska oddaje), keep (% zostaje), everyMin, coins, next, last }
+  function setAuto(state, cfg, t) {
+    const hub = cfg.on ? state.villages[cfg.hub] : null;
+    if (cfg.on && (!hub || hub.owner !== 'player')) return { ok: false, reason: 'Wybierz swoją wioskę centralną' };
+    const D = C.AUTO.defaults;
+    state.auto = Object.assign({}, state.auto || {}, {
+      on: !!cfg.on, hub: cfg.hub || null,
+      high: Math.max(10, Math.min(100, Number(cfg.high) || D.high)),
+      keep: Math.max(0, Math.min(90, Number(cfg.keep) >= 0 ? Number(cfg.keep) : D.keep)),
+      everyMin: C.AUTO.everyMin.includes(Number(cfg.everyMin)) ? Number(cfg.everyMin) : D.everyMin,
+      coins: !!cfg.coins, next: t + 1000
+    });
+    return { ok: true };
+  }
+  function runAuto(state, t) {
+    const a = state.auto;
+    a.next = t + a.everyMin * 60000;
+    const hub = state.villages[a.hub];
+    if (!hub || hub.owner !== 'player') { a.on = false; notice(state, t, 'bad', 'Konwoje wyłączone – wioska centralna nie jest już Twoja.'); return; }
+    const off = {};
+    villagesOf(state, 'player').forEach(v => {
+      tickVillage(state, v, t);
+      const cap = storageCap(v);
+      if (Math.max.apply(null, RES.map(r => v.res[r] / cap)) * 100 < a.high) off[v.id] = true;
+    });
+    const plan = planGather(state, hub.id, { mode: 'gather', reservePct: a.keep, capToRoom: true, off }, t);
+    const sent = plan.rows.some(r => !r.skip && r.total > 0) ? sendGather(state, plan, t) : { ok: false };
+    let coins = 0;
+    if (a.coins && (hub.buildings.market || 0) > 0) {
+      tickVillage(state, hub, t);
+      const res = RES.slice().sort((x, y) => hub.res[y] - hub.res[x])[0], q = coinQuick(hub, res, 'max', t);
+      if (q.ok) { const r = buyCoins(state, hub.id, res, q.count, t); if (r.ok) coins = r.coins; }
+    }
+    a.last = { t, sent: sent.ok ? sent.sent.length : 0, total: sent.ok ? sent.total : 0, coins };
+  }
+
   /* ---------- zbieranie i rozdzielanie wojska (wiele wiosek naraz) ---------- */
   // Jednostki wybierane domyślnie: cała armia poza Osadnikiem i Zwiadowcami.
   function troopKinds(opts) {
@@ -807,7 +931,7 @@
         room -= fit(row.units, room);
         row.total = sumUnits(row.units);
         if (row.total < 1) { row.skip = 'brak miejsca na farmie celu'; return; }
-        row.pop = unitsPop(row.units); row.time = travelTime(v, target, row.units);
+        row.pop = unitsPop(row.units); row.time = travelTime(v, target, row.units, v.owner);
       });
     } else {
       // Rozdzielanie: z celu (tu: wioska wysyłająca) po równo do pozostałych; reszta z dzielenia trafia do najbliższych.
@@ -828,7 +952,7 @@
         }
         d.row.total = sumUnits(d.row.units);
         if (d.row.total < 1) { d.row.skip = 'brak miejsca na farmie'; return; }
-        d.row.pop = unitsPop(d.row.units); d.row.time = travelTime(target, d.v, d.row.units);
+        d.row.pop = unitsPop(d.row.units); d.row.time = travelTime(target, d.v, d.row.units, d.v.owner);
       });
     }
     plan.rows.forEach(r => { plan.total += r.total; plan.pop += r.pop; });
@@ -932,7 +1056,7 @@
     from.units.settler -= 1;
     const u = emptyUnits(); u.settler = 1;
     const m = { id: newId(state, 'm'), type: 'settle', owner: from.owner, from: from.id, to: null, x, y,
-      units: u, start: t, arrive: t + travelTime(from, { x, y }, u) };
+      units: u, start: t, arrive: t + travelTime(from, { x, y }, u, from.owner) };
     state.movements.push(m);
     return { ok: true, movement: m };
   }
@@ -941,7 +1065,7 @@
     if (why) {
       const origin = state.villages[m.from];
       state.movements.push({ id: newId(state, 'm'), type: 'return', owner: m.owner, from: m.from, to: null, x: m.x, y: m.y,
-        units: m.units, loot: null, start: t, arrive: t + travelTime({ x: m.x, y: m.y }, origin, m.units) });
+        units: m.units, loot: null, start: t, arrive: t + travelTime({ x: m.x, y: m.y }, origin, m.units, m.owner) });
       if (m.owner === 'player') notice(state, t, 'bad', 'Nie udało się założyć osady (' + m.x + ':' + m.y + '): ' + why.toLowerCase() + '. Osadnik wraca.');
       return;
     }
@@ -971,7 +1095,7 @@
     const intel = success ? snapshot(target, t) : null;
     if (survivors.scout > 0) {
       state.movements.push({ id: newId(state, 'm'), type: 'return', owner: m.owner, from: m.from, to: m.to,
-        units: survivors, loot: null, start: t, arrive: t + travelTime(target, origin, survivors) });
+        units: survivors, loot: null, start: t, arrive: t + travelTime(target, origin, survivors, m.owner) });
     }
     if (m.owner === 'player') {
       if (intel) state.intel[target.id] = intel;
@@ -999,7 +1123,7 @@
     if (target.owner === m.owner) {
       const units = Object.assign(emptyUnits(), m.units);
       state.movements.push({ id: newId(state, 'm'), type: 'return', owner: m.owner, from: m.from, to: m.to, bounced: true,
-        units, loot: null, start: t, arrive: t + travelTime(target, origin, units) });
+        units, loot: null, start: t, arrive: t + travelTime(target, origin, units, m.owner) });
       if (m.owner === 'player') notice(state, t, 'info', 'Wioska ' + target.name + ' jest już Twoja – wojsko zawraca do ' + origin.name + '.');
       return;
     }
@@ -1033,6 +1157,11 @@
         g[k] -= l; defLoss[k] += l;
       }));
       for (const key in target.support) if (sumUnits(target.support[key]) === 0) delete target.support[key];
+    }
+    // Lazaret (badanie gracza): część poległych atakujących wraca ranna
+    let healed = 0;
+    if (m.owner === 'player' && FX.heal > 0) {
+      UNITS.forEach(k => { const h = Math.floor(attLoss[k] * FX.heal); attLoss[k] -= h; healed += h; });
     }
     const survivors = emptyUnits();
     UNITS.forEach(k => { survivors[k] = attUnits[k] - attLoss[k]; });
@@ -1069,9 +1198,19 @@
     let loyaltyAfter = null;
     if (attackerWon && anyAlive) {
       if (defOwner === null) {
-        conquered = !m.raid;
+        // każda wygrana w trybie Podbój obniża poparcie; Dowódca podboju dokłada swój zwykły spadek
+        if (!m.raid) {
+          let drop = randInt(state, C.NEUTRAL.dropMin, C.NEUTRAL.dropMax);
+          if (survivors.noble > 0) drop += randInt(state, C.LOYALTY.dropMin, C.LOYALTY.dropMax) + (m.owner === 'player' ? FX.command : 0);
+          target.loyalty -= drop;
+          loyaltyAfter = Math.max(0, Math.floor(target.loyalty));
+          if (target.loyalty <= 0) conquered = true;
+        }
       } else if (survivors.noble > 0) {
-        target.loyalty -= randInt(state, C.LOYALTY.dropMin, C.LOYALTY.dropMax);
+        let drop = randInt(state, C.LOYALTY.dropMin, C.LOYALTY.dropMax);
+        if (m.owner === 'player') drop += FX.command;                       // Dowództwo
+        if (defOwner === 'player') drop = Math.round(drop * (1 - FX.faith)); // Wiara
+        target.loyalty -= drop;
         loyaltyAfter = Math.max(0, Math.floor(target.loyalty));
         if (target.loyalty <= 0) { conquered = true; survivors.noble -= 1; }
       }
@@ -1090,7 +1229,7 @@
     // Powrót ocalałych
     if (sumUnits(survivors) > 0) {
       const back = { id: newId(state, 'm'), type: 'return', owner: m.owner, from: m.from, to: m.to,
-        units: survivors, loot, start: t, arrive: t + travelTime(target, origin, survivors) };
+        units: survivors, loot, start: t, arrive: t + travelTime(target, origin, survivors, m.owner) };
       state.movements.push(back);
     }
 
@@ -1106,8 +1245,8 @@
       attacker: m.owner, defender: defOwner,
       fromName: origin.name, fromX: origin.x, fromY: origin.y, from: origin.id,
       toName: target.name, toX: target.x, toY: target.y, to: target.id,
-      attUnits, attLoss, defUnits, defLoss, attackerWon, loot, luck: Math.round((luck - 1) * 100), raid: !!m.raid, stayed,
-      loyaltyBefore: defOwner !== null && attUnits.noble > 0 ? loyaltyBefore : null, loyaltyAfter, conquered,
+      attUnits, attLoss, defUnits, defLoss, attackerWon, loot, luck: Math.round((luck - 1) * 100), raid: !!m.raid, stayed, healed,
+      loyaltyBefore: loyaltyAfter !== null ? loyaltyBefore : null, loyaltyAfter, conquered,
       wallBefore, wallFight, wallAfter, hadSupport, lootCapacity, lootHidden, killPts,
       intel: intel && intel.buildings ? intel : null
     };
@@ -1128,7 +1267,8 @@
 
   function changeOwner(state, v, newOwner, prevOwner, t) {
     v.owner = newOwner;
-    delete v.garrison;
+    delete v.garrison; delete v.garrison0; delete v.growNext; delete v.grown;
+    if (v.acc) v.acc.loyalty = 0;
     v.loyalty = C.LOYALTY.afterConquest;
     v.buildQueue = [];
     v.recruitQueue = [];
@@ -1194,6 +1334,7 @@
       const f = state.factions[fid];
       if (f.ai && f.alive) consider(f.nextThink, 'ai', fid);
     }
+    if (state.auto && state.auto.on && state.auto.next) consider(state.auto.next, 'auto', null);
     return best;
   }
 
@@ -1219,6 +1360,8 @@
       f.nextThink = t + C.AI.thinkInterval * 1000;
       if (villagesOf(state, f.id).length === 0) { f.alive = false; return; }
       if (MP.AI) MP.AI.think(state, f.id, t);
+    } else if (ev.kind === 'auto') {
+      runAuto(state, t);
     }
   }
 
@@ -1260,6 +1403,7 @@
   function hiddenRes(state, v) { return v.owner === 'player' ? Math.floor(storageCap(v) * hideShare(state)) : 0; }
 
   MP.Engine = {
+    queueMax, planBuildAll, buildAll, setAuto, runAuto,
     RES, UNITS, BUILDINGS, ramCount, diff, useDifficulty, hiddenRes,
     rand, randInt, dist, emptyUnits, cleanUnits, sumUnits, attackPower, defensePower, upgradeMult, upgradesOf,
     exchange, exchangeMax, exchangeGet, exchangeRate, exchangeQuick, coinQuick, buyCoinsAll, mintLimit, mintTokens, buyCoins, techInfo, researchTech, techNode, techLevel, techCost, techEffects,

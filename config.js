@@ -30,18 +30,19 @@
     // aiAggro: jak często AI atakuje; playerBias: jak chętnie AI wybiera gracza;
     // aiCaution: jakiej przewagi AI potrzebuje do ataku; lootProtect: część magazynu
     // gracza ukryta przed łupieniem; hitCooldownMin: przerwa między atakami AI na tę samą wioskę gracza;
+    // aiTech: tempo automatycznych ulepszeń jednostek AI (1 = poziom co AI.tech.minutesPerLevel minut gry);
     // aiExpand: mnożnik limitu wiosek AI; playerZone: promień (w polach) wokół wiosek gracza, w którym AI nie zajmuje wolnych osad ani pól.
     DEFAULT_DIFFICULTY: 'normal',
     DIFFICULTY: {
       easy:   { label: 'Łatwy',    desc: 'Spokojny rozwój. AI rzadko atakuje i wolniej rośnie.',
                 playerProd: 1.3, aiProd: 0.6, graceMinutes: 40, aiAggro: 0.4, playerBias: 0.4, aiCaution: 1.5, lootProtect: 0.4, hitCooldownMin: 15,
-                aiExpand: 0.5, playerZone: 4 },
+                aiExpand: 0.5, playerZone: 4, aiTech: 0.5 },
       normal: { label: 'Normalny', desc: 'Wyważona rozgrywka. AI naciska, ale da się je wyprzedzić.',
                 playerProd: 1.15, aiProd: 0.72, graceMinutes: 25, aiAggro: 0.7, playerBias: 0.7, aiCaution: 1.2, lootProtect: 0.25, hitCooldownMin: 8,
-                aiExpand: 0.7, playerZone: 3 },
+                aiExpand: 0.7, playerZone: 3, aiTech: 0.8 },
       hard:   { label: 'Trudny',   desc: 'Agresywne i szybkie AI. Dla doświadczonych.',
                 playerProd: 1, aiProd: 0.95, graceMinutes: 10, aiAggro: 1, playerBias: 1, aiCaution: 1, lootProtect: 0.1, hitCooldownMin: 0,
-                aiExpand: 1, playerZone: 0 }
+                aiExpand: 1, playerZone: 0, aiTech: 1 }
     },
     WIN_VILLAGES: 20,           // domyślny cel (stare zapisy); nowe gry biorą cel ze świata (WORLDS)
 
@@ -176,7 +177,8 @@
       branches: [
         { id: 'war', name: 'Wojsko' },
         { id: 'eco', name: 'Gospodarka' },
-        { id: 'prod', name: 'Produkcja' }
+        { id: 'prod', name: 'Produkcja' },
+        { id: 'realm', name: 'Królestwo' }      // późna gra: drogie badania dla rozbudowanego plemienia
       ],
       nodes: [
         { id: 'drill', branch: 'war', name: 'Musztra', desc: 'Szybsze szkolenie wojska.', max: 5, base: 10, factor: 1.3, req: null, effect: { type: 'recruit', per: -0.04 } },
@@ -196,9 +198,30 @@
         { id: 'tools', branch: 'prod', name: 'Narzędzia', desc: 'Większa produkcja wszystkich surowców we wszystkich wioskach.', max: 5, base: 12, factor: 1.3, req: null, effect: { type: 'prod', per: 0.02 } },
         { id: 'p_wood', branch: 'prod', name: 'Leśnictwo', desc: 'Większa produkcja drewna.', max: 10, base: 15, factor: 1.27, req: { id: 'tools', min: 2 }, effect: { type: 'prodWood', per: 0.03 } },
         { id: 'p_clay', branch: 'prod', name: 'Ceglarstwo', desc: 'Większa produkcja gliny.', max: 10, base: 15, factor: 1.27, req: { id: 'tools', min: 2 }, effect: { type: 'prodClay', per: 0.03 } },
-        { id: 'p_iron', branch: 'prod', name: 'Górnictwo', desc: 'Większa produkcja żelaza.', max: 10, base: 15, factor: 1.27, req: { id: 'tools', min: 2 }, effect: { type: 'prodIron', per: 0.03 } }
+        { id: 'p_iron', branch: 'prod', name: 'Górnictwo', desc: 'Większa produkcja żelaza.', max: 10, base: 15, factor: 1.27, req: { id: 'tools', min: 2 }, effect: { type: 'prodIron', per: 0.03 } },
+        // --- Królestwo (późna gra) ---
+        { id: 'admin', branch: 'realm', name: 'Administracja', desc: 'Dłuższe kolejki budowy i rekrutacji we wszystkich wioskach.', max: 2, base: 120, factor: 2, req: null, effect: { type: 'queue', per: 1 } },
+        { id: 'roads', branch: 'realm', name: 'Trakty', desc: 'Szybszy marsz Twoich wojsk i osadników (ataki, wsparcie, powroty).', max: 10, base: 25, factor: 1.27, req: { id: 'admin', min: 1 }, effect: { type: 'march', per: -0.03 } },
+        { id: 'medic', branch: 'realm', name: 'Lazaret', desc: 'Część poległych w Twoich atakach wraca ranna do domu zamiast ginąć.', max: 10, base: 25, factor: 1.27, req: { id: 'admin', min: 1 }, effect: { type: 'heal', per: 0.03 } },
+        { id: 'fort', branch: 'realm', name: 'Fortyfikacje', desc: 'Mocniejszy bonus muru w Twoich wioskach.', max: 10, base: 25, factor: 1.27, req: { id: 'admin', min: 2 }, effect: { type: 'fort', per: 0.03 } },
+        { id: 'command', branch: 'realm', name: 'Dowództwo', desc: 'Twoi Dowódcy podboju mocniej obniżają poparcie.', max: 5, base: 40, factor: 1.35, req: { id: 'roads', min: 3 }, effect: { type: 'command', per: 3 } },
+        { id: 'faith', branch: 'realm', name: 'Wiara', desc: 'Wrodzy Dowódcy słabiej obniżają poparcie Twoich wiosek.', max: 5, base: 40, factor: 1.35, req: { id: 'medic', min: 3 }, effect: { type: 'faith', per: 0.08 } }
       ]
     },
+
+    // Szablony „Buduj we wszystkich wioskach”: [budynek, docelowy poziom]. Wioska buduje najpierw to, co jest najdalej od celu.
+    BUILD_TEMPLATES: {
+      eco:   { label: 'Gospodarka', desc: 'Tartak, Cegielnia, Kopalnia i Ratusz do 10, Farma do 8.',
+               items: [['wood', 10], ['clay', 10], ['iron', 10], ['hq', 10], ['farm', 8]] },
+      army:  { label: 'Wojsko', desc: 'Koszary, Farma i Mur do 10, Ratusz do 8.',
+               items: [['barracks', 10], ['farm', 10], ['wall', 10], ['hq', 8]] },
+      trade: { label: 'Handel', desc: 'Targowisko do 10 (kupcy i monety), Ratusz do 8.',
+               items: [['market', 10], ['hq', 8]] },
+      full:  { label: 'Pełna rozbudowa', desc: 'Wszystkie budynki do poziomu 10, po równo.',
+               items: [['hq', 10], ['wood', 10], ['clay', 10], ['iron', 10], ['farm', 10], ['barracks', 10], ['market', 10], ['wall', 10]] }
+    },
+    // Konwoje (automatyczne odsyłanie nadwyżek do wioski centralnej)
+    AUTO: { everyMin: [5, 15, 30], defaults: { high: 80, keep: 40, everyMin: 15, coins: true } },
 
     // Nowa wioska założona przez Osadnika
     SETTLE: {
@@ -288,7 +311,16 @@
       axePerDist: 0.6,
       lightFromDist: 7,
       startRes: 300,
-      regenPerHour: 0.25           // po najeździe wolna osada odtwarza 25% swojej stałej załogi na godzinę
+      regenPerHour: 0.25,          // po najeździe wolna osada odtwarza 25% swojej stałej załogi na godzinę
+      // Podbój: każda wygrana w trybie Podbój obniża poparcie o dropMin–dropMax (z Dowódcą + jego zwykły spadek);
+      // przy 0% osada przechodzi na zwycięzcę. Poparcie odnawia się jak w każdej wiosce (LOYALTY.regenPerMin).
+      dropMin: 35, dropMax: 50,
+      loyaltyRegenPerMin: 0.25,    // poparcie wolnej osady wraca wolniej niż w wioskach frakcji (15 p.p. na godzinę)
+      // Rozwój: co growEveryMin minut +1 poziom budynku (najpierw najniższy względem limitu z growMax),
+      // a stała załoga rośnie o garrisonPerLevel (np. 0.12 = +12% na każdy zdobyty poziom).
+      growEveryMin: 60,
+      growMax: { wood: 10, clay: 10, iron: 10, hq: 8, farm: 8, wall: 6 },
+      garrisonPerLevel: 0.12
     },
 
     PLAYER: { name: 'Twoje plemię', color: '#2f62c9' },
@@ -298,6 +330,9 @@
       prodFactor: 1.1,           // mnożnik produkcji AI (poziom trudności)
       graceMinutes: 10,          // przez tyle minut AI nie atakuje gracza
       maxOrder: 40,              // maks. liczba jednostek w jednym zleceniu AI
+      // Ulepszenia jednostek AI (odpowiednik badań gracza): rosną same z czasem gry, tempo × DIFFICULTY.aiTech.
+      // Każdy poziom = +TECH.unitBonus ataku i obrony, jak u gracza. Frakcja najpierw ulepsza jednostki, których używa najchętniej.
+      tech: { minutesPerLevel: 45, startAfterMin: 30, max: 10 },
       // Taktyka wspólna dla wszystkich frakcji (ai.js)
       tactics: {
         buildQueue: 2,           // ile budów AI trzyma w kolejce

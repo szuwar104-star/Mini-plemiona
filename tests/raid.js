@@ -33,21 +33,25 @@ function setup(seed) {
   const half = E.sumUnits(n.units);
   ok(half > 0 && half < garrison, 'po 2 h załoga częściowo odrodzona (' + half + '/' + garrison + ')');
   E.advance(s, r.movement.arrive + 8 * 3600e3); E.tickVillage(s, n, s.now);
-  ok(E.sumUnits(n.units) === garrison, 'po 8 h pełna załoga, nie więcej (' + E.sumUnits(n.units) + ')');
+  ok(E.sumUnits(n.units) <= E.sumUnits(n.garrison) && E.sumUnits(n.units) >= E.sumUnits(n.garrison) * 0.75,
+    'po 8 h załoga prawie pełna, nigdy ponad stałą (' + E.sumUnits(n.units) + '/' + E.sumUnits(n.garrison) + ' – stała rośnie z rozwojem)');
+  ok(E.sumUnits(n.garrison) > garrison, 'osada rozwinęła się i ma większą stałą załogę (' + garrison + ' → ' + E.sumUnits(n.garrison) + ')');
   // 3. odradzanie niezależne od liczby kroków (jeden skok vs. wiele)
   const a = setup(12), b = setup(12);
   const ra = E.sendAttack(a.s, a.p.id, a.n.id, { axe: 300 }, 0, 'attack', { raid: true });
   E.sendAttack(b.s, b.p.id, b.n.id, { axe: 300 }, 0, 'attack', { raid: true });
   E.advance(a.s, ra.movement.arrive + 3 * 3600e3); E.tickVillage(a.s, a.n, a.s.now);
   for (let t = 60e3; t <= ra.movement.arrive + 3 * 3600e3; t += 60e3) { E.advance(b.s, t); E.tickVillage(b.s, b.n, t); }
+  E.advance(b.s, ra.movement.arrive + 3 * 3600e3); E.tickVillage(b.s, b.n, b.s.now);
   ok(JSON.stringify(a.n.units) === JSON.stringify(b.n.units), 'odradzanie identyczne przy jednym skoku i krokach co minutę');
 }
 // 4. Zwykły atak nadal przejmuje wolną osadę
 {
   const { s, p, n } = setup(13);
+  n.loyalty = 20;                                         // wcześniejsze ataki już obniżyły poparcie
   const r = E.sendAttack(s, p.id, n.id, { axe: 300, light: 60 }, 0);
   E.advance(s, r.movement.arrive + 1);
-  ok(n.owner === 'player', 'zwykły atak przejmuje wolną osadę');
+  ok(n.owner === 'player', 'zwykły atak przy niskim poparciu przejmuje wolną osadę');
   ok(!n.garrison, 'przejęta osada nie ma już stałej załogi');
 }
 // 5. Znacznik raid ignorowany dla wioski frakcji

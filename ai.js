@@ -77,7 +77,7 @@
 
     // dowódca podboju
     if (P.nobles && v.buildings.barracks >= C.UNITS.noble.barracks && noblesOf(state, v) === 0 && owned < Math.ceil(P.maxVillages * X) &&
-        E.villageDefense(v) >= homeDefTarget(v, P) * 0.6) {
+        E.villageDefense(v, null, E.upgradesOf(state, v.owner)) >= homeDefTarget(v, P) * 0.6) {
       const ri = E.recruitInfo(state, v, 'noble');
       if (ri.ok && ri.max >= 1) { E.queueRecruit(state, v, 'noble', 1, t); return; }
       if (ri.code === 'resources' && !full && E.rand(state) < 0.5) return; // odkłada surowce na dowódcę
@@ -90,7 +90,7 @@
       if (si.code === 'resources' && !full) return; // odkłada surowce na osadnika
     }
 
-    const def = E.villageDefense(v);
+    const def = E.villageDefense(v, null, E.upgradesOf(state, v.owner));
     const threatened = incomingOn(state, v).length > 0;
     const needDef = def < homeDefTarget(v, P) * (threatened ? 1.5 : 1);
     const pool = Object.keys(C.UNITS).filter(u => {
@@ -126,7 +126,7 @@
         const spare = E.emptyUnits();
         let any = 0;
         // oddaje część obrońców ponad własne minimum
-        const keep = homeDefTarget(h, P) * 0.7, hdef = E.villageDefense(h);
+        const keep = homeDefTarget(h, P) * 0.7, hdef = E.villageDefense(h, null, E.upgradesOf(state, h.owner));
         if (hdef <= keep) continue;
         const frac = Math.min(T().supportShare, (hdef - keep) / hdef);
         Object.keys(C.UNITS).forEach(k => { if (C.UNITS[k].role === 'def') { spare[k] = Math.floor(h.units[k] * frac); any += spare[k]; } });
@@ -216,7 +216,7 @@
     if (E.defenseFrom(left, v.buildings.wall, E.upgradesOf(state, v.owner)) < target0 * 0.5) {
       Object.keys(C.UNITS).forEach(k => { if (C.UNITS[k].role === 'def') send[k] = 0; }); // tylko jednostki ataku
     }
-    const A = E.attackPower(send);
+    const A = E.attackPower(send, E.upgradesOf(state, v.owner));
     // armia zbiera się do sensownej wielkości (rośnie z rozbudową wioski) – zamiast wysyłać garstki co turę
     if (A < P.minPower + E.points(v) * T().powerPerPoint) return;
 
@@ -249,7 +249,7 @@
       w *= 1 + Math.min(2, (target.res.wood + target.res.clay + target.res.iron) / T().lootScale); // łup
       w *= 1 + Math.min(1, A / Math.max(1, Dv) / 6);                                              // łatwy cel
       if (raid) w *= P.raids;
-      else if (target.owner === null) w *= P.neutralBias;
+      else if (target.owner === null) w *= P.neutralBias * (1 + (100 - target.loyalty) / 25); // dobija rozpoczęty podbój
       else {
         if (target.owner === 'player') w *= P.playerBias * D.playerBias;
         if (P.nobles && target.loyalty != null && target.loyalty < 100) w *= 1 + (100 - target.loyalty) / 25; // dobijanie podboju
@@ -262,9 +262,27 @@
     E.sendAttack(state, v.id, best.target.id, send, t, 'attack', { raid: best.raid });
   }
 
+  /* ---------- 0. ulepszenia jednostek (odpowiednik Technologii gracza) ---------- */
+  // Poziom rośnie sam z czasem gry: po C.AI.tech.startAfterMin minutach co minutesPerLevel / DIFFICULTY.aiTech.
+  // Ulubione jednostki frakcji (waga ≥ 1) dostają pełny poziom, pozostałe o 2 niższy. Nigdy nie maleje.
+  const TECH_UNITS = () => C.TECH.nodes.filter(n => n.effect.type === 'unit').map(n => n.effect.unit);
+  function aiTech(state, f, P, t) {
+    const cfg = C.AI.tech, mult = E.diff(state).aiTech || 0;
+    const minutes = (t - state.created) / 60000 - cfg.startAfterMin;
+    if (minutes <= 0 || !mult) return;
+    const L = Math.min(cfg.max, Math.floor(minutes * mult / cfg.minutesPerLevel));
+    if (L < 1) return;
+    f.upgrades = f.upgrades || {};
+    TECH_UNITS().forEach(u => {
+      const lvl = Math.max(0, (P.unitWeights[u] || 0) >= 1 ? L : L - 2);
+      if (lvl > (f.upgrades[u] || 0)) f.upgrades[u] = lvl;
+    });
+  }
+
   function think(state, fid, t) {
     const f = state.factions[fid];
     const P = C.AI.personalities[f.personality];
+    aiTech(state, f, P, t);
     const vs = E.villagesOf(state, fid);
     for (const v of vs) {
       E.tickVillage(state, v, t);

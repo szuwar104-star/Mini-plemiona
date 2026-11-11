@@ -577,3 +577,14 @@ input[type=checkbox], input[type=radio] { accent-color: var(--gold); width: 1.05
 .md-sup { margin: .35rem 0 .6rem; padding: .5rem .6rem; border-radius: 3px; background: rgba(47, 181, 162, .07); box-shadow: inset 3px 0 0 var(--teal, #2fb5a2); }
 .md-sup p { margin: 0 0 .45rem; }
 .md-sup .btn { width: 100%; min-height: 36px; font-size: .85rem; }
+
+/* --- Technologie: gałąź Królestwo (późna gra) --- */
+.tech-branch.tb-realm { --bc: #8a5cc4; }
+.tech-branch.tb-realm > h2::after { content: "późna gra"; margin-left: .6rem; padding: .05rem .45rem; border-radius: 3px; font: 800 .62rem/1.6 var(--font); letter-spacing: .06em; text-transform: uppercase; background: rgba(138, 92, 196, .22); color: #cdb3f0; }
+
+/* --- Ulepszenia frakcji AI w panelu „Frakcje” --- */
+.fx-up { margin-left: .3rem; padding: 0 .35rem; border-radius: 3px; font-size: .72rem; font-weight: 800; background: rgba(194, 70, 60, .18); color: #ffb0a6; }
+.big-chk { font-weight: 800; color: var(--gold-2); margin: .3rem 0 .6rem; }
+#baPlan table.units td.g-res, #baPlan table.units th:last-child { white-space: normal; text-align: left; }
+#baPlan .uchip { font-size: .78rem; margin: .1rem .15rem .1rem 0; }
+#baPlan td.g-name { white-space: nowrap; }

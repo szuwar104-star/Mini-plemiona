@@ -167,3 +167,39 @@ Test: `node tests/raid.js`.
 - Ocalali mogą przekroczyć miejsce na farmie przejętej wioski – wtedy rekrutacja jest tam wstrzymana do rozbudowy Farmy albo odesłania części wojska.
 
 Test: `node tests/conquest.js`.
+
+## Technologia: gałąź Królestwo (późna gra)
+
+Czwarta gałąź drzewka, ok. 3 900 monet za komplet (reszta drzewka ok. 5 700). Efekty działają tylko dla gracza.
+
+| Badanie | Poziomy | Wymaga | Efekt |
+|---|---|---|---|
+| Administracja | 2 | – | +1 miejsce w kolejce budowy i rekrutacji na poziom (z 3/5 do 5/7) |
+| Trakty | 10 | Administracja 1 | marsz Twoich wojsk i osadników −3% czasu na poziom (ataki, wsparcie, powroty) |
+| Lazaret | 10 | Administracja 1 | 3% poległych w Twoich atakach na poziom wraca rannych do domu (maks. 30%) |
+| Fortyfikacje | 10 | Administracja 2 | bonus muru +3% na poziom (mur 10: +70% → +91% obrony) |
+| Dowództwo | 5 | Trakty 3 | Twój Dowódca obniża poparcie o dodatkowe 3 p.p. na poziom |
+| Wiara | 5 | Lazaret 3 | wrodzy Dowódcy obniżają poparcie Twoich wiosek o 8% mniej na poziom |
+
+Raport ataku pokazuje liczbę rannych uratowanych przez Lazaret. Test: `node tests/realm.js`.
+
+## Ulepszenia jednostek AI
+
+Frakcje AI nie kupują badań, ale ich jednostki same zyskują ulepszenia (jak gracz w gałęzi Wojsko: +5% ataku i obrony na poziom). Pierwszy poziom po 30 minutach gry, kolejne co 45 minut × tempo poziomu trudności (`aiTech`: Łatwy 0,5, Normalny 0,8, Trudny 1). Maksimum: poziom 10 (+50%) – na Normalnym po ok. 10 h, na Trudnym po ok. 8 h, na Łatwym po ok. 15 h. Ulubione jednostki frakcji dostają pełny poziom, pozostałe o 2 niższy. Panel „Frakcje” pokazuje najwyższe ulepszenie każdej frakcji (np. „+30%”). Parametry: `AI.tech` i `DIFFICULTY.*.aiTech` w `config.js`. Stare zapisy: AI od razu dostaje poziom odpowiadający czasowi gry.
+
+## Zarządzanie wieloma wioskami
+
+- **Buduj we wszystkich wioskach** (Przegląd): szablon (Gospodarka, Wojsko, Handel, Pełna rozbudowa – `BUILD_TEMPLATES` w `config.js`) albo jeden budynek do wybranego poziomu. Każda wioska kolejkuje tyle, ile zmieści się w kolejce i na ile ją stać, najpierw budynek najdalej od celu. Podgląd pokazuje, co trafi do kolejki w każdej wiosce, i pozwala wioski odznaczyć.
+- **Konwoje** (Przegląd): wybierasz wioskę centralną, próg (domyślnie: wioska z magazynem ponad 80% wysyła nadwyżkę, zostawiając 40%) i częstotliwość (5/15/30 min). Kupcy jadą sami, także podczas nieobecności (gra nadrabia czas), ale nie w pauzie. Opcjonalnie wioska centralna od razu kupuje monety (maks. limitu, najobfitszym surowcem). Wysyłające wioski potrzebują Targowiska. Utrata wioski centralnej wyłącza konwoje. Ustawienia są w zapisie gry.
+
+Test: `node tests/empire.js`.
+
+## Wolne osady: podbój w kilku atakach i samodzielny rozwój
+
+- **Podbój wymaga 2–3 wygranych.** Każda wygrana w trybie Podbój obniża poparcie wolnej osady o 35–50% (`NEUTRAL.dropMin/dropMax`); z Dowódcą podboju dochodzi jego zwykły spadek (25–40%), a dowódca się nie zużywa. Przy 0% osada przechodzi na zwycięzcę. Wygrana bez przejęcia działa jak zwykły atak – ocalali wracają z łupem. Grabież nie rusza poparcia.
+- **Poparcie wraca powoli:** 15 p.p. na godzinę (`NEUTRAL.loyaltyRegenPerMin`), więc kolejne ataki trzeba wysłać w ciągu kilku godzin.
+- **Wolne osady same się rozwijają:** co godzinę gry +1 poziom budynku (najpierw najniższy względem limitu: surowce do 10, Ratusz i Farma do 8, Mur do 6 – `NEUTRAL.growMax`), a ich stała załoga rośnie o 12% na każdy zdobyty poziom (`garrisonPerLevel`). Rośnie też ich produkcja, więc późne grabieże dają więcej, ale są trudniejsze. Panel osady na mapie pokazuje poparcie i „Rozwój: +N poz.”.
+- AI podlega tym samym zasadom i chętniej dobija osady z obniżonym poparciem.
+- Stare zapisy: osady zaczynają rozwój od pierwszego przeliczenia po aktualizacji.
+
+Test: `node tests/neutral.js`.

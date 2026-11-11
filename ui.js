@@ -179,7 +179,7 @@
       '</div><div class="vh-units"><span class="muted">W wiosce</span>' + unitsLine(v.units) + '</div></section>';
 
     if (v.buildings.market > 0) html += '<section class="panel quick"><h2>Targowisko – szybkie akcje</h2><div data-quick="village"></div></section>';
-    html += '<section class="panel"><h2>Kolejka budowy <small>' + v.buildQueue.length + '/' + C.BUILD_QUEUE_MAX + '</small></h2>';
+    html += '<section class="panel"><h2>Kolejka budowy <small>' + v.buildQueue.length + '/' + E.queueMax(v, 'build') + '</small></h2>';
     if (!v.buildQueue.length) html += '<p class="muted">Nic się nie buduje. Wybierz budynek poniżej.</p>';
     else html += '<ul class="queue">' + v.buildQueue.map(e =>
       '<li>' + ico(S.building[e.building]) + '<span class="qname">' + C.BUILDINGS[e.building].name + ' – poziom ' + e.level + '</span>' +
@@ -348,7 +348,7 @@
       html += '</section>';
     }
 
-    html += '<section class="panel"><h2>Kolejka rekrutacji <small>' + v.recruitQueue.length + '/' + C.RECRUIT_QUEUE_MAX + '</small></h2>';
+    html += '<section class="panel"><h2>Kolejka rekrutacji <small>' + v.recruitQueue.length + '/' + E.queueMax(v, 'recruit') + '</small></h2>';
     if (!v.recruitQueue.length) html += '<p class="muted">Koszary są wolne.</p>';
     else html += '<ul class="queue">' + v.recruitQueue.map(e => {
       const end = e.start + e.count * e.per;
@@ -409,6 +409,9 @@
       '<div class="actions left"><button class="btn" data-act="gather-open"' + (own.length > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"') + '>' + ico('merchant') + 'Zbierz / rozdziel surowce</button>' +
       '<button class="btn" data-act="troops-open"' + (own.length > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"') + '>' + ico('spear') + 'Zbierz / rozdziel wojsko</button>' +
       '<button class="btn" data-act="mass-open">' + ico('barracks') + 'Szkol we wszystkich wioskach</button>' +
+      '<button class="btn" data-act="buildall-open">' + ico('hq') + 'Buduj we wszystkich wioskach</button>' +
+      '<button class="btn" data-act="auto-open"' + (own.length > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"') + '>' + ico('merchant') + 'Konwoje' +
+        (s.auto && s.auto.on ? ' <small>(wł.)</small>' : '') + '</button>' +
       '<button class="btn" data-act="tech-open">' + ico('scroll') + 'Technologia</button></div></div>' +
       '<div class="army-kpis ov-kpis">' + E.RES.map(r => '<div class="kpi"><small>' + C.RESOURCES[r].name + ' razem</small><b>' + fmt(total[r]) + '</b><small>+' + Math.round(prod[r]) + ' / min</small></div>').join('') +
       '<div class="kpi"><small>Wojsko w wioskach</small><b>' + fmt(army) + '</b></div>' +
@@ -491,7 +494,8 @@
   }
 
   /* ---------- ekran: TECHNOLOGIA ---------- */
-  const TECH_ICON = { drill: 'barracks', trade: 'market', store: 'hq', agri: 'farm', mint: 'coin', build: 'pick', tools: 'pick', p_wood: 'wood', p_clay: 'clay', p_iron: 'iron', plunder: 'merchant', hide: 'wall' };
+  const TECH_ICON = { drill: 'barracks', trade: 'market', store: 'hq', agri: 'farm', mint: 'coin', build: 'pick', tools: 'pick', p_wood: 'wood', p_clay: 'clay', p_iron: 'iron', plunder: 'merchant', hide: 'wall',
+    admin: 'hq', roads: 'map', medic: 'pop', fort: 'wall', command: 'noble', faith: 'village' };
   function techEffectText(n, lvl, next) {
     const e = n.effect, pc = x => Math.round(x * 1000) / 10;
     const cur = lvl, nxt = next;
@@ -508,6 +512,12 @@
       case 'pop': return 'Miejsce na farmach ' + line(l => '+' + pc(e.per * l) + '%');
       case 'hide': return 'Ukryta część magazynu ' + line(l => '+' + pc(e.per * l) + ' p.p.');
       case 'mint': return 'Limit zakupu monet ' + line(l => '+' + (e.per * l) + '/h na wioskę');
+      case 'queue': return 'Kolejka budowy i rekrutacji ' + line(l => '+' + (e.per * l) + ' miejsce');
+      case 'march': return 'Czas marszu Twoich wojsk ' + line(l => '−' + pc(Math.min(0.5, -e.per * l)) + '%');
+      case 'heal': return 'Ranni wracający z ataków ' + line(l => pc(Math.min(0.3, e.per * l)) + '% poległych');
+      case 'fort': return 'Bonus muru ' + line(l => '+' + pc(e.per * l) + '% (mur 10: +' + Math.round(C.BUILDINGS.wall.bonus[C.MAX_LEVEL] * (1 + e.per * l) * 100) + '% obrony)');
+      case 'command': return 'Spadek poparcia od Twojego Dowódcy ' + line(l => '+' + (e.per * l) + ' p.p.');
+      case 'faith': return 'Spadek poparcia Twoich wiosek ' + line(l => '−' + pc(Math.min(0.4, e.per * l)) + '%');
     }
     return '';
   }
@@ -723,7 +733,8 @@
       html += '<div class="sides"><p><b>Atakujący:</b> ' + flag(s, r.attacker) + ', ' + esc(r.fromName) + ' ' + xy(r.fromX, r.fromY) + '</p>' +
         '<p><b>Obrońca:</b> ' + flag(s, r.defender) + ', ' + esc(r.toName) + ' ' + xy(r.toX, r.toY) + '</p></div>' +
         reportSummary(r, hideDef) + reportUnitsTable(r, hideDef);
-      if (hideDef) html += '<p class="muted">Nikt nie wrócił z bitwy – brak informacji o obrońcach.</p>';
+      if (hideDef && !r.healed) html += '<p class="muted">Nikt nie wrócił z bitwy – brak informacji o obrońcach.</p>';
+      if (r.healed) html += '<p>Lazaret: <b>' + fmt(r.healed) + '</b> rannych wraca do zdrowia zamiast zginąć.</p>';
       html += '<p>Szczęście atakującego: ' + (r.luck > 0 ? '+' : '') + r.luck + '%</p>';
       if (r.killPts) {
         const mine = r.attacker === 'player' ? r.killPts.att : r.defender === 'player' ? r.killPts.def : null;
@@ -851,7 +862,8 @@
       '<dl class="facts"><dt>Właściciel</dt><dd>' + esc(E.ownerName(s, v.owner)) +
       (v.owner && s.factions[v.owner].ai ? ' <span class="muted">(' + C.AI.personalities[s.factions[v.owner].personality].label + ')</span>' : '') + '</dd>' +
       '<dt>Punkty</dt><dd>' + E.points(v) + '</dd>';
-    if (v.owner !== null) html += '<dt>Poparcie</dt><dd>' + Math.floor(v.loyalty) + '%</dd>';
+    html += '<dt>Poparcie</dt><dd>' + Math.floor(v.loyalty) + '%</dd>';
+    if (v.owner === null && v.grown) html += '<dt>Rozwój</dt><dd>+' + v.grown + ' poz. od startu gry</dd>';
     if (v0 && v0.id !== v.id) {
       html += '<dt>Odległość</dt><dd>' + d.toFixed(1) + ' pola od ' + esc(v0.name) + '</dd>' +
         '<dt>Marsz</dt><dd>' + ico('axe') + dur(d * C.UNITS.axe.speed * 1000) + '  ' + ico('light') + dur(d * C.UNITS.light.speed * 1000) +
@@ -879,7 +891,7 @@
       const I = s.intel[v.id];
       html += I ? intelHtml(I) : '<p class="hint-box">' + ico('scout') + 'Nie wiesz, co jest w tej wiosce. Wyślij zwiadowców.</p>';
       html += '<p class="muted">' + (v.owner === null
-        ? 'Atak: wygrana bitwa przejmuje osadę. Grabież: zabierasz surowce, osada zostaje wolna, a jej załoga odradza się w ciągu kilku godzin.'
+        ? 'Atak: każda wygrana obniża poparcie o ' + C.NEUTRAL.dropMin + '–' + C.NEUTRAL.dropMax + '% (z Dowódcą więcej), przy 0% osada jest Twoja. Grabież: tylko surowce, poparcie bez zmian. Wolne osady same się rozwijają, a ich załoga rośnie.'
         : 'Aby przejąć wioskę, pokonaj obrońców z Dowódcą podboju w armii, aż poparcie spadnie do zera.') + '</p>' +
         '<p class="muted tip">Dwuklik na tej wiosce otwiera okno ataku z ' + esc(v0.name) + '.</p>' +
         '<div class="actions"><button class="btn ghost" data-act="spy-open" data-id="' + v.id + '">' + ico('scout') + 'Zwiad</button>' +
@@ -916,7 +928,7 @@
       '<div id="atkSummary" class="summary"></div>' +
       '<p class="muted">' + (target.owner !== null ? 'Dowódca podboju obniża poparcie tylko wtedy, gdy przeżyje zwycięską bitwę.'
         : raid ? 'Wygrana daje łup do udźwigu ocalałych jednostek, a osada zostaje wolna. Jej załoga odradza się po ' + Math.round(C.NEUTRAL.regenPerHour * 100) + '% na godzinę – można wracać.'
-        : 'Wygrana bitwa = przejęcie osady.') + '</p>' +
+        : 'Wygrana obniża poparcie o ' + C.NEUTRAL.dropMin + '–' + C.NEUTRAL.dropMax + '% (z Dowódcą podboju więcej, dowódca się nie zużywa). Przy 0% osada jest Twoja – zwykle po 2–3 wygranych. Poparcie: ' + Math.floor(target.loyalty) + '%.') + '</p>' +
       '<div class="actions"><button class="btn ghost" data-act="close">Anuluj</button><button class="btn danger" data-act="send-attack">' + (raid ? 'Wyślij grabież' : 'Wyślij atak') + '</button></div>';
     return html;
   }
@@ -1119,6 +1131,71 @@
     const first = E.UNITS.find(k => k !== 'settler' && k !== 'noble' && E.villagesOf(s, 'player').some(v => E.recruitInfo(s, v, k).code !== 'locked')) || E.UNITS[0];
     return { unit: first, count: '', max: false, off: {} };
   }
+  /* ---------- budowa we wszystkich wioskach ---------- */
+  function buildAllDefaults() { return { mode: 'tpl', tpl: 'eco', key: 'hq', level: 10, off: {} }; }
+  function buildAllItems(g) { return g.mode === 'tpl' ? C.BUILD_TEMPLATES[g.tpl].items : [[g.key, Math.max(1, Math.min(C.MAX_LEVEL, Number(g.level) || 1))]]; }
+  function buildAllModal() {
+    const g = UI.buildall, tpl = g.mode === 'tpl';
+    return '<h2>' + ico('hq') + 'Budowa we wszystkich wioskach</h2>' +
+      '<p class="muted">Każda wioska kolejkuje tyle budów, ile zmieści się w kolejce i na ile ją stać – najpierw to, co jest najdalej od celu. Kliknij ponownie później, żeby dołożyć kolejne.</p>' +
+      '<div class="seg"><button class="btn' + (tpl ? '' : ' ghost') + '" data-act="ba-mode" data-m="tpl">Szablon</button>' +
+      '<button class="btn' + (tpl ? ' ghost' : '') + '" data-act="ba-mode" data-m="one">Jeden budynek</button></div>' +
+      (tpl ? '<label class="field">Szablon <select data-batpl>' + Object.keys(C.BUILD_TEMPLATES).map(k => '<option value="' + k + '"' + (k === g.tpl ? ' selected' : '') + '>' +
+          C.BUILD_TEMPLATES[k].label + '</option>').join('') + '</select></label><p class="muted seg-note">' + C.BUILD_TEMPLATES[g.tpl].desc + '</p>'
+        : '<div class="gopts"><label class="field">Budynek <select data-bakey>' + E.BUILDINGS.map(k => '<option value="' + k + '"' + (k === g.key ? ' selected' : '') + '>' + C.BUILDINGS[k].name + '</option>').join('') + '</select></label>' +
+          '<label class="field">Do poziomu <input type="number" inputmode="numeric" min="1" max="' + C.MAX_LEVEL + '" step="1" data-balevel value="' + esc(g.level) + '"></label></div>') +
+      '<div id="baPlan"></div>' +
+      '<div class="actions"><button class="btn ghost" data-act="close">Anuluj</button><button class="btn" data-act="buildall-go" id="baGo">Kolejkuj</button></div>';
+  }
+  function updateBuildAllPlan() {
+    const box = $('#baPlan');
+    if (!box || !UI.modal || UI.modal.type !== 'buildall') return;
+    const s = st(), g = UI.buildall, plan = E.planBuildAll(s, buildAllItems(g), s.now, g.off);
+    const cost = { wood: 0, clay: 0, iron: 0 };
+    plan.rows.forEach(r => r.items.forEach(it => E.RES.forEach(k => { cost[k] += it.cost[k]; })));
+    box.innerHTML = '<div class="selbar"><button class="btn ghost" data-act="sel-all" data-w="b" data-on="1">Zaznacz wszystkie</button><button class="btn ghost" data-act="sel-all" data-w="b" data-on="0">Odznacz wszystkie</button></div>' +
+      '<div class="tablewrap"><table class="units gather"><thead><tr><th></th><th>Wioska</th><th>Zakolejkuje</th></tr></thead><tbody>' +
+      plan.rows.map(r => {
+        const v = s.villages[r.villageId];
+        return '<tr class="' + (r.skip && !r.off ? 'skipped' : '') + '"><td class="g-chk"><input type="checkbox" data-bsrc="' + v.id + '"' + (r.off ? '' : ' checked') + '></td>' +
+          '<td class="g-name">' + esc(v.name) + '<small>' + xy(v.x, v.y) + '</small></td>' +
+          '<td class="g-res">' + (r.items.length ? r.items.map(it => '<span class="uchip">' + ico(S.building[it.key]) + C.BUILDINGS[it.key].name + ' ' + it.level + '</span>').join(' ')
+            : '<span class="muted">' + esc(r.skip) + '</span>') + '</td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<div class="summary"><div><span>Budów</span><b>' + plan.total + '</b></div><div><span>Wiosek</span><b>' + plan.rows.filter(r => r.items.length).length + '</b></div>' +
+      (plan.total ? '<div class="wide"><span>Koszt</span><b>' + E.RES.map(r => ico(r) + fmt(cost[r])).join(' ') + '</b></div>' : '') + '</div>';
+    const btn = $('#baGo'); if (btn) { btn.disabled = !plan.total; btn.textContent = plan.total ? 'Kolejkuj (' + plan.total + ')' : 'Kolejkuj'; }
+  }
+
+  /* ---------- konwoje ---------- */
+  function autoDefaults() {
+    const s = st(), a = s.auto || {}, D = C.AUTO.defaults;
+    const hubs = E.villagesOf(s, 'player').filter(v => (v.buildings.market || 0) > 0);
+    return { on: a.on !== undefined ? a.on : true, hub: a.hub || (hubs[0] && hubs[0].id) || (cur() && cur().id),
+      high: a.high || D.high, keep: a.keep !== undefined ? a.keep : D.keep, everyMin: a.everyMin || D.everyMin, coins: a.coins !== undefined ? a.coins : D.coins };
+  }
+  function autoModal() {
+    const s = st(), g = UI.auto, a = s.auto;
+    const own = E.villagesOf(s, 'player').sort((x, y) => x.name.localeCompare(y.name, 'pl'));
+    const hub = s.villages[g.hub];
+    const ago = a && a.last ? Math.round((s.now - a.last.t) / 60000) : null;
+    return '<h2>' + ico('merchant') + 'Konwoje – nadwyżki do wioski centralnej</h2>' +
+      '<p class="muted">Co jakiś czas wioski z prawie pełnym magazynem same wysyłają kupców z nadwyżką do wybranej wioski. Działa też podczas nieobecności (gra nadrabia czas), nie działa w pauzie.</p>' +
+      '<label class="chk big-chk"><input type="checkbox" data-aon' + (g.on ? ' checked' : '') + '>Konwoje włączone</label>' +
+      '<label class="field">Wioska centralna <select data-ahub>' + own.map(v => '<option value="' + v.id + '"' + (v.id === g.hub ? ' selected' : '') + '>' + esc(v.name) + ' ' + xy(v.x, v.y) +
+        ((v.buildings.market || 0) > 0 ? '' : ' – bez Targowiska') + '</option>').join('') + '</select></label>' +
+      '<div class="gopts"><label class="field">Wysyłaj, gdy magazyn ma ponad (%)<input type="number" inputmode="numeric" min="10" max="100" step="5" data-ahigh value="' + esc(g.high) + '"></label>' +
+      '<label class="field">Zostaw w wiosce (% magazynu)<input type="number" inputmode="numeric" min="0" max="90" step="5" data-akeep value="' + esc(g.keep) + '"></label></div>' +
+      '<label class="field">Sprawdzaj co <select data-aevery>' + C.AUTO.everyMin.map(m => '<option value="' + m + '"' + (m === Number(g.everyMin) ? ' selected' : '') + '>' + m + ' min</option>').join('') + '</select></label>' +
+      '<label class="chk"><input type="checkbox" data-acoins' + (g.coins ? ' checked' : '') + '>Kupuj monety w wiosce centralnej (maks. limitu, najobfitszym surowcem)</label>' +
+      (hub && !((hub.buildings.market || 0) > 0) && g.coins ? '<p class="why">Wioska centralna nie ma Targowiska – monet nie kupi. Wysyłające wioski też potrzebują Targowiska (kupcy).</p>' : '') +
+      '<div class="summary"><div><span>Stan</span><b>' + (a && a.on ? 'włączone' : 'wyłączone') + '</b></div>' +
+      (a && a.on && a.next ? '<div><span>Następny przegląd</span><b>' + clock(a.next) + '</b></div>' : '') +
+      (ago !== null ? '<div class="wide"><span>Ostatnio (' + ago + ' min temu)</span><b>' + (a.last.sent ? a.last.sent + ' konwojów, ' + fmt(a.last.total) + ' surowców' : 'nic do wysłania') +
+        (a.last.coins ? ', ' + a.last.coins + ' monet' : '') + '</b></div>' : '') + '</div>' +
+      '<div class="actions"><button class="btn ghost" data-act="close">Anuluj</button><button class="btn" data-act="auto-save">Zapisz</button></div>';
+  }
+
   function massModal() {
     const g = UI.mass;
     return '<h2>' + ico('barracks') + 'Szkolenie we wszystkich wioskach</h2>' +
@@ -1348,6 +1425,8 @@
     else if (UI.modal.type === 'gather') inner = gatherModal();
     else if (UI.modal.type === 'troops') inner = troopsModal();
     else if (UI.modal.type === 'mass') inner = massModal();
+    else if (UI.modal.type === 'buildall') inner = buildAllModal();
+    else if (UI.modal.type === 'auto') inner = autoModal();
     else if (UI.modal.type === 'report') inner = reportModal(s.reports.find(r => r.id === UI.modal.id));
     else if (UI.modal.type === 'menu') inner = menuModal();
     else if (UI.modal.type === 'newgame') inner = newGameModal();
@@ -1363,6 +1442,7 @@
     updateGatherPlan();
     updateTroopsPlan();
     updateMassPlan();
+    updateBuildAllPlan();
     const first = box.querySelector('input:not([disabled]), button');
     if (first && !['attack', 'spy', 'transport', 'settle', 'support', 'gather', 'troops', 'mass'].includes(UI.modal.type)) first.focus({ preventScroll: true });
   }
@@ -1404,7 +1484,9 @@
     html += '<section class="panel"><h2>Ruchy wojsk</h2>' + (mv.length ? '<ul class="mvlist compact">' + mv.slice(0, 8).map(m => movementItem(s, m)).join('') + '</ul>'
       : '<p class="muted">Brak ruchów wojsk.</p>') + '</section>';
     html += '<section class="panel"><h2>Frakcje</h2><ul class="vlist">' + Object.values(s.factions).map(f =>
-      '<li><span class="flag" style="--fc:' + f.color + '"></span>' + esc(f.name) + ' <span class="muted">' + E.villagesOf(s, f.id).length + ' wiosek</span></li>').join('') + '</ul></section>';
+      '<li><span class="flag" style="--fc:' + f.color + '"></span>' + esc(f.name) + ' <span class="muted">' + E.villagesOf(s, f.id).length + ' wiosek</span>' +
+        (f.ai && f.upgrades && Object.keys(f.upgrades).length ? ' <span class="fx-up" title="Najwyższe ulepszenie jednostek frakcji (atak i obrona)">+' +
+          Math.round(Math.max.apply(null, Object.values(f.upgrades)) * C.TECH.unitBonus * 100) + '%</span>' : '') + '</li>').join('') + '</ul></section>';
     el.innerHTML = html;
   }
 
@@ -1801,6 +1883,23 @@
         break;
       }
       case 'troops-open': UI.troops = troopsDefaults(UI.vid || (cur() && cur().id)); openModal('troops'); break;
+      case 'buildall-open': UI.buildall = buildAllDefaults(); openModal('buildall'); break;
+      case 'ba-mode': UI.buildall.mode = b.dataset.m; renderModal(); break;
+      case 'buildall-go': {
+        const g = UI.buildall;
+        const r = G.action(s => E.buildAll(s, buildAllItems(g), s.now, g.off));
+        if (r.ok) { toast('info', 'Zakolejkowano ' + r.queued + ' budów w ' + r.villages + ' wioskach.'); UI.buildall = null; closeModal(); invalidate(); render(); }
+        else toast('bad', r.reason);
+        break;
+      }
+      case 'auto-open': UI.auto = autoDefaults(); openModal('auto'); break;
+      case 'auto-save': {
+        const g = UI.auto;
+        const r = G.action(s => E.setAuto(s, g, s.now));
+        if (r.ok) { toast('info', g.on ? 'Konwoje włączone – pierwszy przegląd za chwilę.' : 'Konwoje wyłączone.'); UI.auto = null; closeModal(); invalidate(); render(); }
+        else toast('bad', r.reason);
+        break;
+      }
       case 'tunits-all': {
         const on = b.dataset.on === '1';
         E.UNITS.forEach(k => { UI.troops.units[k] = on; });
@@ -1809,9 +1908,9 @@
         break;
       }
       case 'sel-all': {
-        const w = b.dataset.w, on = b.dataset.on === '1', O = w === 'g' ? UI.gather : w === 'm' ? UI.mass : UI.troops;
+        const w = b.dataset.w, on = b.dataset.on === '1', O = w === 'g' ? UI.gather : w === 'm' ? UI.mass : w === 'b' ? UI.buildall : UI.troops;
         document.querySelectorAll('[data-' + w + 'src]').forEach(i => { if (on) delete O.off[i.dataset[w + 'src']]; else O.off[i.dataset[w + 'src']] = true; });
-        (w === 'g' ? updateGatherPlan : w === 'm' ? updateMassPlan : updateTroopsPlan)();
+        (w === 'g' ? updateGatherPlan : w === 'm' ? updateMassPlan : w === 'b' ? updateBuildAllPlan : updateTroopsPlan)();
         break;
       }
       case 'troops-mode': UI.troops.mode = b.dataset.m; renderModal(); break;
@@ -1898,6 +1997,16 @@
     else if (t.id === 'atkFrom') { UI.modal.from = t.value; renderModal(); }
     else if (t.hasAttribute && t.hasAttribute('data-from')) { UI.modal.from = t.value; renderModal(); }
     else if (t.hasAttribute && t.hasAttribute('data-munit')) { UI.mass.unit = t.value; renderModal(); }
+    else if (t.hasAttribute && t.hasAttribute('data-batpl')) { UI.buildall.tpl = t.value; renderModal(); }
+    else if (t.hasAttribute && t.hasAttribute('data-bakey')) { UI.buildall.key = t.value; updateBuildAllPlan(); }
+    else if (t.hasAttribute && t.hasAttribute('data-balevel')) { UI.buildall.level = t.value; updateBuildAllPlan(); }
+    else if (t.dataset && t.dataset.bsrc) { if (t.checked) delete UI.buildall.off[t.dataset.bsrc]; else UI.buildall.off[t.dataset.bsrc] = true; updateBuildAllPlan(); }
+    else if (t.hasAttribute && t.hasAttribute('data-aon')) { UI.auto.on = t.checked; }
+    else if (t.hasAttribute && t.hasAttribute('data-ahub')) { UI.auto.hub = t.value; renderModal(); }
+    else if (t.hasAttribute && t.hasAttribute('data-ahigh')) { UI.auto.high = t.value; }
+    else if (t.hasAttribute && t.hasAttribute('data-akeep')) { UI.auto.keep = t.value; }
+    else if (t.hasAttribute && t.hasAttribute('data-aevery')) { UI.auto.everyMin = Number(t.value); }
+    else if (t.hasAttribute && t.hasAttribute('data-acoins')) { UI.auto.coins = t.checked; renderModal(); }
     else if (t.hasAttribute && t.hasAttribute('data-mmax')) { UI.mass.max = t.checked; renderModal(); }
     else if (t.dataset && t.dataset.msrc) { if (t.checked) delete UI.mass.off[t.dataset.msrc]; else UI.mass.off[t.dataset.msrc] = true; updateMassPlan(); }
     else if (t.hasAttribute && t.hasAttribute('data-ttarget')) { UI.troops.target = t.value; UI.troops.off = {}; renderModal(); }

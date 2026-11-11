@@ -18,6 +18,7 @@ function setup(seed) {
   const { s, p } = setup(21);
   const n = Object.values(s.villages).filter(v => v.owner === null).sort((a, b) => E.dist(a, p) - E.dist(b, p))[0];
   n.res = { wood: 500, clay: 500, iron: 500 };
+  n.loyalty = 20;                                         // poparcie już obniżone wcześniejszymi atakami
   const r1 = E.sendAttack(s, p.id, n.id, { axe: 200, light: 40 }, 0);
   const r2 = E.sendAttack(s, p.id, n.id, { axe: 100 }, 30e3); // druga fala, później
   E.advance(s, r1.movement.arrive + 1);
