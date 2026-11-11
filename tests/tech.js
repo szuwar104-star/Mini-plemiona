@@ -159,14 +159,14 @@ E.useDifficulty(nt);
 nf.coins = 1e6;
 ok(['tools', 'p_wood', 'p_clay', 'p_iron', 'u_ram', 'plunder', 'hide'].every(id => E.techNode(id)), 'nowe węzły istnieją w drzewku');
 ok(T.branches.every(b => T.nodes.some(n => n.branch === b.id && !n.req)), 'każda gałąź ma korzeń');
-ok(E.techInfo(nt, 'p_wood').code === 'req', 'Drwalnictwo wymaga Narzędzi poz. 2');
+ok(E.techInfo(nt, 'p_wood').code === 'req', 'Leśnictwo wymaga Narzędzi poz. 2');
 const p0 = E.productionPerMin(nv);
 E.researchTech(nt, 'tools', 0); E.researchTech(nt, 'tools', 0);
 const p1 = E.productionPerMin(nv);
 ok(E.RES.every(k => Math.abs(p1[k] - p0[k] * 1.04) < 1e-9), 'Narzędzia poz. 2: +4% produkcji każdego surowca');
 for (let i = 0; i < 3; i++) E.researchTech(nt, 'p_clay', 0);
 const p2 = E.productionPerMin(nv);
-ok(Math.abs(p2.clay - p0.clay * 1.04 * 1.09) < 1e-9 && Math.abs(p2.wood - p1.wood) < 1e-9, 'Garncarstwo poz. 3: +9% tylko gliny');
+ok(Math.abs(p2.clay - p0.clay * 1.04 * 1.09) < 1e-9 && Math.abs(p2.wood - p1.wood) < 1e-9, 'Ceglarstwo poz. 3: +9% tylko gliny');
 const aiv = Object.values(nt.villages).find(x => x.owner && x.owner !== 'player');
 ok(E.productionPerMin(aiv).wood === C.BUILDINGS.wood.prod[aiv.buildings.wood] * E.diff(nt).aiProd, 'AI nie dostaje bonusu do produkcji');
 // łupy i skrytki
