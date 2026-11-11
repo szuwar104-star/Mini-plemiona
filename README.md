@@ -103,7 +103,7 @@ Menu → „Moc konta” (z licznikiem pokonanych wrogów; skrót: panel „Impe
 
 ## Zapis
 
-Autozapis co 5 s, po każdej akcji i przy zamykaniu karty (synchroniczna kopia w localStorage). Przy starcie wczytywany jest nowszy z dwóch zapisów. Menu → „Pobierz kopię zapisu” / „Wczytaj zapis z pliku”. Zapis ma numer wersji (`SAVE_VERSION` w `config.js`); przy zmianie struktury dopisz migrację w `database.js` (`MIGRATIONS`).
+Autozapis co 5 s, po każdej akcji i przy zamykaniu karty (synchroniczna kopia w localStorage). Przy starcie wczytywany jest nowszy z dwóch zapisów. Menu → „Pobierz kopię zapisu” / „Wczytaj zapis z pliku”. **Pauza**: Menu → „Wstrzymaj grę” albo „Zapisz do pliku i wstrzymaj”. W pauzie czas gry stoi (AI się nie rozwija, nic nie nadrabia się po powrocie), a rozkazy są zablokowane; po wznowieniu (pasek u góry) gra liczy dalej od tego samego momentu. Pauza i łączny czas pauz (`skew`) są w zapisie, więc działają też po wczytaniu pliku na innym urządzeniu. Czas gry = zegar − `skew` (`Engine.gameClock`). Test: `node tests/pause.js`. Zapis ma numer wersji (`SAVE_VERSION` w `config.js`); przy zmianie struktury dopisz migrację w `database.js` (`MIGRATIONS`).
 
 ## Balans i poziomy trudności
 

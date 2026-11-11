@@ -754,3 +754,8 @@ table.gather td small { color: var(--muted); margin-left: .35rem; }
 /* ---------- szkolenie zbiorcze ---------- */
 .rrow { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
 .rrow input[type=number] { flex: 1 1 8rem; min-width: 0; }
+
+/* ---------- pauza ---------- */
+.pausebar { position: sticky; top: var(--top-h); z-index: 29; display: flex; align-items: center; justify-content: center; gap: .75rem; flex-wrap: wrap;
+  padding: .4rem .8rem; background: rgba(232, 182, 76, .16); border-bottom: 1px solid rgba(232, 182, 76, .4); color: var(--gold-2); font-weight: 700; }
+.pausebar[hidden] { display: none; }

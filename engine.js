@@ -1063,6 +1063,23 @@
     return count;
   }
 
+  /* ---------- pauza: zegarek gry zatrzymany, po wznowieniu liczony dalej od tego samego momentu ---------- */
+  // skew = łączny czas spędzony w pauzie; czas gry = czas rzeczywisty - skew.
+  function gameClock(state, real) { return state.paused ? state.now : real - (state.skew || 0); }
+  function pauseGame(state, real) {
+    if (state.paused) return false;
+    advance(state, gameClock(state, real));
+    state.paused = true; state.pausedReal = real;
+    return true;
+  }
+  function resumeGame(state, real) {
+    if (!state.paused) return false;
+    const from = Number(state.pausedReal);
+    state.skew = (state.skew || 0) + (Number.isFinite(from) ? Math.max(0, real - from) : 0);
+    state.paused = false; state.pausedReal = null;
+    return true;
+  }
+
   function hiddenRes(state, v) { return v.owner === 'player' ? Math.floor(storageCap(v) * diff(state).lootProtect) : 0; }
 
   MP.Engine = {
@@ -1071,7 +1088,7 @@
     tileAt, villagesOf, points, unitPoints, armyOf, accountPower, addKills, killsOf, ranking, ownerName, ownerColor,
     newGame, worldOf, winVillages, productionPerMin, storageCap, popCap, popUsed, tickVillage,
     buildInfo, queueBuild, recruitInfo, queueRecruit, recruitPer,
-    travelTime, slowest, sendAttack, sendSpy, advance, nextEvent,
+    travelTime, slowest, sendAttack, sendSpy, advance, nextEvent, gameClock, pauseGame, resumeGame,
     unitsPop, supportRoom, sendSupport, withdrawSupport, defenders, defenseFrom, villageDefense,
     merchantsTotal, merchantsBusy, merchantsFree, merchantTime, sendTransport, planGather, sendGather, planTroops, sendTroops, planRecruitAll, recruitAll, incomingRes, settleCheck, sendSettler
   };

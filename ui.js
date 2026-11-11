@@ -27,12 +27,13 @@
     const m = Math.floor(s / 60); s %= 60;
     return h ? h + ':' + pad(m) + ':' + pad(s) : m + ':' + pad(s);
   }
+  const wall = ts => MP.Game ? MP.Game.wall(ts) : ts;
   function clock(ts) {
-    const d = new Date(ts);
+    const d = new Date(wall(ts));
     return pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
   }
   function dayClock(ts) {
-    const d = new Date(ts), now = new Date();
+    const d = new Date(wall(ts)), now = new Date();
     const same = d.toDateString() === now.toDateString();
     return (same ? '' : pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + ' ') + pad(d.getHours()) + ':' + pad(d.getMinutes());
   }
@@ -440,7 +441,7 @@
     if (!UI.modal || UI.modal.type !== 'report') return;
     const list = filteredReports(st()), i = list.findIndex(r => r.id === UI.modal.id), n = list[i + d];
     if (!n) return;
-    G.action(s => { const r = s.reports.find(x => x.id === n.id); if (r) r.read = true; });
+    G.action(s => { const r = s.reports.find(x => x.id === n.id); if (r) r.read = true; }, { allowPaused: true });
     openModal('report', { id: n.id });
     const dlg = document.querySelector('#modal .dialog');
     if (dlg) dlg.scrollTop = 0;
@@ -493,7 +494,7 @@
   }
   function reportModal(r) {
     const s = st();
-    let html = '<h2>' + reportTitle(s, r) + '</h2><p class="muted">' + new Date(r.time).toLocaleString('pl-PL') + '</p>';
+    let html = '<h2>' + reportTitle(s, r) + '</h2><p class="muted">' + new Date(wall(r.time)).toLocaleString('pl-PL') + '</p>';
     if (r.kind === 'spy' || r.kind === 'spydef') {
       html += '<div class="sides"><p><b>Zwiadowcy:</b> ' + flag(s, r.attacker) + ', ' + esc(r.fromName) + ' ' + xy(r.fromX, r.fromY) + '</p>' +
         '<p><b>Cel:</b> ' + flag(s, r.defender) + ', ' + esc(r.toName) + ' ' + xy(r.toX, r.toY) + '</p></div>' +
@@ -988,8 +989,11 @@
       rankingSection(s) +
       '<section><h3>Poziom trudności</h3>' + diffPicker(s.difficulty, 'set-diff') +
       '<p class="muted seg-note">' + E.diff(s).desc + ' Zmiana działa od razu.</p></section>' +
-      '<section><h3>Zapis gry</h3><p class="muted">Gra zapisuje się sama. Kopia zapasowa przyda się przy zmianie przeglądarki lub urządzenia.</p>' +
-      '<div class="actions left"><button class="btn" data-act="export">Pobierz kopię zapisu (JSON)</button>' +
+      '<section><h3>Zapis gry</h3><p class="muted">Gra zapisuje się sama. Czas płynie także przy zamkniętej grze – AI rozwija się wtedy dalej. ' +
+      'Jeśli chcesz wrócić dokładnie do tego momentu (np. jutro albo na innym urządzeniu), wstrzymaj grę: czas stoi, dopóki jej nie wznowisz.</p>' +
+      '<div class="actions left">' + (s.paused ? '<button class="btn" data-act="resume">Wznów grę</button>' : '<button class="btn" data-act="pause">Wstrzymaj grę</button>') +
+      (s.paused ? '' : '<button class="btn" data-act="export-pause">Zapisz do pliku i wstrzymaj</button>') +
+      '<button class="btn ghost" data-act="export">Pobierz kopię zapisu (JSON)</button>' +
       '<button class="btn ghost" data-act="import">Wczytaj zapis z pliku</button>' +
       '<input type="file" id="importFile" accept=".json,application/json" hidden></div></section>' +
       '<section><h3>Jak grać</h3><ul class="help">' +
@@ -1110,12 +1114,12 @@
   /* ---------- liczniki i paski postępu ---------- */
   // Postęp liczony z bieżącego zegara – pasek ma od razu właściwą szerokość i rośnie płynnie.
   function pct(a, b, now) {
-    now = now == null ? Date.now() : now;
+    now = now == null ? MP.Game.clock() : now;
     const p = b > a ? Math.max(0, Math.min(1, (now - a) / (b - a))) : 1;
     return (p * 100).toFixed(2);
   }
   function updateBars() {
-    const now = Date.now();
+    const now = MP.Game.clock();
     document.querySelectorAll('[data-pe]').forEach(el => { el.style.width = pct(Number(el.dataset.ps), Number(el.dataset.pe), now) + '%'; });
   }
   function updateTimers() {
@@ -1161,6 +1165,7 @@
     if (!s) return;
     renderHeader();
     renderNav();
+    const pb = $('#pausebar'); if (pb) pb.hidden = !s.paused;
     document.querySelectorAll('.screen').forEach(el => { el.hidden = el.id !== 'screen-' + UI.screen; });
     if (UI.screen === 'village') renderVillage();
     else if (UI.screen === 'army') renderArmy();
@@ -1266,14 +1271,14 @@
         break;
       }
       case 'filter': UI.filter = b.dataset.f; render(); break;
-      case 'read-all': G.action(s => { s.reports.forEach(r => { r.read = true; }); }); break;
+      case 'read-all': G.action(s => { s.reports.forEach(r => { r.read = true; }); }, { allowPaused: true }); break;
       case 'clear-reports':
         openModal('confirm', { title: 'Usunąć wszystkie raporty?', text: 'Tej operacji nie można cofnąć.', ok: 'clear-reports-ok', okLabel: 'Usuń raporty' });
         break;
-      case 'clear-reports-ok': G.action(s => { s.reports = []; }); closeModal(); break;
+      case 'clear-reports-ok': G.action(s => { s.reports = []; }, { allowPaused: true }); closeModal(); break;
       case 'report': {
         const id = b.dataset.id;
-        G.action(s => { const r = s.reports.find(x => x.id === id); if (r) r.read = true; });
+        G.action(s => { const r = s.reports.find(x => x.id === id); if (r) r.read = true; }, { allowPaused: true });
         openModal('report', { id });
         break;
       }
@@ -1418,12 +1423,22 @@
         toast('info', 'Pobrano kopię zapisu.');
         break;
       }
+      case 'pause': if (MP.Game.pause()) toast('info', 'Gra wstrzymana – czas nie płynie.'); renderModal(); break;
+      case 'resume': if (MP.Game.resume()) toast('info', 'Gra wznowiona.'); renderModal(); break;
+      case 'export-pause': {
+        MP.Game.pause();
+        const d = new Date();
+        download('mini-plemiona-zapis-' + d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + '.json', MP.DB.serialize(st()));
+        toast('info', 'Gra wstrzymana, zapis pobrany. Po wczytaniu wznów grę przyciskiem u góry.');
+        renderModal();
+        break;
+      }
       case 'import': $('#importFile').click(); break;
       case 'new-game': openModal('newgame', { diff: st().difficulty, world: st().world || C.DEFAULT_WORLD }); break;
       case 'pick-diff': UI.modal.diff = b.dataset.d; renderModal(); break;
       case 'pick-world': UI.modal.world = b.dataset.w; renderModal(); break;
       case 'set-diff':
-        G.action(s => { s.difficulty = b.dataset.d; });
+        G.action(s => { s.difficulty = b.dataset.d; }, { allowPaused: true });
         toast('info', 'Poziom trudności: ' + C.DIFFICULTY[b.dataset.d].label + '.');
         renderModal();
         break;

@@ -1,6 +1,6 @@
 /* =========================================================================
    Mini Plemiona – START GRY, PĘTLA I AUTOZAPIS
-   Pętla co sekundę tylko przesuwa świat do bieżącego czasu (Date.now()).
+   Pętla co sekundę tylko przesuwa świat do bieżącego czasu gry (zegarek minus pauzy).
    Cała logika czasu siedzi w Engine.advance, więc gra liczy się
    poprawnie także po kilku godzinach z zamkniętą aplikacją.
    ========================================================================= */
@@ -16,6 +16,23 @@
     pendingSave: false,
     lastSave: 0,
 
+    // Czas gry: rzeczywisty minus czas spędzony w pauzie (w pauzie stoi w miejscu).
+    clock() { return this.state ? E.gameClock(this.state, Date.now()) : Date.now(); },
+    // Czas z gry -> czas na zegarku (do wyświetlania godzin w raportach).
+    wall(ts) { return ts + (this.state && this.state.skew || 0); },
+    paused() { return !!(this.state && this.state.paused); },
+
+    pause() {
+      if (!this.state || !E.pauseGame(this.state, Date.now())) return false;
+      this.dirty = true; UI().invalidate(); UI().render(); this.save();
+      return true;
+    },
+    resume() {
+      if (!this.state || !E.resumeGame(this.state, Date.now())) return false;
+      this.dirty = true; UI().invalidate(); UI().render(); this.save();
+      return true;
+    },
+
     async init() {
       UI().init();
       let state = null;
@@ -23,12 +40,14 @@
       if (state) {
         await new Promise(r => setTimeout(r, 30)); // pozwól wyświetlić ekran ładowania
         this.state = state;
-        const away = Date.now() - state.now;
+        const away = state.paused ? 0 : this.clock() - state.now;
         const unreadBefore = state.reports.filter(r => !r.read).length;
         this.tick(true);
         const fresh = state.reports.filter(r => !r.read).length - unreadBefore;
         UI().drainNotices(true);
-        if (away > 60000) {
+        if (state.paused) {
+          UI().toast('info', 'Gra jest wstrzymana – czas nie płynie. Wznów ją przyciskiem u góry.');
+        } else if (away > 60000) {
           UI().toast('info', 'Witaj z powrotem! Minęło ' + Math.round(away / 60000) + ' min.' + (fresh > 0 ? ' Nowe raporty: ' + fresh + '.' : ''));
         }
       } else {
@@ -52,7 +71,8 @@
     // Przesuwa świat do teraz. silent = bez renderu (np. przy zamykaniu).
     tick(silent) {
       if (!this.state) return;
-      const n = E.advance(this.state, Date.now());
+      if (this.state.paused) return;
+      const n = E.advance(this.state, this.clock());
       if (n > 0) { this.dirty = true; UI().invalidate(); }
       if (!silent) {
         UI().drainNotices(false);
@@ -61,8 +81,13 @@
     },
 
     // Każda akcja gracza: najpierw aktualizacja świata, potem zmiana, potem zapis.
-    action(fn) {
-      E.advance(this.state, Date.now());
+    // opts.allowPaused: czynność bez wpływu na czas gry (np. oznaczanie raportów) działa też w pauzie.
+    action(fn, opts) {
+      if (this.state.paused && !(opts && opts.allowPaused)) {
+        UI().toast('bad', 'Gra jest wstrzymana. Wznów ją, żeby wydawać rozkazy.');
+        return { ok: false, reason: 'Gra jest wstrzymana' };
+      }
+      if (!this.state.paused) E.advance(this.state, this.clock());
       const result = fn(this.state);
       this.dirty = true;
       UI().invalidate();
@@ -100,7 +125,7 @@
     async importText(text) {
       const parsed = MP.DB.parse(text);
       this.state = parsed.state;
-      E.advance(this.state, Date.now());
+      if (!this.state.paused) E.advance(this.state, this.clock());
       this.state.notices = [];
       const ui = UI().state;
       ui.vid = null; ui.sel = null; ui.recruit = {}; ui.atk = {};
