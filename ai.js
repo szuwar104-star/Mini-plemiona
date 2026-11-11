@@ -14,7 +14,8 @@
    4. Rozrost – osadnicy, dowódcy podboju, dobijanie wiosek z obniżonym
       poparciem.
    5. Ataki – jedna lub dwie wyprawy naraz (osobowość), cele wybierane
-      według siły obrony, odległości, łupu i poparcia.
+      według siły obrony, odległości, łupu i poparcia oraz dyplomacji
+      (pakt = brak ataku, zemsta za ataki, polowanie na lidera; diplomacy.js).
    Wszystkie liczby: C.AI w config.js.
    ========================================================================= */
 (function (root) {
@@ -192,7 +193,7 @@
   function trySpy(state, v, P, t) {
     if (!P.spyChance || v.units.scout < 2 || E.rand(state) >= P.spyChance) return;
     if ((t - state.created) / 60000 < E.diff(state).graceMinutes) return;
-    const targets = E.villagesOf(state, 'player').filter(p => E.dist(v, p) <= P.range);
+    const targets = E.villagesOf(state, 'player').filter(p => E.dist(v, p) <= P.range && !(MP.Diplomacy && MP.Diplomacy.blocked(state, v.owner, 'player', t)));
     if (!targets.length) return;
     const target = targets[Math.floor(E.rand(state) * targets.length)];
     E.sendSpy(state, v.id, target.id, Math.min(v.units.scout, 3), t);
@@ -232,6 +233,9 @@
       const target = state.villages[id];
       if (target.owner === v.owner || busy.has(id)) continue;
       if (target.owner !== null && !canTakeAny) continue;
+      // dyplomacja: pakt = brak ataku; zemsta, lider i sympatia zmieniają atrakcyjność celu
+      const dw = target.owner !== null && MP.Diplomacy ? MP.Diplomacy.targetWeight(state, v.owner, target.owner, t) : 1;
+      if (dw <= 0) continue;
       // limit wiosek osiągnięty: wolne osady już tylko grabi (łup bez przejęcia)
       const raid = target.owner === null && owned >= cap;
       if (raid && !P.raids) continue;
@@ -245,7 +249,7 @@
       const wall = Math.max(0, target.buildings.wall - Math.floor(E.ramCount(send) / C.RAM.fightPerLevel));
       const Dv = E.villageDefense(target, wall, E.upgradesOf(state, target.owner));
       if (A < Dv * P.attackRatio * (target.owner === 'player' ? D.aiCaution : 1)) continue;
-      let w = 1 / (1 + d);
+      let w = dw / (1 + d);
       w *= 1 + Math.min(2, (target.res.wood + target.res.clay + target.res.iron) / T().lootScale); // łup
       w *= 1 + Math.min(1, A / Math.max(1, Dv) / 6);                                              // łatwy cel
       if (raid) w *= P.raids;
@@ -283,6 +287,7 @@
     const f = state.factions[fid];
     const P = C.AI.personalities[f.personality];
     aiTech(state, f, P, t);
+    if (MP.Diplomacy) MP.Diplomacy.tick(state, t);
     const vs = E.villagesOf(state, fid);
     for (const v of vs) {
       E.tickVillage(state, v, t);

@@ -73,6 +73,7 @@ Wolną osadę przejmujesz, wygrywając bitwę. Wioskę frakcji AI – wysyłają
 | `style.css` | wygląd (komputer: panele boczne, telefon: dolny pasek) |
 | `config.js` | **wszystkie parametry balansu** – koszty, czasy, produkcja, jednostki, AI |
 | `engine.js` | stan gry, centralny procesor zdarzeń, ekonomia, walka, podbój |
+| `diplomacy.js` | dyplomacja: nastawienie, pakty o nieagresji, dary, zdrada, lider |
 | `ai.js` | skrypt czterech frakcji AI (agresywna, gospodarcza, obronna, ekspansywna) |
 | `database.js` | zapis IndexedDB + kopia w localStorage, wersjonowanie, eksport/import JSON |
 | `sprites.js` | małe ikony pikselowe (surowce, jednostki, budynki) |
@@ -130,7 +131,7 @@ Edytuj `config.js` i odśwież stronę. Po zmianie plików gry podnieś wersję 
 
 
 
-Zapisy z poprzedniej wersji są automatycznie uzupełniane o Targowisko i nowe jednostki (migracje zapisu v1 → … → v8; stare gry dostają poziom Normalny).
+Zapisy z poprzedniej wersji są automatycznie uzupełniane o Targowisko i nowe jednostki (migracje zapisu v1 → … → v9; stare gry dostają poziom Normalny).
 
 ## Zachowanie AI (wersja 2)
 
@@ -182,6 +183,21 @@ Czwarta gałąź drzewka, ok. 3 900 monet za komplet (reszta drzewka ok. 5 700).
 | Wiara | 5 | Lazaret 3 | wrodzy Dowódcy obniżają poparcie Twoich wiosek o 8% mniej na poziom |
 
 Raport ataku pokazuje liczbę rannych uratowanych przez Lazaret. Test: `node tests/realm.js`.
+
+## Dyplomacja i zachowanie AI (wersja 3)
+
+Moduł `diplomacy.js` (parametry w `DIPLO` i `diplo` każdej osobowości w `config.js`). Menu → Dyplomacja, skrót w Przeglądzie i w panelu obcej wioski na mapie.
+
+- **Nastawienie** (-100 … +100, osobno w każdą stronę) każdej frakcji AI do gracza i do pozostałych frakcji. Startuje od wartości bazowej osobowości (gospodarcza i obronna ufają od razu, agresywna i ekspansywna nie). Rośnie z czasem, gdy nikogo nie atakujesz (w pakcie dwa razy szybciej, do limitu osobowości), a po ataku spada: -12 po wygranej, -5 po przegranej, -30 po podboju (sojusznicy ofiary dodatkowo -6). Potem wraca do bazowego.
+- **Pakt o nieagresji** trwa 6 h, żadna ze stron nie może atakować drugiej (zwiad wolno). Gracz ma do 3 paktów, frakcja AI do 2. Wojsko w marszu, gdy pakt zostaje podpisany, zawraca bez bitwy. Zgoda AI zależy od nastawienia (próg osobowości), reputacji proponującego, zapełnienia paktów i od tego, czy proponujący nie jest „liderem”. Okno Dyplomacja pokazuje, czemu frakcja odmawia i ile brakuje.
+- **Wypowiedzenie**: pakt chroni jeszcze 20 min. Zrywający traci reputację (każdy punkt zniechęca frakcje do paktu z nim, maleje 1 pkt na 8 h), a ofiara -40 nastawienia.
+- **Dary**: 3 000 / 6 000 / 12 000 surowców z aktywnej wioski podnoszą nastawienie o 5 / 10 / 20 (surowce znikają). Kolejny dar dla tej samej frakcji dopiero po 20 min. To kolejny sposób na zagospodarowanie nadwyżek.
+- **Oferty AI**: przychylne frakcje same proponują pakt sąsiadom (także graczowi, oferta wisi 3 h) i przedłużenie, gdy pakt zbliża się do końca. Frakcje zawierają też pakty między sobą (widać je w oknie Dyplomacja przy nazwie frakcji).
+- **Zdrada**: agresywna i ekspansywna frakcja może po godzinie wypowiedzieć pakt wyraźnie słabszemu partnerowi (z wypowiedzeniem, więc gracz ma czas na reakcję).
+- **Lider**: frakcja z 60% celu zwycięstwa (domyślnie 12 z 20 wiosek) nie dostaje paktów, partnerzy AI wypowiadają jej pakty bez utraty reputacji, a wszystkie frakcje chętniej ją atakują. Dotyczy też gracza, więc końcówka gry jest trudniejsza.
+- **AI atakuje mądrzej**: wybór celu uwzględnia pakt (zero ataków), zemstę (im niższe nastawienie, tym chętniej, skala `revenge`), sympatię (mniej chętnie) i lidera (`leaderBias`). AI nie szpieguje partnerów paktu.
+
+Test: `node tests/diplomacy.js` (pakty, blokada, zawracanie wojska, dary, oferty, zdrada, lider, migracja v8 → v9, symulacja 24 h na mapie Dużej). Zapis ma teraz numer wersji 9 (migracja dodaje pustą dyplomację).
 
 ## Ulepszenia jednostek AI
 

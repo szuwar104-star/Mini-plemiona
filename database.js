@@ -133,6 +133,12 @@
       if (pf) { if (typeof pf.coins !== 'number') pf.coins = 0; if (!pf.tech) pf.tech = {}; if (!pf.upgrades) pf.upgrades = {}; }
       s.version = 8;
       return s;
+    },
+    // v8 → v9: dyplomacja (nastawienie frakcji, pakty o nieagresji, oferty)
+    8: s => {
+      s.diplo = { rel: {}, hostile: {}, rep: {}, pacts: [], offers: [], cool: {}, gifts: {}, last: 0, seq: 0 };
+      s.version = 9;
+      return s;
     }
   };
 

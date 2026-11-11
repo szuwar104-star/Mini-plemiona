@@ -891,3 +891,16 @@ html, body { max-width: 100%; overflow-x: clip; }
 .ugrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: .5rem .8rem; }
 .ugrid .chk { min-height: 2.2rem; }
 .ugrid .chk input { flex: 0 0 auto; }
+
+/* ---------- dyplomacja ---------- */
+.dp-list { list-style: none; margin: .4rem 0 0; padding: 0; display: grid; gap: .55rem; }
+.dp-card { padding: .7rem .8rem; background: var(--bg-2); border: 1px solid var(--line-2); border-radius: var(--r-sm); display: grid; gap: .35rem; }
+.dp-top { display: flex; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap; font-weight: 700; }
+.dp-meter { position: relative; display: block; height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--red), var(--surface-3) 50%, var(--green)); }
+.dp-meter i { position: absolute; top: -3px; width: 4px; height: 12px; margin-left: -2px; border-radius: 2px; background: var(--text); box-shadow: 0 0 0 1px var(--bg); }
+.dp-line { font-size: .88rem; }
+.dp-ok { color: var(--green); font-weight: 700; }
+.dp-warn { color: #ff9a92; font-weight: 700; }
+.dp-hint { margin: 0; font-size: .84rem; }
+.dp-gift { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; }
+.dp-gift .btn.sm { padding: .3rem .55rem; font-size: .82rem; }

@@ -1,6 +1,6 @@
 /* Raport zachowania AI bez gracza: node tools/ai-report.js [easy|normal|hard] [godziny] [ziarno]
    Kolumny: wioski, suma poziomów budynków, całe wojsko (z marszami), zapełnienie magazynu i farmy, liczba ataków, osadników, budów i zrekrutowanych jednostek. */
-require('../config.js'); require('../engine.js'); require('../ai.js');
+require('../config.js'); require('../engine.js'); require('../diplomacy.js'); require('../ai.js');
 const E = MP.Engine, C = MP.CONFIG;
 const diff = process.argv[2] || 'normal', hours = +(process.argv[3] || 6), seed = +(process.argv[4] || 1);
 const s = E.newGame(0, seed, diff, 'small');
