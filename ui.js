@@ -391,7 +391,7 @@
     const s = st(), el = $('#screen-overview');
     const own = E.villagesOf(s, 'player').sort((a, b) => a.name.localeCompare(b.name, 'pl'));
     // odświeżanie co 5 s albo przy zmianie struktury – liczniki czasu tykają same
-    const sig = JSON.stringify([own.map(v => [v.id, v.buildQueue.length, v.recruitQueue.length, E.sumUnits(v.units)]), incomingAttacks(s).length, diploOffers(s), UI.vid, Math.floor(s.now / 5000)]);
+    const sig = JSON.stringify([own.map(v => [v.id, v.buildQueue.length, v.recruitQueue.length, E.sumUnits(v.units)]), incomingAttacks(s).length, diploOffers(s), UI.vid, Math.floor(s.now / 5000), (s.factions.player && s.factions.player.stat) || 0]);
     if (UI.sigs.overview === sig) return;
     // Użytkownik właśnie przewija – nie podmieniamy DOM (przerwałoby to przewijanie, także bezwładność na telefonie).
     // Sygnatura zostaje stara, więc przerysowanie nastąpi w najbliższym ticku po zakończeniu przewijania.
@@ -445,10 +445,26 @@
       '<div class="kpi ov-units"><small>Wszystkie jednostki wg rodzaju (wioski, wsparcie, marsz)</small><div class="ov-units-list">' +
         (allTotal ? E.UNITS.filter(k => all[k] > 0).map(k => '<span class="uov" title="' + C.UNITS[k].name + ': ' + fmt(all[k]) + '">' + ico(k) + '<span class="uov-txt"><small>' + C.UNITS[k].name + '</small><b>' + fmt(all[k]) + '</b></span></span>').join('') : '<span class="muted">brak</span>') +
       '</div></div></div></section>' +
+      statsCard(s) +
       '<section class="panel"><div class="tablewrap"><table class="units ov">' +
       '<thead><tr><th>Wioska</th><th>' + ico('wood') + 'Drewno</th><th>' + ico('clay') + 'Glina</th><th>' + ico('iron') + 'Żelazo</th><th>' + ico('pop') + 'Farma</th><th>Budowa</th><th>Rekrutacja</th><th>Wojsko</th><th>Ataki</th></tr></thead>' +
       '<tbody>' + rows + '</tbody></table></div></section>';
     restoreScroll(el, keep);
+  }
+
+  // Karta statystyk gracza: zrabowane i utracone surowce, bitwy, podbite wioski, pokonani wrogowie.
+  function statsCard(s) {
+    const t = E.statsOf(s, 'player');
+    const kpi = (label, val, sub) => '<div class="kpi"><small>' + label + '</small><b>' + val + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</div>';
+    const byRes = o => E.RES.map(r => ico(r) + fmt(o[r])).join(' ');
+    const battles = t.won + t.lostBattles;
+    return '<section class="panel stats-card"><h2>' + ico('sword') + 'Statystyki</h2><div class="army-kpis ov-kpis">' +
+      kpi('Zrabowane surowce', fmt(t.looted.total), byRes(t.looted)) +
+      kpi('Utracone w najazdach', fmt(t.lost.total), byRes(t.lost)) +
+      kpi('Bitwy', fmt(battles), 'wygrane ' + fmt(t.won) + ' · przegrane ' + fmt(t.lostBattles)) +
+      kpi('Zdobyte wioski', fmt(t.conquered)) +
+      kpi('Pokonane jednostki', fmt(t.kills.units), 'pkt: atak ' + fmt(Math.round(t.kills.att)) + ' · obrona ' + fmt(Math.round(t.kills.def))) +
+      '</div></section>';
   }
 
   /* ---------- przewijanie a przerysowania ---------- */

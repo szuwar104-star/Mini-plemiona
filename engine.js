@@ -93,6 +93,26 @@
     const att = f.killsAtt || 0, def = f.killsDef || 0;
     return { att, def, total: att + def, units: f.killUnits || 0 };
   }
+  // Statystyki frakcji: zrabowane i utracone surowce, bitwy, podbite wioski (liczone przy rozstrzyganiu bitew).
+  function bumpStats(state, owner, key, val) {
+    const f = owner !== null && state.factions[owner];
+    if (!f) return;
+    f.stat = f.stat || {};
+    f.stat[key] = (f.stat[key] || 0) + val;
+  }
+  function addLootStat(state, taker, victim, loot) {
+    RES.forEach(r => {
+      if (!(loot[r] > 0)) return;
+      bumpStats(state, taker, 'loot_' + r, loot[r]);
+      bumpStats(state, victim, 'lost_' + r, loot[r]);
+    });
+  }
+  function statsOf(state, owner) {
+    const st = (state.factions[owner] || {}).stat || {};
+    const sum = pre => RES.reduce((a, r) => a + (st[pre + r] || 0), 0);
+    const res = pre => { const o = {}; RES.forEach(r => { o[r] = st[pre + r] || 0; }); o.total = sum(pre); return o; };
+    return { looted: res('loot_'), lost: res('lost_'), won: st.won || 0, lostBattles: st.lostB || 0, conquered: st.conquered || 0, kills: killsOf(state, owner) };
+  }
   // Ranking wszystkich frakcji. Nie zdradza siły wojska AI – tylko wioski, punkty budynków i pokonanych wrogów.
   function ranking(state, sortBy) {
     const rows = Object.values(state.factions).map(f => {
@@ -1231,7 +1251,10 @@
         const take = Math.min(capacity, total);
         RES.forEach(r => { loot[r] = Math.floor(avail[r] * take / total); target.res[r] -= loot[r]; });
       }
+      addLootStat(state, m.owner, defOwner, loot);
     }
+    bumpStats(state, m.owner, attackerWon ? 'won' : 'lostB', 1);
+    bumpStats(state, defOwner, attackerWon ? 'lostB' : 'won', 1);
 
     // Podbój
     let conquered = false;
@@ -1256,7 +1279,7 @@
         if (target.loyalty <= 0) { conquered = true; survivors.noble -= 1; }
       }
     }
-    if (conquered) changeOwner(state, target, m.owner, defOwner, t);
+    if (conquered) { changeOwner(state, target, m.owner, defOwner, t); bumpStats(state, m.owner, 'conquered', 1); }
     if (MP.Diplomacy) MP.Diplomacy.onBattle(state, m.owner, defOwner, attackerWon, conquered, t);
 
     // Zdobywcy zostają w przejętej wiosce; zrabowane surowce też zostają na miejscu.
@@ -1466,7 +1489,7 @@
     RES, UNITS, BUILDINGS, ramCount, diff, useDifficulty, hiddenRes,
     rand, randInt, dist, emptyUnits, cleanUnits, sumUnits, attackPower, defensePower, upgradeMult, upgradesOf,
     exchange, aiExchange, aiExchangeRate, aiExchangeMax, exchangeMax, merchantCap, ramEff, exchangeGet, exchangeRate, exchangeQuick, coinQuick, buyCoinsAll, mintLimit, mintTokens, buyCoins, techInfo, researchTech, techNode, techLevel, techCost, techEffects,
-    tileAt, villagesOf, points, unitPoints, armyOf, accountPower, addKills, killsOf, ranking, ownerName, ownerColor,
+    tileAt, villagesOf, points, unitPoints, armyOf, accountPower, addKills, killsOf, statsOf, ranking, ownerName, ownerColor,
     newGame, worldOf, winVillages, productionPerMin, storageCap, popCap, popMult, popUsed, tickVillage,
     notice, checkWin,
     buildInfo, queueBuild, recruitInfo, queueRecruit, recruitPer,
