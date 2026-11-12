@@ -144,7 +144,8 @@
       case 'wall': {
         const fort = (ups && ups.__fort) || 0;
         return 'Obrona ' + arrow(l => '+' + Math.round(B.bonus[l] * (1 + fort) * 100) + '%') + bonusTag(pctOf(fort), 'badanie Fortyfikacje') +
-          ', mur sam broni siłą ' + arrow(l => B.flat[l]);
+          ', mur sam broni siłą ' + arrow(l => B.flat[l]) +
+          ((ups && ups.__militia) ? ', stała obrona wioski +' + ups.__militia + ' <span class="tb" title="Bonus: badanie Pospolite ruszenie">Pospolite ruszenie</span>' : '');
       }
       case 'market': return 'Wymiana surowców (kurs ' + Math.round(E.exchangeRate() * 100) + '%) i zakup monet. Kupcy: ' + B.merchants[L] + (next ? ' → ' + B.merchants[next] : '') + ', każdy wiezie do ' + fmt(E.merchantCap()) + ' surowców';
       case 'barracks': {
