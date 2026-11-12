@@ -220,6 +220,69 @@
     }
   }
 
+  /* ---------- 5. osadnicy: nowe wioski w pobliżu własnego terytorium ---------- */
+  function settlersTotal(state, vs) {
+    let n = 0;
+    vs.forEach(v => {
+      n += v.units.settler || 0;
+      v.recruitQueue.forEach(e => { if (e.unit === 'settler') n += e.count - e.done; });
+    });
+    state.movements.forEach(m => { if (m.owner === 'player' && (m.type === 'settle' || (m.type === 'return' && m.units.settler > 0))) n += m.units.settler || 1; });
+    return n;
+  }
+  // Najlepsze wolne pole: blisko wioski macierzystej, z dala od cudzych wiosek. Zwraca { x, y } albo null.
+  function findSpot(state, v) {
+    const N = state.map.size, foe = P().settleFoeDist;
+    for (const R of P().settleRanges) {
+      const near = Object.values(state.villages).filter(o => Math.abs(o.x - v.x) <= R + 4 && Math.abs(o.y - v.y) <= R + 4);
+      let best = null;
+      for (let y = Math.max(0, v.y - R); y <= Math.min(N - 1, v.y + R); y++) {
+        for (let x = Math.max(0, v.x - R); x <= Math.min(N - 1, v.x + R); x++) {
+          const d = E.dist(v, { x, y });
+          if (d < 1.5 || d > R || E.settleCheck(state, x, y)) continue;
+          if (state.movements.some(m => m.type === 'settle' && m.x === x && m.y === y)) continue;
+          if (near.some(o => o.owner && o.owner !== 'player' && E.dist(o, { x, y }) < foe)) continue;   // wolne osady (bez właściciela) nie przeszkadzają
+          const crowd = near.filter(o => o.owner && o.owner !== 'player' && E.dist(o, { x, y }) < 4).length;
+          const score = d + crowd * 1.5;
+          if (!best || score < best.score) best = { x, y, score };
+        }
+      }
+      if (best) return best;
+    }
+    return null;
+  }
+  // Wysyła gotowych osadników, a gdy żadnego nie ma w grze – zleca kolejnego. Zwraca { id, cost }: wioska, która odkłada surowce na osadnika.
+  function settleStep(state, p, vs, t, threatened, acts) {
+    const cap = Math.min(p.settleMax > 0 ? p.settleMax : Infinity, E.winVillages(state));
+    for (const v of vs) {
+      while (v.units.settler >= 1) {
+        const spot = findSpot(state, v);
+        if (!spot || !E.sendSettler(state, v.id, spot.x, spot.y, t).ok) break;
+        acts.settled++;
+        note(state, p, t, 'Osadnik z ' + v.name + ' wyrusza na ' + spot.x + ':' + spot.y);
+      }
+    }
+    if (vs.length + settlersTotal(state, vs) >= cap) return null;
+    if (settlersTotal(state, vs) > 0) return null;
+    const U = C.UNITS.settler, ups = E.upgradesOf(state, 'player');
+    let best = null;
+    vs.forEach(v => {
+      if (threatened[v.id] || v.buildings.hq < U.hq || v.buildings.barracks < U.barracks) return;
+      if (E.villageDefense(v, null, ups) < E.points(v) * p.defLevel * P().settleDefMin) return;
+      if (v.recruitQueue.length >= E.queueMax(v, 'recruit')) return;
+      if (E.RES.some(r => U.cost[r] > E.storageCap(v))) return;
+      const ready = Math.min.apply(null, E.RES.map(r => v.res[r] / U.cost[r]));
+      if (!best || ready > best.ready) best = { v, ready };
+    });
+    if (!best || !findSpot(state, best.v)) return null;
+    const ri = E.recruitInfo(state, best.v, 'settler');
+    if (ri.ok && ri.max >= 1 && E.queueRecruit(state, best.v, 'settler', 1, t).ok !== false) {
+      note(state, p, t, 'Szkolenie osadnika w ' + best.v.name);
+      return null;
+    }
+    return { id: best.v.id, cost: U.cost };       // jeszcze nie stać – ta wioska odkłada surowce
+  }
+
   /* ---------- tura bota ---------- */
   function run(state, t) {
     const p = state.pilot;
@@ -228,7 +291,7 @@
     const vs = own(state);
     if (!vs.length) return;
     vs.forEach(v => E.tickVillage(state, v, t));
-    const acts = { built: 0, recruited: 0, support: 0, research: 0, coins: 0, recalled: 0 };
+    const acts = { built: 0, recruited: 0, support: 0, research: 0, coins: 0, recalled: 0, settled: 0 };
     const threatened = {};
 
     defend(state, p, vs, t, acts, threatened);
@@ -236,12 +299,19 @@
     vs.forEach(v => {
       if (p.build && !threatened[v.id]) reserves[v.id] = buildVillage(state, v, p, t, acts);
     });
+    if (p.settle) {
+      const sv = settleStep(state, p, vs, t, threatened, acts);
+      if (sv) {
+        const cur = reserves[sv.id] || { wood: 0, clay: 0, iron: 0 };
+        reserves[sv.id] = { wood: Math.max(cur.wood, sv.cost.wood), clay: Math.max(cur.clay, sv.cost.clay), iron: Math.max(cur.iron, sv.cost.iron) };
+      }
+    }
     if (p.recruit !== 'off') vs.forEach(v => recruitVillage(state, v, p, t, reserves[v.id], !!threatened[v.id], acts));
     if (p.tech) manageTech(state, p, vs, t, acts);
     recall(state, p, t, acts);
 
-    ['built', 'recruited', 'support', 'research', 'coins', 'recalled'].forEach(k => { p.stats[k] = (p.stats[k] || 0) + acts[k]; });
-    p.last = { t, built: acts.built, recruited: acts.recruited, support: acts.support, research: acts.research };
+    ['built', 'recruited', 'support', 'research', 'coins', 'recalled', 'settled'].forEach(k => { p.stats[k] = (p.stats[k] || 0) + acts[k]; });
+    p.last = { t, built: acts.built, recruited: acts.recruited, support: acts.support, research: acts.research, settled: acts.settled };
   }
 
   /* ---------- konfiguracja ---------- */
@@ -253,6 +323,8 @@
     if (cfg.defend !== undefined) o.defend = !!cfg.defend;
     if (cfg.recruit !== undefined && ['defense', 'balanced', 'off'].indexOf(cfg.recruit) >= 0) o.recruit = cfg.recruit;
     if (cfg.convoy !== undefined) o.convoy = !!cfg.convoy;
+    if (cfg.settle !== undefined) o.settle = !!cfg.settle;
+    if (cfg.settleMax !== undefined) { const n = Math.floor(Number(cfg.settleMax)); o.settleMax = n >= 1 && n <= 200 ? n : 0; }
     if (cfg.hub !== undefined) o.hub = cfg.hub || null;
     if (cfg.defLevel !== undefined) { const n = Number(cfg.defLevel); if (n >= 5 && n <= 400) o.defLevel = Math.round(n); }
     return o;
@@ -275,5 +347,5 @@
     return { ok: true };
   }
 
-  MP.Pilot = { run, configure, nextTech };
+  MP.Pilot = { run, configure, nextTech, findSpot };
 })(typeof window !== 'undefined' ? window : globalThis);

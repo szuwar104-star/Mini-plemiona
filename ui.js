@@ -1238,7 +1238,7 @@
     const s = st(), p = s.pilot || {}, D = C.PILOT.defaults;
     return { on: p.on !== undefined ? p.on : true, build: p.build !== undefined ? p.build : D.build, recruit: p.recruit || D.recruit,
       tech: p.tech !== undefined ? p.tech : D.tech, defend: p.defend !== undefined ? p.defend : D.defend, defLevel: p.defLevel || D.defLevel,
-      convoy: !!p.convoy, hub: p.hub || (s.auto && s.auto.hub) || (autoDefaults().hub) };
+      settle: !!p.settle, settleMax: p.settleMax || 0, convoy: !!p.convoy, hub: p.hub || (s.auto && s.auto.hub) || (autoDefaults().hub) };
   }
   function pilotModal() {
     const s = st(), g = UI.pilot, p = s.pilot;
@@ -1258,6 +1258,8 @@
         ([25, 40, 60, 90].indexOf(Number(g.defLevel)) < 0 ? opt(g.defLevel, g.defLevel, 'Własny (' + g.defLevel + ')') : '') + '</select></label>' +
       '<label class="chk"><input type="checkbox" data-pdefend' + (g.defend ? ' checked' : '') + '>Wysyłaj obronę z innych wiosek do atakowanych (po ataku wraca)</label>' +
       '<label class="chk"><input type="checkbox" data-ptech' + (g.tech ? ' checked' : '') + '>Kupuj monety z nadwyżek surowców i badaj Technologię (wymaga Targowiska)</label>' +
+      '<label class="chk"><input type="checkbox" data-pset' + (g.settle ? ' checked' : '') + '>Szkol osadników i zakładaj nowe wioski w pobliżu (jeden osadnik naraz)</label>' +
+      '<label class="field">Maks. liczba wiosek (puste = cel gry: ' + E.winVillages(s) + ')<input type="number" inputmode="numeric" min="1" max="200" placeholder="' + E.winVillages(s) + '" data-psmax value="' + nz(g.settleMax) + '"></label>' +
       '<label class="chk"><input type="checkbox" data-pconv' + (g.convoy ? ' checked' : '') + '>Wysyłaj nadwyżki surowców do stolicy (Konwoje co 15 min)</label>' +
       '<label class="field">Stolica (wioska centralna) <select data-phub>' + E.villagesOf(s, 'player').sort((x, y) => x.name.localeCompare(y.name, 'pl')).map(v =>
         '<option value="' + v.id + '"' + (v.id === g.hub ? ' selected' : '') + '>' + esc(v.name) + ' ' + xy(v.x, v.y) + ((v.buildings.market || 0) > 0 ? '' : ' – bez Targowiska') + '</option>').join('') + '</select></label>' +
@@ -1265,9 +1267,9 @@
       '<div class="summary"><div><span>Stan</span><b>' + (p && p.on ? 'włączony' : 'wyłączony') + '</b></div>' +
       (p && p.on && p.next ? '<div><span>Następna tura bota</span><b>' + clock(p.next) + '</b></div>' : '') +
       (ago !== null ? '<div class="wide"><span>Ostatnia tura (' + ago + ' min temu)</span><b>budowy: ' + p.last.built + ', wojsko: ' + p.last.recruited +
-        ', posiłki: ' + p.last.support + ', badania: ' + p.last.research + '</b></div>' : '') +
+        ', posiłki: ' + p.last.support + ', badania: ' + p.last.research + ', osadnicy: ' + (p.last.settled || 0) + '</b></div>' : '') +
       (p ? '<div class="wide"><span>Łącznie od włączenia</span><b>budowy ' + (stat.built || 0) + ', wojsko ' + fmt(stat.recruited || 0) + ', wysłane posiłki ' + (stat.support || 0) +
-        ', badania ' + (stat.research || 0) + ', monety ' + (stat.coins || 0) + '</b></div>' : '') + '</div>' + log +
+        ', badania ' + (stat.research || 0) + ', monety ' + (stat.coins || 0) + ', nowe osady ' + (stat.settled || 0) + '</b></div>' : '') + '</div>' + log +
       '<div class="actions"><button class="btn ghost" data-act="close">Anuluj</button><button class="btn" data-act="pilot-save">Zapisz</button></div>';
   }
 
@@ -2307,6 +2309,8 @@
     else if (t.hasAttribute && t.hasAttribute('data-prec')) { UI.pilot.recruit = t.value; }
     else if (t.hasAttribute && t.hasAttribute('data-pdef')) { UI.pilot.defLevel = Number(t.value); }
     else if (t.hasAttribute && t.hasAttribute('data-pdefend')) { UI.pilot.defend = t.checked; }
+    else if (t.hasAttribute && t.hasAttribute('data-pset')) { UI.pilot.settle = t.checked; }
+    else if (t.hasAttribute && t.hasAttribute('data-psmax')) { UI.pilot.settleMax = t.value; }
     else if (t.hasAttribute && t.hasAttribute('data-pconv')) { UI.pilot.convoy = t.checked; }
     else if (t.hasAttribute && t.hasAttribute('data-phub')) { UI.pilot.hub = t.value; }
     else if (t.hasAttribute && t.hasAttribute('data-ptech')) { UI.pilot.tech = t.checked; }

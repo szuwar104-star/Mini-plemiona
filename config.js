@@ -258,7 +258,7 @@
     },
     // Autopilot (pilot.js): bot rozwijający Twoje wioski. Czasy w sekundach/minutach CZASU GRY.
     PILOT: {
-      defaults: { on: false, build: true, recruit: 'defense', tech: true, defend: true, defLevel: 40, convoy: false, hub: null },
+      defaults: { on: false, build: true, recruit: 'defense', tech: true, defend: true, defLevel: 40, convoy: false, hub: null, settle: false, settleMax: 0 },
       tickSec: 60,               // co ile sekund bot sprawdza wioski
       alertDelaySec: 1,          // po wykryciu nowego ataku bot działa po tylu sekundach
       buildDepth: 2,             // ile budów trzyma w kolejce każda wioska
@@ -275,6 +275,9 @@
       recallMin: 10,             // po tylu minutach od ostatniego ataku posiłki wracają do domu
       coinFrom: 0.85, coinTo: 0.6, // zakup monet: gdy magazyn > coinFrom, schodzi do coinTo
       logMax: 30,
+      settleRanges: [5, 8],      // w jakim promieniu od wioski macierzystej bot szuka miejsca na osadę (najpierw bliżej)
+      settleDefMin: 0.5,         // osadników szkoli tylko wioska z obroną co najmniej tej części celu
+      settleFoeDist: 2.5,        // nie zakłada osad bliżej niż tyle pól od wioski innej frakcji (wolne osady bez właściciela nie liczą się)
       buildWeights: { hq: 1, wood: 1.1, clay: 1.1, iron: 1.1, farm: 1, barracks: 0.8, market: 0.5, wall: 0.7 },
       techPriority: [['militia', 2], ['tools', 2], ['trade', 1], ['store', 3], ['u_spear', 3], ['u_archer', 3], ['u_guard', 3],
         ['p_wood', 3], ['p_clay', 3], ['p_iron', 3], ['agri', 3], ['build', 3], ['drill', 2], ['militia', 5], ['hide', 3], ['fort', 3],
