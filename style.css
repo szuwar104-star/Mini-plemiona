@@ -922,10 +922,91 @@ html, body { max-width: 100%; overflow-x: clip; }
 .dp-gift { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; }
 .dp-gift .btn.sm { padding: .3rem .55rem; font-size: .82rem; }
 
-/* Autopilot: dziennik ostatnich decyzji bota */
-.plog { list-style: none; margin: .4rem 0 0; padding: 0; display: grid; gap: .25rem; font-size: .86rem; }
-.plog li { padding: .3rem .5rem; background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--r-sm); }
+/* ---------- Autopilot ---------- */
+.dialog.pil { width: min(640px, 100%); padding-top: 1.1rem; }
+.pil-hero { display: flex; align-items: center; gap: .8rem; }
+.pil-badge { flex: 0 0 auto; display: grid; place-items: center; width: 3rem; height: 3rem; border-radius: 14px; background: var(--surface-3); box-shadow: inset 0 0 0 1px var(--line-2); }
+.pil-badge .ico { width: 1.7rem; height: 1.7rem; opacity: .6; }
+.pil-badge.on { background: rgba(79, 178, 107, .16); box-shadow: inset 0 0 0 1px rgba(79, 178, 107, .5), 0 0 18px rgba(79, 178, 107, .18); }
+.pil-badge.on .ico { opacity: 1; }
+.pil-head { flex: 1 1 8rem; min-width: 0; }
+.pil-head h2 { margin: 0; font-size: 1.35rem; }
+.pil-head p { margin: 0; font-size: .85rem; }
+.pil-state { flex: 0 0 auto; display: inline-flex; align-items: center; gap: .4rem; padding: .2rem .7rem; border-radius: 999px; font-size: .78rem; font-weight: 800; background: rgba(255, 255, 255, .07); color: var(--muted); }
+.pil-state i { width: .55rem; height: .55rem; border-radius: 50%; background: var(--faint); }
+.pil-state.on { background: rgba(79, 178, 107, .16); color: #8fdca2; }
+.pil-state.on i { background: var(--green); box-shadow: 0 0 0 0 rgba(79, 178, 107, .6); animation: pilpulse 2s infinite; }
+.pil-state.sm { margin-left: .5rem; padding: .05rem .5rem; font-size: .7rem; vertical-align: middle; }
+@keyframes pilpulse { 70% { box-shadow: 0 0 0 .45rem rgba(79, 178, 107, 0); } 100% { box-shadow: 0 0 0 0 rgba(79, 178, 107, 0); } }
+.pdot { display: inline-block; width: .55rem; height: .55rem; margin-left: .15rem; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green); }
+.pil-meta { display: flex; flex-wrap: wrap; gap: .3rem .9rem; margin: .6rem 0 0; font-size: .8rem; color: var(--muted); }
+.pil-meta b { color: var(--text); }
+.pil-how { margin: .5rem 0 .2rem; font-size: .85rem; }
+.pil-how summary { cursor: pointer; color: var(--muted); font-weight: 700; width: fit-content; }
+.pil-how summary:hover { color: var(--text); }
+.pil-how p { margin: .4rem 0 0; }
+
+.pil-sec { margin-top: 1rem; padding: .7rem .8rem .8rem; background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--r); }
+.pil-sec > h3 { display: flex; align-items: center; gap: .45rem; margin: 0 0 .5rem; color: var(--muted); font-size: .76rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; }
+.pil-sec > h3 .ico { width: 1.15rem; height: 1.15rem; }
+
+/* wiersz opcji: ikona, tekst, przełącznik */
+.dialog .opt { position: relative; display: flex; align-items: center; gap: .7rem; margin: 0; padding: .55rem .5rem; border-radius: var(--r-sm); cursor: pointer; transition: background .12s; }
+.dialog .opt + .opt { border-top: 1px solid var(--line); border-top-left-radius: 0; border-top-right-radius: 0; }
+.dialog .opt:hover { background: rgba(255, 255, 255, .035); }
+.dialog .opt:has(input:focus-visible) { outline: 2px solid var(--gold); outline-offset: -2px; }
+.opt-ico { flex: 0 0 auto; display: grid; place-items: center; width: 2.1rem; height: 2.1rem; border-radius: 9px; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); }
+.opt-ico .ico { width: 1.3rem; height: 1.3rem; }
+.opt-txt { flex: 1 1 auto; min-width: 0; display: grid; gap: .1rem; line-height: 1.3; }
+.opt-txt b { font-size: .92rem; font-weight: 800; color: var(--text); }
+.opt-txt small { font-size: .78rem; font-weight: 600; color: var(--muted); line-height: 1.35; }
+.dialog .opt input[type=checkbox] { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.sw { flex: 0 0 auto; position: relative; width: 2.5rem; height: 1.45rem; border-radius: 999px; background: var(--surface-3); box-shadow: inset 0 0 0 1px var(--line-2); transition: background .15s; }
+.sw::after { content: ""; position: absolute; top: .2rem; left: .2rem; width: 1.05rem; height: 1.05rem; border-radius: 50%; background: #aab6c3; box-shadow: 0 1px 3px rgba(0, 0, 0, .45); transition: transform .15s, background .15s; }
+.opt input:checked ~ .sw { background: var(--green); box-shadow: none; }
+.opt input:checked ~ .sw::after { transform: translateX(1.05rem); background: #fff; }
+.opt:has(input:checked) .opt-ico { background: rgba(79, 178, 107, .14); box-shadow: inset 0 0 0 1px rgba(79, 178, 107, .35); }
+.opt-war:has(input:checked) .opt-ico { background: rgba(229, 83, 75, .16); box-shadow: inset 0 0 0 1px rgba(229, 83, 75, .45); }
+.opt-war input:checked ~ .sw { background: var(--red); }
+.opt-master { margin-top: 1rem; padding: .8rem .8rem; background: var(--surface-2); border: 1px solid var(--line-2); border-radius: var(--r); }
+.opt-master .opt-txt b { font-size: 1.02rem; }
+.opt-master .opt-ico { width: 2.5rem; height: 2.5rem; }
+.opt-master .opt-ico .ico { width: 1.6rem; height: 1.6rem; }
+.dialog .opt-field { cursor: default; flex-wrap: wrap; }
+.opt-field .opt-txt { flex: 1 1 9rem; }
+.opt-field select, .opt-field input[type=number] { flex: 1 1 12rem; min-width: 0; width: 100%; max-width: 100%; }
+.opt-field input[type=number] { flex: 0 0 8.5rem; width: 8.5rem; text-align: right; }
+@media (max-width: 520px) {
+  .pil-hero { flex-wrap: wrap; }
+  .pil-state { margin-left: 3.8rem; }
+  .opt-field select { flex-basis: 100%; }
+}
+
+/* statystyki */
+.pil-cap { margin: .6rem 0 .3rem; font-size: .74rem; font-weight: 800; color: var(--faint); text-transform: uppercase; letter-spacing: .06em; }
+.pil-cap:first-of-type { margin-top: 0; }
+.pil-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(5.2rem, 1fr)); gap: .4rem; }
+.pil-tile { padding: .45rem .55rem; background: rgba(0, 0, 0, .2); border: 1px solid var(--line); border-radius: var(--r-sm); display: grid; gap: .05rem; }
+.pil-tile b { font-size: 1.1rem; font-weight: 800; line-height: 1.15; overflow-wrap: anywhere; }
+.pil-tile small { font-size: .7rem; font-weight: 700; color: var(--muted); }
+.pil-tile.gold b { color: var(--gold-2); }
+.pil-note { display: flex; align-items: center; gap: .6rem; margin: .5rem 0 0; padding: .5rem .65rem; background: rgba(0, 0, 0, .2); border-radius: var(--r-sm); box-shadow: inset 3px 0 0 var(--gold); }
+.pil-note .ico { flex: 0 0 auto; width: 1.5rem; height: 1.5rem; }
+.pil-note small { display: block; color: var(--muted); font-size: .72rem; font-weight: 700; }
+.pil-note b { font-size: .88rem; font-weight: 700; overflow-wrap: anywhere; }
+
+/* dziennik decyzji bota: oś czasu */
+.plog { list-style: none; margin: 0; padding: 0 0 0 .9rem; display: grid; gap: 0; font-size: .86rem; border-left: 2px solid var(--line-2); margin-left: .35rem; }
+.plog li { position: relative; display: grid; grid-template-columns: 4.2rem 1fr; gap: .5rem; padding: .3rem 0 .3rem .1rem; }
+.plog li::before { content: ""; position: absolute; left: calc(-.9rem - 5px); top: .72rem; width: 8px; height: 8px; border-radius: 50%; background: var(--surface-3); box-shadow: 0 0 0 2px var(--bg-2), 0 0 0 3px var(--line-2); }
+.plog li:first-child::before { background: var(--gold); box-shadow: 0 0 0 2px var(--bg-2), 0 0 8px var(--gold); }
+.plog li small { color: var(--faint); font-weight: 700; padding-top: .1rem; }
+.plog li span { overflow-wrap: anywhere; }
+
+/* pasek przycisków przyklejony do dołu okna */
+.pil-actions { position: sticky; bottom: -1.4rem; z-index: 2; margin: 1rem -1.5rem -1.4rem; padding: .8rem 1.5rem 1.1rem; background: linear-gradient(180deg, transparent, var(--surface) 28%); }
 
 /* Bonus z technologii przy statystyce jednostki / efekcie budynku */
 .tb { display: inline-block; margin-left: .25rem; padding: 0 .3rem; border-radius: 3px; font-size: .68rem; font-weight: 800; font-style: normal; background: rgba(110, 190, 120, .18); color: #8fd69a; vertical-align: middle; }
 .u-stats .tb { display: block; margin: .1rem auto 0; width: fit-content; }
+.opt-field select[data-prec] { flex-basis: 100%; }
