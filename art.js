@@ -220,40 +220,60 @@
   }
 
   /* ---------- MAPA: teren (rysowany raz na grę) ---------- */
+  let baseCache = null;
   function terrain(state) {
     const N = state.map.size, W = N * AP, tiles = state.map.tiles;
     const seed = (state.created % 2147483647) | 0;
     const R = rng(seed);
     const cv = canvas(W, W), ctx = cv.getContext('2d'), p = pen(ctx);
-    const img = ctx.createImageData(W, W), d = img.data;
-    const kindMap = new Uint8Array(W * W);   // 0 trawa, 1 las, 2 góry
     const busy = new Uint8Array(W * W);      // drogi i place wiosek
-
-    for (let y = 0; y < W; y++) {
-      for (let x = 0; x < W; x++) {
-        const tx = Math.floor(x / AP), ty = Math.floor(y / AP);
-        let kind = 0, best = 9;
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            const nx = tx + dx, ny = ty + dy;
-            if (nx < 0 || ny < 0 || nx >= N || ny >= N) continue;
-            const t = tiles[ny * N + nx];
-            if (t.terrain === 'plain') continue;
-            const dist = Math.hypot(x - (nx + 0.5) * AP, y - (ny + 0.5) * AP) / AP;
-            const r = (t.terrain === 'forest' ? 0.66 : 0.5) + (noise(x, y, 6, seed + 3) - 0.5) * 0.4;
-            if (dist < r && dist < best) { best = dist; kind = t.terrain === 'forest' ? 1 : 2; }
-          }
+    // Baza terenu (trawa / las / góry) zależy tylko od świata, nie od osad. Kosztuje najwięcej (piksel po pikselu),
+    // więc liczymy ją raz na świat – nowa osada przerysowuje już tylko drogi, place i drzewa.
+    const baseKey = seed + ':' + N + ':' + tiles.map(t => t.terrain[0]).join('');
+    let kindMap;
+    if (baseCache && baseCache.key === baseKey) {
+      kindMap = baseCache.kindMap;
+      ctx.drawImage(baseCache.cv, 0, 0);
+    } else {
+      const img = ctx.createImageData(W, W), d = img.data;
+      kindMap = new Uint8Array(W * W);       // 0 trawa, 1 las, 2 góry
+      // Pole, w którego sąsiedztwie 3×3 są same równiny, jest trawą – pomijamy dla niego szukanie lasu i gór.
+      const rough = new Uint8Array(N * N);
+      for (let ty = 0; ty < N; ty++) for (let tx = 0; tx < N; tx++) {
+        for (let dy = -1; dy <= 1 && !rough[ty * N + tx]; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const nx = tx + dx, ny = ty + dy;
+          if (nx >= 0 && ny >= 0 && nx < N && ny < N && tiles[ny * N + nx].terrain !== 'plain') { rough[ty * N + tx] = 1; break; }
         }
-        kindMap[y * W + x] = kind;
-        const pal = kind === 1 ? FOREST : kind === 2 ? ROCK : GRASS;
-        const n = noise(x, y, 18, seed) * 0.62 + noise(x, y, 6, seed + 11) * 0.38;
-        let lv = Math.floor(n * pal.length + BAYER[(y & 3) * 4 + (x & 3)]);
-        lv = Math.max(0, Math.min(pal.length - 1, lv));
-        const c = pal[lv], i = (y * W + x) * 4;
-        d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255;
       }
+
+      for (let y = 0; y < W; y++) {
+        for (let x = 0; x < W; x++) {
+          const tx = Math.floor(x / AP), ty = Math.floor(y / AP);
+          let kind = 0, best = 9;
+          for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              const nx = tx + dx, ny = ty + dy;
+              if (nx < 0 || ny < 0 || nx >= N || ny >= N) continue;
+              const t = tiles[ny * N + nx];
+              if (t.terrain === 'plain') continue;
+              const dist = Math.hypot(x - (nx + 0.5) * AP, y - (ny + 0.5) * AP) / AP;
+              const r = (t.terrain === 'forest' ? 0.66 : 0.5) + (noise(x, y, 6, seed + 3) - 0.5) * 0.4;
+              if (dist < r && dist < best) { best = dist; kind = t.terrain === 'forest' ? 1 : 2; }
+            }
+          }
+          kindMap[y * W + x] = kind;
+          const pal = kind === 1 ? FOREST : kind === 2 ? ROCK : GRASS;
+          const n = noise(x, y, 18, seed) * 0.62 + noise(x, y, 6, seed + 11) * 0.38;
+          let lv = Math.floor(n * pal.length + BAYER[(y & 3) * 4 + (x & 3)]);
+          lv = Math.max(0, Math.min(pal.length - 1, lv));
+          const c = pal[lv], i = (y * W + x) * 4;
+          d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255;
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+      const bcv = canvas(W, W); bcv.getContext('2d').drawImage(cv, 0, 0);
+      baseCache = { key: baseKey, kindMap, cv: bcv };
     }
-    ctx.putImageData(img, 0, 0);
 
     // Drogi między sąsiednimi osadami
     const vs = Object.values(state.villages);
@@ -327,38 +347,74 @@
   }
 
   /* ---------- MAPA: terytoria frakcji ---------- */
+  // Dla każdego piksela liczy się właściciel najbliższej osady w zasięgu. Zamiast sprawdzać wszystkie osady,
+  // każde pole (tile) ma własną krótką listę osad, które mogą go dosięgnąć (w tej samej kolejności, więc wynik
+  // jest identyczny). Ramka obramowania liczona bez domknięć, na tablicy z marginesem (poza mapą = inny właściciel).
   function territory(state, cv) {
     const N = state.map.size, W = N * AP;
     const ctx = cv.getContext('2d');
     const img = ctx.createImageData(W, W), d = img.data;
     const owners = Object.values(state.villages).filter(v => v.owner !== null);
-    const colors = {};
-    const ownerIdx = new Int16Array(W * W).fill(-1);
     const keys = Object.keys(state.factions);
-    keys.forEach((k, i) => { colors[i] = rgb(state.factions[k].color); });
-    const R2 = (2.35 * AP) * (2.35 * AP);
+    const colors = keys.map(k => rgb(state.factions[k].color));
+    const R = 2.35 * AP, R2 = R * R;
     const cs = owners.map(v => ({ x: (v.x + 0.5) * AP, y: (v.y + 0.5) * AP, o: keys.indexOf(v.owner) }));
-    for (let y = 0; y < W; y += 1) {
-      for (let x = 0; x < W; x += 1) {
-        let best = R2, o = -1;
-        for (const c of cs) {
-          const dx = x - c.x, dy = y - c.y, dd = dx * dx + dy * dy;
-          if (dd < best) { best = dd; o = c.o; }
+    const M = 10, PW = W + 2 * M;            // margines = największy skok wykrywania krawędzi
+    const own = new Int16Array(PW * PW).fill(-2);
+    const near = new Array(N * N);
+    for (let i = 0; i < near.length; i++) near[i] = [];
+    cs.forEach(c => {
+      const x0 = Math.max(0, Math.floor((c.x - R) / AP)), x1 = Math.min(N - 1, Math.floor((c.x + R) / AP));
+      const y0 = Math.max(0, Math.floor((c.y - R) / AP)), y1 = Math.min(N - 1, Math.floor((c.y + R) / AP));
+      for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) near[ty * N + tx].push(c);
+    });
+    const uni = new Int16Array(N * N);       // właściciel całego pola, jeśli jest jeden (-1 = nikt), inaczej -3
+    for (let ty = 0; ty < N; ty++) {
+      for (let tx = 0; tx < N; tx++) {
+        const list = near[ty * N + tx], n = list.length;
+        let lo = 32767, hi = -32768;
+        for (let y = ty * AP, ye = y + AP; y < ye; y++) {
+          const row = (y + M) * PW + M;
+          for (let x = tx * AP, xe = x + AP; x < xe; x++) {
+            let best = R2, o = -1;
+            for (let i = 0; i < n; i++) {
+              const c = list[i], dx = x - c.x, dy = y - c.y, dd = dx * dx + dy * dy;
+              if (dd < best) { best = dd; o = c.o; }
+            }
+            own[row + x] = o;
+            if (o < lo) lo = o;
+            if (o > hi) hi = o;
+          }
         }
-        ownerIdx[y * W + x] = o;
+        uni[ty * N + tx] = lo === hi ? lo : -3;
       }
     }
-    for (let y = 0; y < W; y++) {
-      for (let x = 0; x < W; x++) {
-        const o = ownerIdx[y * W + x];
+    // Pole, którego wszystkie 8 sąsiadów ma tego samego właściciela, nie ma w zasięgu 10 px żadnej krawędzi
+    // (pole ma 28 px), więc dostaje samo wypełnienie bez sprawdzania sąsiadów piksel po pikselu.
+    const inner = (tx, ty) => {
+      const o = uni[ty * N + tx];
+      if (o < 0 || tx < 1 || ty < 1 || tx > N - 2 || ty > N - 2) return false;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (uni[(ty + dy) * N + tx + dx] !== o) return false;
+      return true;
+    };
+    const diff = (j, o, k) => own[j - k] !== o || own[j + k] !== o || own[j - k * PW] !== o || own[j + k * PW] !== o;
+    for (let ty = 0; ty < N; ty++) for (let tx = 0; tx < N; tx++) {
+      if (uni[ty * N + tx] === -1) continue;   // pole poza terytoriami
+      const fast = inner(tx, ty), cf = fast ? colors[uni[ty * N + tx]] : null;
+      for (let y = ty * AP, ye = y + AP; y < ye; y++) {
+      for (let x = tx * AP, xe = x + AP; x < xe; x++) {
+        const j = (y + M) * PW + M + x, o = own[j];
         if (o < 0) continue;
         const i = (y * W + x) * 4, c = colors[o];
-        const diff = k => (x - k < 0 || ownerIdx[y * W + x - k] !== o) || (x + k > W - 1 || ownerIdx[y * W + x + k] !== o) ||
-          (y - k < 0 || ownerIdx[(y - k) * W + x] !== o) || (y + k > W - 1 || ownerIdx[(y + k) * W + x] !== o);
-        const edge = diff(1) || diff(2), glow = !edge && diff(6), band = !edge && !glow && diff(10);
+        if (fast) { d[i] = cf[0]; d[i + 1] = cf[1]; d[i + 2] = cf[2]; d[i + 3] = 85; continue; }
+        const edge = diff(j, o, 1) || diff(j, o, 2);
         // granica: gruba, pełna linia w ciemniejszym kolorze frakcji, od środka pas "poświaty", wnętrze wyraźnie podbarwione
         if (edge) { d[i] = c[0] * .6; d[i + 1] = c[1] * .6; d[i + 2] = c[2] * .6; d[i + 3] = 255; }
-        else { d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = glow ? 170 : band ? 120 : 85; }
+        else {
+          const glow = diff(j, o, 6), band = !glow && diff(j, o, 10);
+          d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = glow ? 170 : band ? 120 : 85;
+        }
+      }
       }
     }
     ctx.clearRect(0, 0, W, W);
