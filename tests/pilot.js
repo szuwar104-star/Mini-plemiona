@@ -286,5 +286,77 @@ function twoVillages() {
   ok(!f.s.movements.some(m => m.type === 'support') && f.A.units.spear === 20, 'bez wrogów w zasięgu nie ma garnizonów');
 }
 
+// 14. Podbój: zwiad -> fale z Dowódcą -> przejęcie wioski frakcji
+{
+  const setup = (units, opts) => {
+    const s = E.newGame(T0, 31, 'normal', 'small');
+    Object.values(s.factions).forEach(f => { if (f.ai) f.nextThink = 1e15; });
+    const A = E.villagesOf(s, 'player')[0];
+    const foe = Object.values(s.villages).filter(v => v.owner && v.owner !== 'player').sort((a, b) => E.dist(a, A) - E.dist(b, A))[0];
+    Object.keys(s.villages).forEach(id => { const o = s.villages[id]; if (o.owner && o.owner !== 'player' && id !== foe.id) o.owner = null; });
+    foe.x = A.x + 5; foe.y = A.y; foe.units = E.emptyUnits(); foe.units.spear = 10; foe.buildings.wall = 0;
+    A.buildings.barracks = 5; A.buildings.farm = 20; A.buildings.storage = 20;
+    A.units = Object.assign(E.emptyUnits(), units);
+    MP.Pilot.configure(s, Object.assign({ on: true, build: false, recruit: 'off', tech: false, defend: false, garrison: false, attack: true }, opts || {}), s.now);
+    return { s, A, foe };
+  };
+  const army = { axe: 500, ram: 12, noble: 2, scout: 5 };
+  const { s, A, foe } = setup(army);
+  E.advance(s, s.now + 2 * MIN);
+  ok(s.pilot.stats.spied >= 1, 'bot najpierw zwiadowuje cel (' + (s.pilot.stats.spied || 0) + ' zwiadów)');
+  ok(s.movements.some(m => m.type === 'spy' || (m.type === 'return' && m.units.scout > 0)) || s.intel[foe.id], 'zwiadowcy wyruszyli');
+  E.advance(s, s.now + 8 * MIN);
+  const atk = s.movements.filter(m => m.type === 'attack' && m.owner === 'player');
+  const rep0 = s.reports.filter(r => r.kind === 'attack' && r.to === foe.id);
+  ok(atk.length + rep0.length >= 1, 'po zwiadzie bot wysyła falę ataku');
+  ok(atk.concat(rep0).length >= 1 && (atk.every(m => m.units.noble === 1 && m.units.axe > 0 && m.units.ram > 0)), 'fala niesie Dowódcę, armię i Tarany');
+  ok(atk.every(m => m.units.spear === 0 && m.units.guard === 0), 'fala nie zabiera obrońców');
+  E.advance(s, s.now + 3 * HOUR);
+  ok(foe.owner === 'player', 'wioska frakcji przejęta po kolejnych falach (właściciel: ' + foe.owner + ', poparcie ' + Math.floor(foe.loyalty) + ')');
+  ok(s.pilot.stats.conquered >= 1 && s.pilot.stats.attacked >= 2, 'statystyki: fale ' + s.pilot.stats.attacked + ', przejęte ' + s.pilot.stats.conquered);
+  ok(E.villagesOf(s, 'player').length >= 2, 'przejęta wioska trafia pod opiekę bota');
+
+  // za słaba armia: bot nie atakuje
+  const w = setup({ axe: 20, noble: 1, scout: 5 });
+  E.advance(w.s, w.s.now + 2 * HOUR);
+  ok(!w.s.reports.some(r => r.kind === 'attack') && !w.s.movements.some(m => m.type === 'attack'), 'za słaba armia – bot czeka');
+  // bez Dowódcy: tylko zwiad, bez ataku
+  const nn = setup({ axe: 500, ram: 12, scout: 5 });
+  E.advance(nn.s, nn.s.now + 2 * HOUR);
+  ok(!nn.s.reports.some(r => r.kind === 'attack'), 'bez Dowódcy bot nie atakuje');
+  // opcja wyłączona
+  const off = setup(army, { attack: false });
+  E.advance(off.s, off.s.now + 2 * HOUR);
+  ok(!off.s.reports.some(r => r.kind === 'attack') && !off.s.movements.some(m => m.type === 'attack'), 'bez opcji bot nie atakuje');
+  // silna obrona celu: bot nie atakuje
+  const st = setup(army); st.foe.units.guard = 400; st.foe.units.spear = 400;
+  E.advance(st.s, st.s.now + 2 * HOUR);
+  ok(!st.s.reports.some(r => r.kind === 'attack'), 'mocno bronionego celu bot nie atakuje (zwiad pokazał obronę)');
+  // pakt o nieagresji chroni cel
+  const pk = setup(army);
+  pk.s.diplomacy = pk.s.diplomacy || {};
+  const bl = MP.Diplomacy.blocked; MP.Diplomacy.blocked = () => true;
+  E.advance(pk.s, pk.s.now + 2 * HOUR);
+  MP.Diplomacy.blocked = bl;
+  ok(!pk.s.reports.some(r => r.kind === 'attack') && pk.foe.owner !== 'player', 'cel z paktem nie jest atakowany');
+}
+// 15. Zbiórka armii: zaplecze przenosi atak i Dowódcę do najsilniejszej wioski
+{
+  const s = E.newGame(T0, 31, 'normal', 'small');
+  Object.values(s.factions).forEach(f => { if (f.ai) f.nextThink = 1e15; });
+  const A = E.villagesOf(s, 'player')[0];
+  A.buildings.farm = 20;
+  Object.values(s.villages).forEach(o => { if (o.owner && o.owner !== 'player') o.owner = null; });   // bez wrogów – tylko zbiórka
+  const B = JSON.parse(JSON.stringify(A));
+  Object.assign(B, { id: 'vgB', name: 'B', x: A.x + 2, y: A.y + 1, buildQueue: [], recruitQueue: [], support: {}, lastTick: s.now });
+  s.villages.vgB = B;
+  A.units = Object.assign(E.emptyUnits(), { axe: 300, scout: 3 });
+  B.units = Object.assign(E.emptyUnits(), { axe: 100, noble: 1, spear: 50, scout: 3 });
+  MP.Pilot.configure(s, { on: true, build: false, recruit: 'off', tech: false, defend: false, garrison: false, attack: true }, s.now);
+  E.advance(s, s.now + 20 * MIN);
+  ok(A.units.axe === 400 && A.units.noble === 1, 'armia i Dowódca zebrane w najsilniejszej wiosce (' + A.units.axe + ' Toporników, ' + A.units.noble + ' Dowódca)');
+  ok(B.units.axe === 0 && B.units.spear === 50, 'obrońcy zostają w domu');
+}
+
 if (fails) { console.error('\nBłędy: ' + fails); process.exit(1); }
 console.log('\nWszystkie testy Autopilota przeszły.');
