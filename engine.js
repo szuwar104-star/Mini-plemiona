@@ -1582,7 +1582,7 @@
     exchange, aiExchange, aiExchangeRate, aiExchangeMax, exchangeMax, merchantCap, ramEff, exchangeGet, exchangeRate, exchangeQuick, coinQuick, buyCoinsAll, mintLimit, mintTokens, buyCoins, techInfo, researchTech, techNode, techLevel, techCost, techEffects,
     tileAt, villagesOf, points, unitPoints, armyOf, accountPower, addKills, killsOf, statsOf, ranking, ownerName, ownerColor,
     newGame, worldOf, winVillages, productionPerMin, storageCap, popCap, popMult, popUsed, tickVillage,
-    notice, checkWin, changeOwner,
+    notice, addReport, newId, checkWin, changeOwner,
     buildInfo, queueBuild, wonderLevel, wonderQueued, wonderVillage, wonderInfo, queueWonder, checkWonder, epochDone, recruitInfo, queueRecruit, recruitPer,
     travelTime, slowest, sendAttack, sendSpy, advance, nextEvent, gameClock, pauseGame, resumeGame,
     unitsPop, supportRoom, sendSupport, withdrawSupport, defenders, defenseFrom, villageDefense, villageDefenseDef,
