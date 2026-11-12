@@ -250,7 +250,7 @@
   /* ---------- 5. ataki ---------- */
   function tryAttack(state, v, P, t, owned, playerAll, press) {
     const out = state.movements.filter(m => m.from === v.id && m.type === 'attack' && m.owner === v.owner).length;
-    if (out >= (P.waves || 1)) return;
+    if (out >= (P.waves || 1) + (press >= 0.5 ? 1 : 0)) return; // pod presją jedna wyprawa więcej
     if (incomingOn(state, v).length) return; // nie wysyła wojska, gdy samo jest atakowane
     // obrońców zostawia tyle, żeby dom nie został pusty
     const send = E.emptyUnits();
@@ -294,7 +294,7 @@
       if (target.owner === null && zone && playerAll.some(pv => E.dist(pv, target) <= zone)) continue;
       if (target.owner === 'player' && (grace || (state.lastHit && t - (state.lastHit[target.id] || -1e15) < cooldown))) continue;
       const d = E.dist(v, target);
-      if (d > P.range) continue;
+      if (d > P.range * (target.owner === 'player' ? 1 + press * C.AI.pressure.rangeBoost : 1)) continue; // pod presją sięga dalej po gracza
       // okres ochronny: osady bliższe graczowi zostają dla niego
       if (grace && target.owner === null && playerAll.some(pv => E.dist(pv, target) < d)) continue;
       E.tickVillage(state, target, t);
