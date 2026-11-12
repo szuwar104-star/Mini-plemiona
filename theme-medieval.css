@@ -661,3 +661,16 @@ input[type=checkbox], input[type=radio] { accent-color: var(--gold); width: 1.05
 .tech-branch.tb-realm2 { --bc: #8a5ea8; }
 .epoch-head { border-top: 3px solid #8a5ea8; }
 .wonder-card { border-top: 3px solid #c9a043; }
+
+/* ---------- ekran Ataki ---------- */
+.threat-head { border-top: 2px solid var(--red); }
+.threat-head.alarm { background: radial-gradient(520px 220px at 0% 0%, rgba(194, 70, 60, .26), transparent 70%), var(--grain), linear-gradient(180deg, var(--surface-2), var(--surface)); }
+.threat-kpis .kpi:nth-child(1) { border-top-color: var(--red); }
+.threat-kpis .kpi:nth-child(2) { border-top-color: var(--copper); }
+.threat-kpis .kpi:nth-child(3) { border-top-color: var(--green); }
+.threat-kpis .kpi:nth-child(4) { border-top-color: var(--steel); }
+.threat { border-left-color: var(--red); }
+.th-head h3 { font-family: var(--serif); }
+.wave { border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(194, 70, 60, .4); }
+.wno { border-radius: 4px; background: linear-gradient(180deg, #c2463c, #8e2a20); box-shadow: inset 0 0 0 1px #17120e; }
+.threat-banner { border-radius: 3px; background: var(--grain), rgba(194, 70, 60, .16); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .4); }
