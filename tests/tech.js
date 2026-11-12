@@ -63,6 +63,7 @@ E.researchTech(st, 'u_spear', 0);
 ok(f.upgrades.spear === 1, 'badanie Pikiniera zapisuje poziom w ulepszeniach plemienia');
 ok(Math.abs(E.attackPower({ spear: 10 }, E.upgradesOf(st, 'player')) - atk0 * 1.05) < 1e-9, 'atak +5% na poziom');
 ok(E.techInfo(st, 'u_guard').code === 'req', 'Tarczownik wymaga Pospolitego ruszenia poz. 2 (nie Pikiniera)');
+ok(E.techNode('u_heavy') && E.techNode('u_heavy').req.id === 'militia' && E.techNode('u_heavy').req.min === 4 && E.techInfo(st, 'u_heavy').code === 'req', 'Ciężka kawaleria wymaga Pospolitego ruszenia poz. 4 (nie innej jednostki)');
 f.coins = 100000;
 for (let i = 0; i < 12; i++) E.researchTech(st, 'u_spear', 0);
 ok(f.upgrades.spear === 10 && E.techInfo(st, 'u_spear').code === 'max', 'poziom maksymalny 10 i dalej zablokowany');
@@ -209,6 +210,9 @@ ok(T.nodes.every(n => T.branches.some(b => b.id === n.branch)), 'każdy węzeł 
   ['u_spear', 'u_archer', 'u_guard'].forEach(id => ok(E.techInfo(g, id).code === 'req', id + ': bez Pospolitego ruszenia zablokowany'));
   E.researchTech(g, 'militia', 0); E.researchTech(g, 'militia', 0);
   ok(['u_spear', 'u_archer', 'u_guard'].every(id => E.techInfo(g, id).ok), 'Pospolite ruszenie 2: wszystkie trzy jednostki obrony badane od razu, w dowolnej kolejności');
+  ok(E.techInfo(g, 'u_heavy').code === 'req', 'Ciężka kawaleria: przy Pospolitym ruszeniu 2 jeszcze zablokowana');
+  E.researchTech(g, 'militia', 0); E.researchTech(g, 'militia', 0);
+  ok(E.techInfo(g, 'u_heavy').ok, 'Ciężka kawaleria: badana od razu przy Pospolitym ruszeniu 4, bez innych jednostek');
   E.researchTech(g, 'u_guard', 0);
   ok(g.factions.player.upgrades.guard === 1 && !g.factions.player.upgrades.spear, 'Tarczownik ulepszony bez Pikiniera');
   for (let i = 0; i < 3; i++) E.researchTech(g, 'drill', 0);

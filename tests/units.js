@@ -85,6 +85,18 @@ v.buildings.barracks = 3; v.res = { wood: 5000, clay: 5000, iron: 5000 };
 ok(E.queueRecruit(s, v, 'guard', 5, 0).ok, 'Tarczownik rekrutuje się w Koszarach 3');
 ok(E.ramCount({ ram: 8 }) === 8, 'ramCount liczy tarany');
 
+/* ---------- Ciężka kawaleria ---------- */
+const HV = C.UNITS.heavy, LI = C.UNITS.light;
+ok(HV && HV.name === 'Ciężka kawaleria' && HV.role === 'def' && HV.barracks === 4 && HV.pop === 4, 'Ciężka kawaleria: jednostka obronna, Koszary 4, 4 miejsca na farmie');
+ok(HV.speed < C.UNITS.guard.speed && HV.speed > LI.speed, 'Ciężka kawaleria: szybsza od piechoty, wolniejsza od lekkiej');
+ok(HV.def / HV.pop > GU.def / GU.pop, 'Ciężka kawaleria: więcej obrony na miejsce w farmie niż Tarczownik (' + (HV.def / HV.pop).toFixed(1) + ' vs ' + (GU.def / GU.pop).toFixed(1) + ')');
+ok(HV.def / total(HV.cost) < GU.def / total(GU.cost), 'Ciężka kawaleria: droższa na punkt obrony niż Tarczownik');
+ok(HV.att <= 40 && HV.att < LI.att / 2, 'Ciężka kawaleria: słaba w ataku');
+v.buildings.barracks = 3;
+ok(E.recruitInfo(s, v, 'heavy').code === 'locked', 'Ciężka kawaleria zablokowana do Koszar 4');
+v.buildings.barracks = 4; v.res = { wood: 5000, clay: 5000, iron: 5000 };
+ok(E.queueRecruit(s, v, 'heavy', 3, 0).ok, 'Ciężka kawaleria rekrutuje się w Koszarach 4');
+
 /* ---------- odporność wczytywania zapisów ---------- */
 const finiteState = st => Object.values(st.villages).every(x => E.UNITS.every(k => Number.isFinite(x.units[k]) && x.units[k] >= 0) &&
   Object.values(x.support).every(u => E.UNITS.every(k => Number.isFinite(u[k]))) &&
@@ -107,7 +119,7 @@ ok(finiteState(m4), 'po migracji v4 gra liczy się bez NaN');
 // (b) zapis w AKTUALNEJ wersji, ale bez jednostki dodanej później (przypadek, który dawał NaN)
 const cur = JSON.parse(JSON.stringify(E.newGame(0, 6, 'normal')));
 const cids = Object.keys(cur.villages);
-Object.values(cur.villages).forEach(x => { delete x.units.archer; });
+Object.values(cur.villages).forEach(x => { delete x.units.archer; delete x.units.heavy; });
 cur.movements.push({ id: 'm2', type: 'attack', owner: 'player', from: cids[0], to: cids[1], units: { spear: 1 }, start: 0, arrive: 1 });
 const m5 = DB.migrate(cur);
 ok(finiteState(m5), 'zapis v' + C.SAVE_VERSION + ' bez Łucznika: brak NaN (liczniki uzupełnione zerami)');
@@ -134,6 +146,13 @@ ok(archers > 0, 'po 12 h AI ma w armiach ' + archers + ' Łuczników');
 let guards = 0;
 Object.values(sim.villages).forEach(x => { if (x.owner && x.owner !== 'player') guards += x.units.guard; });
 ok(guards > 0, 'po 12 h AI ma w armiach ' + guards + ' Tarczowników');
+const sim2 = E.newGame(0, 99, 'hard', 'small');
+Object.values(sim2.villages).forEach(x => { if (x.owner && x.owner !== 'player') { x.buildings.barracks = 5; x.buildings.farm = 20; x.buildings.hq = 20; } });
+E.advance(sim2, 12 * 3600 * 1000);
+let heavies = 0;
+Object.values(sim2.villages).forEach(x => { if (x.owner && x.owner !== 'player') heavies += x.units.heavy; });
+ok(heavies > 0, 'AI z Koszarami 5 szkoli Ciężką kawalerię (' + heavies + ' po 12 h)');
+ok(finiteState(sim2), 'symulacja z Ciężką kawalerią: brak NaN');
 ok(finiteState(sim), 'symulacja 12 h: brak NaN i ujemnych wartości');
 
 console.log(fails ? '\nNIEPOWODZENIE: ' + fails : '\nWszystkie testy jednostek przeszły.');

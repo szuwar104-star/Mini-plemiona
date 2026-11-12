@@ -332,6 +332,18 @@
       // siodło na czapraku
       c.paint(S.rrect(11.4, 11.8, 6.2, 2.8, 1.2), '#4a2a14', 'v', { bev: 0.4 });
     },
+    heavy(c) {
+      // ciężka kawaleria: czarny koń bojowy w stalowej zbroi (bez jeźdźca, jak lekka)
+      DRAW.light(c, { coat: '#26232b', coatD: '#141217', mane: '#0c0b0f', cloth: '#7a1f2b' });
+      // napierśnik i osłona szyi
+      c.paint(S.poly([[19.4, 11.6], [24, 9.2], [26, 14], [24.2, 20.6], [19.6, 21.4]]), COL.steel, 'd', { bev: 0.7 });
+      c.flat(S.line(21.4, 11, 22.2, 20.4, 0.7), COL.steelD);
+      c.flat(S.line(19.8, 15.6, 25.2, 14.6, 0.7), COL.steelD);
+      // osłona zadu (kropierz)
+      c.paint(S.poly([[5.6, 13.4], [10.2, 13.2], [10, 21.4], [5.2, 20.4]]), COL.steel, 'd', { bev: 0.6 });
+      c.flat(S.line(5.8, 17, 10, 17.2, 0.6), COL.steelD);
+      c.flat(S.rect(5.2, 20, 5, 0.9), COL.gold);
+    },
     scout(c) {
       DRAW.light(c, { coat: '#eeece6', coatD: '#b9bcc6', mane: '#8d95a6', cloth: '#3f6cc4', scout: true });
     },

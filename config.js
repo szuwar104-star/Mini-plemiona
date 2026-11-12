@@ -220,6 +220,7 @@
         { id: 'u_spear', branch: 'def', name: 'Pikinier', desc: 'Atak i obrona Pikiniera.', max: 10, base: 10, factor: 1.25, req: { id: 'militia', min: 1 }, effect: { type: 'unit', unit: 'spear' } },
         { id: 'u_archer', branch: 'def', name: 'Łucznik', desc: 'Atak i obrona Łucznika.', max: 10, base: 10, factor: 1.25, req: { id: 'militia', min: 1 }, effect: { type: 'unit', unit: 'archer' } },
         { id: 'u_guard', branch: 'def', name: 'Tarczownik', desc: 'Atak i obrona Tarczownika.', max: 10, base: 10, factor: 1.25, req: { id: 'militia', min: 2 }, effect: { type: 'unit', unit: 'guard' } },
+        { id: 'u_heavy', branch: 'def', name: 'Ciężka kawaleria', desc: 'Atak i obrona Ciężkiej kawalerii.', max: 10, base: 14, factor: 1.25, req: { id: 'militia', min: 4 }, effect: { type: 'unit', unit: 'heavy' } },
         { id: 'hide', branch: 'def', name: 'Skrytki', desc: 'Większa część magazynu ukryta przed łupieżcami.', max: 5, base: 14, factor: 1.3, req: { id: 'militia', min: 3 }, effect: { type: 'hide', per: 0.03 } },
         { id: 'fort', branch: 'def', name: 'Fortyfikacje', desc: 'Mocniejszy bonus muru w Twoich wioskach.', max: 10, base: 25, factor: 1.27, req: { id: 'militia', min: 5 }, effect: { type: 'fort', per: 0.03 } },
         // --- Gospodarka ---
@@ -291,8 +292,8 @@
       buildWeights: { hq: 1, wood: 1.1, clay: 1.1, iron: 1.1, farm: 1, barracks: 0.8, market: 0.5, wall: 0.7 },
       techPriority: [['militia', 2], ['tools', 2], ['trade', 1], ['store', 3], ['u_spear', 3], ['u_archer', 3], ['u_guard', 3],
         ['p_wood', 3], ['p_clay', 3], ['p_iron', 3], ['agri', 3], ['build', 3], ['drill', 2], ['militia', 5], ['hide', 3], ['fort', 3],
-        ['u_spear', 6], ['u_archer', 6], ['u_guard', 6], ['tools', 5], ['store', 6], ['agri', 6], ['build', 6],
-        ['p_wood', 6], ['p_clay', 6], ['p_iron', 6], ['fort', 6], ['hide', 5], ['mint', 3], ['caravan', 2], ['admin', 2]]
+        ['u_spear', 6], ['u_archer', 6], ['u_guard', 6], ['u_heavy', 3], ['tools', 5], ['store', 6], ['agri', 6], ['build', 6],
+        ['p_wood', 6], ['p_clay', 6], ['p_iron', 6], ['fort', 6], ['u_heavy', 6], ['hide', 5], ['mint', 3], ['caravan', 2], ['admin', 2]]
     },
 
     // Konwoje (automatyczne odsyłanie nadwyżek do wioski centralnej)
@@ -359,6 +360,11 @@
         name: 'Lekka kawaleria', desc: 'Szybka i groźna, dużo zabiera łupów.',
         cost: { wood: 100, clay: 90, iron: 170 }, time: 16,
         att: 120, def: 28, speed: 7, pop: 3, carry: 80, barracks: 3
+      },
+      heavy: {
+        name: 'Ciężka kawaleria', desc: 'Czarny rumak i pełna zbroja płytowa. Najmocniejsza obrona w grze, a do tego szybka – ale kosztuje fortunę i zajmuje dużo miejsca na farmie. Odblokowuje się w Koszarach 4.',
+        cost: { wood: 220, clay: 190, iron: 380 }, time: 24,
+        att: 35, def: 210, speed: 9, pop: 4, carry: 40, barracks: 4, role: 'def'
       },
       ram: {
         name: 'Taran', desc: 'Kruszy mur obronny wroga. Wolny i słaby w walce.',
@@ -487,7 +493,7 @@
           // betray = szansa na minutę na zdradę słabszego partnera; revenge = skala zemsty; leaderBias = zapał do atakowania lidera
           diplo: { baseline: -10, cap: 25, warm: 1.5, heal: 3, minAttitude: 5, repLimit: 3, offerChance: 0.004, betray: 0.006, revenge: 30, leaderBias: 0.5 },
           buildWeights: { hq: 1, wood: 1, clay: 1, iron: 1.2, farm: 1.2, barracks: 1.5, market: 0.4, wall: 0.6 },
-          unitWeights: { spear: 1, axe: 4, scout: 0.3, light: 3, ram: 0.5, archer: 0.5, guard: 0.4 },
+          unitWeights: { spear: 1, axe: 4, scout: 0.3, light: 3, ram: 0.5, archer: 0.5, guard: 0.4, heavy: 0.2 },
           recruitShare: 0.9, attackChance: 0.6, attackRatio: 1.3, keepHome: 0.2,
           minPower: 250, range: 8, targets: 'any', anyAfterMin: 0,
           neutralBias: 1, playerBias: 1.6, nobles: true, maxVillages: 12, settle: false, spyChance: 0.15,
@@ -500,7 +506,7 @@
           // betray = szansa na minutę na zdradę słabszego partnera; revenge = skala zemsty; leaderBias = zapał do atakowania lidera
           diplo: { baseline: 10, cap: 60, warm: 3, heal: 5, minAttitude: -5, repLimit: 2, offerChance: 0.02, betray: 0, revenge: 60, leaderBias: 1 },
           buildWeights: { hq: 1.3, wood: 1.5, clay: 1.5, iron: 1.4, farm: 1, barracks: 0.7, market: 0.6, wall: 0.8 },
-          unitWeights: { spear: 2, axe: 1, scout: 0.2, light: 1, ram: 0.1, archer: 2, guard: 1.5 },
+          unitWeights: { spear: 2, axe: 1, scout: 0.2, light: 1, ram: 0.1, archer: 2, guard: 1.5, heavy: 1 },
           recruitShare: 0.65, attackChance: 0.25, attackRatio: 2.0, keepHome: 0.5,
           minPower: 300, range: 6, targets: 'neutral', anyAfterMin: 30,
           neutralBias: 2, playerBias: 0.8, nobles: true, maxVillages: 8, settleMax: 12, settle: true, spyChance: 0.05,
@@ -513,7 +519,7 @@
           // betray = szansa na minutę na zdradę słabszego partnera; revenge = skala zemsty; leaderBias = zapał do atakowania lidera
           diplo: { baseline: 5, cap: 60, warm: 2.5, heal: 4, minAttitude: 0, repLimit: 2, offerChance: 0.015, betray: 0, revenge: 50, leaderBias: 0.8 },
           buildWeights: { hq: 1.2, wood: 1.2, clay: 1.2, iron: 1, farm: 1.4, barracks: 1, market: 0.4, wall: 1.4 },
-          unitWeights: { spear: 5, axe: 1, scout: 0.5, light: 0.5, ram: 0, archer: 4, guard: 5 },
+          unitWeights: { spear: 5, axe: 1, scout: 0.5, light: 0.5, ram: 0, archer: 4, guard: 5, heavy: 3 },
           recruitShare: 0.75, attackChance: 0.2, attackRatio: 2.5, keepHome: 0.8,
           minPower: 300, range: 5, targets: 'neutral', anyAfterMin: 45,
           neutralBias: 2, playerBias: 0.6, nobles: false, maxVillages: 6, settleMax: 7, settle: true, spyChance: 0.05,
@@ -526,7 +532,7 @@
           // betray = szansa na minutę na zdradę słabszego partnera; revenge = skala zemsty; leaderBias = zapał do atakowania lidera
           diplo: { baseline: -5, cap: 40, warm: 2, heal: 3, minAttitude: 10, repLimit: 3, offerChance: 0.006, betray: 0.004, revenge: 35, leaderBias: 0.7 },
           buildWeights: { hq: 1.2, wood: 1.1, clay: 1.1, iron: 1.1, farm: 1.2, barracks: 1.3, market: 0.4, wall: 0.6 },
-          unitWeights: { spear: 1, axe: 3, scout: 0.3, light: 2, ram: 0.3, archer: 0.5, guard: 0.4 },
+          unitWeights: { spear: 1, axe: 3, scout: 0.3, light: 2, ram: 0.3, archer: 0.5, guard: 0.4, heavy: 0.2 },
           recruitShare: 0.85, attackChance: 0.5, attackRatio: 1.5, keepHome: 0.3,
           minPower: 200, range: 9, targets: 'any', anyAfterMin: 0,
           neutralBias: 2.5, playerBias: 1, nobles: true, maxVillages: 13, settleMax: 17, settle: true, spyChance: 0.1,
