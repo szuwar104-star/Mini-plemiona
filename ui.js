@@ -1267,7 +1267,7 @@
   function pilotDefaults() {
     const s = st(), p = s.pilot || {}, D = C.PILOT.defaults;
     return { on: p.on !== undefined ? p.on : true, build: p.build !== undefined ? p.build : D.build, recruit: p.recruit || D.recruit,
-      tech: p.tech !== undefined ? p.tech : D.tech, defend: p.defend !== undefined ? p.defend : D.defend, garrison: p.garrison !== undefined ? p.garrison : D.garrison, defLevel: p.defLevel || D.defLevel,
+      tech: p.tech !== undefined ? p.tech : D.tech, defend: p.defend !== undefined ? p.defend : D.defend, garrison: p.garrison !== undefined ? p.garrison : D.garrison, supply: p.supply !== undefined ? p.supply : D.supply, defLevel: p.defLevel || D.defLevel,
       settle: !!p.settle, settleMax: p.settleMax || 0, convoy: !!p.convoy, hub: p.hub || (s.auto && s.auto.hub) || (autoDefaults().hub) };
   }
   function pilotModal() {
@@ -1288,6 +1288,7 @@
         ([25, 40, 60, 90].indexOf(Number(g.defLevel)) < 0 ? opt(g.defLevel, g.defLevel, 'Własny (' + g.defLevel + ')') : '') + '</select></label>' +
       '<label class="chk"><input type="checkbox" data-pdefend' + (g.defend ? ' checked' : '') + '>Wysyłaj obronę z innych wiosek do atakowanych (po ataku wraca)</label>' +
       '<label class="chk"><input type="checkbox" data-pgar' + (g.garrison ? ' checked' : '') + '>Stałe garnizony: wioski blisko wrogów mają więcej obrony (zaplecze przenosi tam nadwyżkę wojska)</label>' +
+      '<label class="chk"><input type="checkbox" data-psup' + (g.supply ? ' checked' : '') + '>Zasilaj surowcami wioski z pustą kolejką budowy (bogatsze wioski wysyłają brakujące surowce; wymaga Targowiska)</label>' +
       '<label class="chk"><input type="checkbox" data-ptech' + (g.tech ? ' checked' : '') + '>Kupuj monety z nadwyżek surowców i badaj Technologię (wymaga Targowiska)</label>' +
       '<label class="chk"><input type="checkbox" data-pset' + (g.settle ? ' checked' : '') + '>Szkol osadników i zakładaj nowe wioski w pobliżu (jeden osadnik naraz)</label>' +
       '<label class="field">Maks. liczba wiosek (puste = bez limitu)<input type="number" inputmode="numeric" min="1" max="200" placeholder="bez limitu" data-psmax value="' + nz(g.settleMax) + '"></label>' +
@@ -1300,7 +1301,7 @@
       (ago !== null ? '<div class="wide"><span>Ostatnia tura (' + ago + ' min temu)</span><b>budowy: ' + p.last.built + ', wojsko: ' + p.last.recruited +
         ', posiłki: ' + p.last.support + ', badania: ' + p.last.research + ', osadnicy: ' + (p.last.settled || 0) + '</b></div>' : '') +
       (p ? '<div class="wide"><span>Łącznie od włączenia</span><b>budowy ' + (stat.built || 0) + ', wojsko ' + fmt(stat.recruited || 0) + ', wysłane posiłki ' + (stat.support || 0) +
-        ', badania ' + (stat.research || 0) + ', monety ' + (stat.coins || 0) + ', nowe osady ' + (stat.settled || 0) + '</b></div>' : '') + '</div>' + log +
+        ', zasilone surowce ' + fmt(stat.supplied || 0) + ', badania ' + (stat.research || 0) + ', monety ' + (stat.coins || 0) + ', nowe osady ' + (stat.settled || 0) + '</b></div>' : '') + '</div>' + log +
       '<div class="actions"><button class="btn ghost" data-act="close">Anuluj</button><button class="btn" data-act="pilot-save">Zapisz</button></div>';
   }
 
@@ -2356,6 +2357,7 @@
     else if (t.hasAttribute && t.hasAttribute('data-pdef')) { UI.pilot.defLevel = Number(t.value); }
     else if (t.hasAttribute && t.hasAttribute('data-pdefend')) { UI.pilot.defend = t.checked; }
     else if (t.hasAttribute && t.hasAttribute('data-pgar')) { UI.pilot.garrison = t.checked; }
+    else if (t.hasAttribute && t.hasAttribute('data-psup')) { UI.pilot.supply = t.checked; }
     else if (t.hasAttribute && t.hasAttribute('data-pset')) { UI.pilot.settle = t.checked; }
     else if (t.hasAttribute && t.hasAttribute('data-psmax')) { UI.pilot.settleMax = t.value; }
     else if (t.hasAttribute && t.hasAttribute('data-pconv')) { UI.pilot.convoy = t.checked; }

@@ -170,6 +170,58 @@
     return saving;
   }
 
+  /* ---------- 2b. zasilanie wiosek z pustą kolejką budowy ---------- */
+  // Wioska, której kolejka budowy stoi pusta (bot nie ma z czego zapłacić za następny budynek), dostaje brakujące surowce
+  // od wiosek, które mają je ponad własną rezerwę. Najbliższe wioski oddają pierwsze; liczą się surowce już jadące.
+  function supply(state, p, vs, t, reserves, threatened, acts) {
+    if (p.supply === false || vs.length < 2) return;
+    const needy = vs.filter(v => !threatened[v.id] && v.buildQueue.length === 0 && reserves[v.id] && !incomingOn(state, v).length);
+    if (!needy.length) return;
+    const needyIds = {};
+    needy.forEach(v => { needyIds[v.id] = true; });
+    // ile surowca wioska-dawca może oddać: ponad własną rezerwę na budynek i ponad część magazynu
+    const spareOf = v => {
+      const keep = E.storageCap(v) * P().supplyKeep, own = reserves[v.id] || { wood: 0, clay: 0, iron: 0 }, out = {};
+      E.RES.forEach(r => { out[r] = Math.max(0, Math.floor(v.res[r] - Math.max(keep, own[r] || 0))); });
+      return out;
+    };
+    const donors = vs.filter(v => !needyIds[v.id] && !threatened[v.id] && !incomingOn(state, v).length && E.merchantsTotal(v) > 0);
+    // najbardziej potrzebujące (najmniejsza dostępność) pierwsze
+    needy.sort((a, b) => Math.min.apply(null, E.RES.map(r => a.res[r] / Math.max(1, reserves[a.id][r] || 1))) -
+      Math.min.apply(null, E.RES.map(r => b.res[r] / Math.max(1, reserves[b.id][r] || 1))));
+    needy.forEach(v => {
+      const cost = reserves[v.id], inc = E.incomingRes(state, v.id), lack = {};
+      let any = false;
+      E.RES.forEach(r => { lack[r] = Math.max(0, Math.ceil((cost[r] || 0) - v.res[r] - inc[r])); if (lack[r] > 0) any = true; });
+      if (!any) return;                                     // brakujące surowce już jadą
+      const sorted = donors.slice().sort((a, b) => E.dist(a, v) - E.dist(b, v));
+      let sentFrom = 0, sentTotal = 0;
+      for (const d of sorted) {
+        if (!E.RES.some(r => lack[r] > 0)) break;
+        E.tickVillage(state, d, t);
+        const sp = spareOf(d), send = {};
+        let total = 0;
+        E.RES.forEach(r => { send[r] = Math.min(lack[r], sp[r]); total += send[r]; });
+        if (total < 1) continue;
+        const cap = E.merchantCap(), free = E.merchantsFree(state, d);
+        if (free < 1) continue;
+        if (Math.ceil(total / cap) > free) {                // za mało kupców: wysyła tyle, ile uniesie
+          let left = free * cap;
+          E.RES.forEach(r => { send[r] = Math.min(send[r], left); left -= send[r]; });
+          total = send.wood + send.clay + send.iron;
+          if (total < 1) continue;
+        }
+        if (!E.sendTransport(state, d.id, v.id, send, t).ok) continue;
+        E.RES.forEach(r => { lack[r] -= send[r]; });
+        sentFrom++; sentTotal += total;
+      }
+      if (sentFrom) {
+        acts.supplied += sentTotal;
+        note(state, p, t, 'Zasilanie ' + v.name + ': ' + sentTotal + ' surowców z ' + sentFrom + ' wiosek');
+      }
+    });
+  }
+
   /* ---------- 3. wojsko ---------- */
   function recruitVillage(state, v, p, t, reserve, threatened, acts) {
     if (v.recruitQueue.length >= Math.min(P().recruitDepth, E.queueMax(v, 'recruit'))) return;
@@ -388,7 +440,7 @@
     const vs = own(state);
     if (!vs.length) return;
     vs.forEach(v => E.tickVillage(state, v, t));
-    const acts = { built: 0, recruited: 0, support: 0, research: 0, coins: 0, recalled: 0, settled: 0, garrisoned: 0 };
+    const acts = { built: 0, recruited: 0, support: 0, research: 0, coins: 0, recalled: 0, settled: 0, garrisoned: 0, supplied: 0 };
     const threatened = {};
 
     defend(state, p, vs, t, acts, threatened);
@@ -397,6 +449,7 @@
     vs.forEach(v => {
       if (p.build && !threatened[v.id]) reserves[v.id] = buildVillage(state, v, p, t, acts);
     });
+    if (p.build) supply(state, p, vs, t, reserves, threatened, acts);
     if (p.settle) {
       const sv = settleStep(state, p, vs, t, threatened, acts);
       if (sv) {
@@ -408,8 +461,8 @@
     if (p.tech) manageTech(state, p, vs, t, acts);
     recall(state, p, t, acts);
 
-    ['built', 'recruited', 'support', 'research', 'coins', 'recalled', 'settled', 'garrisoned'].forEach(k => { p.stats[k] = (p.stats[k] || 0) + acts[k]; });
-    p.last = { t, built: acts.built, recruited: acts.recruited, support: acts.support, research: acts.research, settled: acts.settled };
+    ['built', 'recruited', 'support', 'research', 'coins', 'recalled', 'settled', 'garrisoned', 'supplied'].forEach(k => { p.stats[k] = (p.stats[k] || 0) + acts[k]; });
+    p.last = { t, built: acts.built, recruited: acts.recruited, support: acts.support, research: acts.research, settled: acts.settled, supplied: acts.supplied };
   }
 
   /* ---------- konfiguracja ---------- */
@@ -421,6 +474,7 @@
     if (cfg.defend !== undefined) o.defend = !!cfg.defend;
     if (cfg.garrison !== undefined) o.garrison = !!cfg.garrison;
     if (cfg.recruit !== undefined && ['defense', 'balanced', 'off'].indexOf(cfg.recruit) >= 0) o.recruit = cfg.recruit;
+    if (cfg.supply !== undefined) o.supply = !!cfg.supply;
     if (cfg.convoy !== undefined) o.convoy = !!cfg.convoy;
     if (cfg.settle !== undefined) o.settle = !!cfg.settle;
     if (cfg.settleMax !== undefined) { const n = Math.floor(Number(cfg.settleMax)); o.settleMax = n >= 1 && n <= 200 ? n : 0; }
