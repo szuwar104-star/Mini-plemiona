@@ -1292,7 +1292,7 @@
     const s = st(), p = s.pilot || {}, D = C.PILOT.defaults;
     return { on: p.on !== undefined ? p.on : true, build: p.build !== undefined ? p.build : D.build, recruit: p.recruit || D.recruit,
       tech: p.tech !== undefined ? p.tech : D.tech, defend: p.defend !== undefined ? p.defend : D.defend, garrison: p.garrison !== undefined ? p.garrison : D.garrison, supply: p.supply !== undefined ? p.supply : D.supply, defLevel: p.defLevel || D.defLevel,
-      settle: !!p.settle, settleMax: p.settleMax || 0, attack: !!p.attack, farm: !!p.farm, convoy: !!p.convoy, hub: p.hub || (s.auto && s.auto.hub) || (autoDefaults().hub) };
+      settle: !!p.settle, settleMax: p.settleMax || 0, split: !!p.split, splitRatio: p.splitRatio || D.splitRatio, attack: !!p.attack, farm: !!p.farm, convoy: !!p.convoy, hub: p.hub || (s.auto && s.auto.hub) || (autoDefaults().hub) };
   }
   function pilotModal() {
     const s = st(), g = UI.pilot, p = s.pilot;
@@ -1336,7 +1336,10 @@
       fld('wall', 'Cel obrony wioski', '', '<select data-pdef>' + opt(25, g.defLevel, 'Niski') + opt(40, g.defLevel, 'Średni') + opt(60, g.defLevel, 'Wysoki') + opt(90, g.defLevel, 'Twierdza') +
         ([25, 40, 60, 90].indexOf(Number(g.defLevel)) < 0 ? opt(g.defLevel, g.defLevel, 'Własny (' + g.defLevel + ')') : '') + '</select>') +
       row('data-pdefend', g.defend, 'sword', 'Obrona atakowanych wiosek', 'Wysyła wojsko z innych wiosek; po ataku wraca') +
-      row('data-pgar', g.garrison, 'wall', 'Stałe garnizony', 'Wioski blisko wrogów mają więcej obrony – zaplecze przenosi tam nadwyżkę wojska'));
+      row('data-pgar', g.garrison, 'wall', 'Stałe garnizony', 'Wioski blisko wrogów mają więcej obrony – zaplecze przenosi tam nadwyżkę wojska') +
+      row('data-psplit', g.split, 'axe', 'Podział na wioski ofensywne i defensywne', 'Ofensywne szkolą tylko armię ataku i stąd wychodzą wszystkie ataki i grabieże; defensywne tylko obronę – stąd idą posiłki i garnizony (także dla ofensywnych). Armia ataku z wiosek defensywnych przechodzi do ofensywnych. Działa przy podboju, grabieży albo szkoleniu zbalansowanym') +
+      fld('barracks', 'Proporcja wiosek', 'Ile wiosek defensywnych przypada na jedną ofensywną', '<select data-psplitn>' + [1, 2, 3, 4, 5, 6].map(n => opt(n, g.splitRatio, n + ' : 1')).join('') + '</select>') +
+      (p && p.roles ? '<p class="pil-cap">Obecnie: ' + Object.keys(p.roles).filter(id => p.roles[id] === 'off').length + ' ofensywnych, ' + Object.keys(p.roles).filter(id => p.roles[id] === 'def').length + ' defensywnych</p>' : ''));
 
     const exp = sec('settler', 'Ekspansja i wojna',
       row('data-pset', g.settle, 'settler', 'Nowe wioski', 'Szkoli osadników i zakłada wioski w pobliżu (jeden osadnik naraz)') +
@@ -2423,6 +2426,8 @@
     else if (t.hasAttribute && t.hasAttribute('data-pdef')) { UI.pilot.defLevel = Number(t.value); }
     else if (t.hasAttribute && t.hasAttribute('data-pdefend')) { UI.pilot.defend = t.checked; }
     else if (t.hasAttribute && t.hasAttribute('data-pgar')) { UI.pilot.garrison = t.checked; }
+    else if (t.hasAttribute && t.hasAttribute('data-psplit')) { UI.pilot.split = t.checked; }
+    else if (t.hasAttribute && t.hasAttribute('data-psplitn')) { UI.pilot.splitRatio = Number(t.value); }
     else if (t.hasAttribute && t.hasAttribute('data-psup')) { UI.pilot.supply = t.checked; }
     else if (t.hasAttribute && t.hasAttribute('data-pset')) { UI.pilot.settle = t.checked; }
     else if (t.hasAttribute && t.hasAttribute('data-patk')) { UI.pilot.attack = t.checked; }
