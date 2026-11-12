@@ -471,6 +471,10 @@
       // (minuty gry) między atakami tej samej frakcji na tę samą frakcję (po zemście/dla lidera × revengeCooldown); maxConcurrent – ile
       // wypraw na frakcje AI frakcja może mieć w drodze naraz; playerSpacingMin – min. odstęp (minuty gry) między wyprawami jednej frakcji na gracza (żeby duże armie nie robiły ciągłego szturmu).
       versus: { powerMult: 2.5, ratioMult: 1.6, weightMult: 0.3, cooldownMin: 120, revengeCooldown: 0.5, maxConcurrent: 1, playerSpacingMin: 30 },
+      // Handel AI (opcja gry state.aiTrade, ai.js): frakcja wymienia w Targowisku nadwyżki na surowiec, którego brakuje do budowy
+      // albo do partii ulubionej jednostki – tylko wtedy, gdy wymiana całkiem pokrywa niedobór. Kurs i udźwig kupców bazowe (bez badań gracza).
+      // cooldownMin: przerwa między wymianami w jednej wiosce; keepShare: część magazynu, której AI nie oddaje; batch: wielkość partii jednostek.
+      trade: { cooldownMin: 5, keepShare: 0.15, batch: 10 },
       // Taktyka wspólna dla wszystkich frakcji (ai.js)
       tactics: {
         buildQueue: 3,           // ile budów AI trzyma w kolejce

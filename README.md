@@ -92,6 +92,7 @@ Wolną osadę przejmujesz, wygrywając bitwę. Wioskę frakcji AI – wysyłają
 | `tests/gather.js` | test zbierania i rozdzielania surowców: `node tests/gather.js` |
 | `tests/worlds.js` | test rozmiarów świata (mapa, liczba frakcji, wydajność): `node tests/worlds.js` |
 | `tests/troops.js` | test zbierania i rozdzielania wojska: `node tests/troops.js` |
+| `tests/aitrade.js` | test wymiany surowców przez AI: `node tests/aitrade.js` |
 | `tools/make-icons.py` | generator ikon (wymaga Pillow) |
 | `tools/balance.js` | symulacja balansu na wszystkich poziomach trudności |
 | `tools/resources.js` | bilans surowców: wydatki, marnowanie, blokady |
@@ -169,6 +170,7 @@ Każda frakcja co turę (`C.AI.thinkInterval`):
 4. **Zbiórka wojsk** – frakcje ofensywne co jakiś czas ściągają jednostki ataku z zaplecza do wioski frontowej, żeby móc uderzyć na silniej bronione cele.
 5. **Ataki** – armia zbiera się do sensownej wielkości (`minPower + punkty × powerPerPoint`) zamiast wysyłać garstki co turę; agresywna i ekspansywna frakcja prowadzą do dwóch wypraw naraz. Cel wybierany według odległości, przewagi, łupu i obniżonego poparcia (dobijanie podboju). AI nie wysyła wojska, gdy samo jest atakowane.
 6. **Rozrost** – osadnicy częściej (także frakcja obronna), dowódcy podboju tylko przy bezpiecznej obronie domu.
+7. **Handel** – opcja w Menu („Handel frakcji AI”, `state.aiTrade`, domyślnie włączona). Wioska AI z Targowiskiem wymienia nadwyżki na surowiec, którego brakuje na budowę (lub na partię ulubionej jednostki), ale tylko gdy nadwyżki w całości pokrywają niedobór. Kurs i udźwig kupców bazowe (bez badań gracza), przerwa między wymianami w wiosce i nieoddawana część magazynu: `C.AI.trade`. Starsze zapisy mają opcję włączoną. Test: `node tests/aitrade.js`.
 
 Poziomy trudności działają jak wcześniej (produkcja, agresja, ostrożność, strefa wokół gracza). Parametry: `C.AI.tactics` i `C.AI.personalities` w `config.js`. Raport bez gracza: `node tools/ai-report.js normal 8 1`.
 

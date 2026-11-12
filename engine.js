@@ -149,7 +149,7 @@
       world: C.WORLDS[world] ? world : C.DEFAULT_WORLD, winVillages: W.win,
       movements: [], reports: [], notices: [], ended: null, intel: {}, lastHit: {},
       difficulty: C.DIFFICULTY[difficulty] ? difficulty : C.DEFAULT_DIFFICULTY,
-      stats: { battles: 0, conquests: 0 }, race: !!race, raceWarn: {}
+      stats: { battles: 0, conquests: 0 }, race: !!race, raceWarn: {}, aiTrade: true
     };
     state.factions.player = { id: 'player', name: C.PLAYER.name, color: C.PLAYER.color, ai: false, alive: true, killsAtt: 0, killsDef: 0, killUnits: 0, coins: 0, tech: {}, upgrades: {} };
     aiFactions.forEach((f, i) => {
@@ -470,6 +470,20 @@
     const got = exchangeGet(amount), room = storageCap(v) - Math.floor(v.res[to]);
     if (got < 1) return { ok: false, reason: 'Za mała ilość' };
     if (got > room) return { ok: false, reason: 'Za mało miejsca w magazynie (zmieści się jeszcze ' + Math.max(0, room) + ')' };
+    v.res[from] -= amount;
+    v.res[to] += got;
+    return { ok: true, spent: amount, got };
+  }
+
+  // Wymiana frakcji AI: kurs i udźwig bazowe (AI nie ma badań gracza), ten sam limit kupców i miejsca w magazynie.
+  function aiExchangeRate() { return C.MARKET.exchangeRate; }
+  function aiExchangeMax(v) { return merchantsTotal(v) * C.MERCHANT.capacity; }
+  function aiExchange(state, v, from, to, amount) {
+    amount = Math.floor(Number(amount) || 0);
+    if (!RES.includes(from) || !RES.includes(to) || from === to || amount < 1 || !merchantsTotal(v)) return { ok: false };
+    if (amount > aiExchangeMax(v) || Math.floor(v.res[from]) < amount) return { ok: false };
+    const got = Math.floor(amount * C.MARKET.exchangeRate + 1e-9), room = storageCap(v) - Math.floor(v.res[to]);
+    if (got < 1 || got > room) return { ok: false };
     v.res[from] -= amount;
     v.res[to] += got;
     return { ok: true, spent: amount, got };
@@ -1451,7 +1465,7 @@
     queueMax, planBuildAll, buildAll, setAuto, runAuto,
     RES, UNITS, BUILDINGS, ramCount, diff, useDifficulty, hiddenRes,
     rand, randInt, dist, emptyUnits, cleanUnits, sumUnits, attackPower, defensePower, upgradeMult, upgradesOf,
-    exchange, exchangeMax, merchantCap, ramEff, exchangeGet, exchangeRate, exchangeQuick, coinQuick, buyCoinsAll, mintLimit, mintTokens, buyCoins, techInfo, researchTech, techNode, techLevel, techCost, techEffects,
+    exchange, aiExchange, aiExchangeRate, aiExchangeMax, exchangeMax, merchantCap, ramEff, exchangeGet, exchangeRate, exchangeQuick, coinQuick, buyCoinsAll, mintLimit, mintTokens, buyCoins, techInfo, researchTech, techNode, techLevel, techCost, techEffects,
     tileAt, villagesOf, points, unitPoints, armyOf, accountPower, addKills, killsOf, ranking, ownerName, ownerColor,
     newGame, worldOf, winVillages, productionPerMin, storageCap, popCap, popMult, popUsed, tickVillage,
     notice, checkWin,

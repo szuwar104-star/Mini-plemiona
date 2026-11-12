@@ -1594,6 +1594,8 @@
       powerSection(s) +
       rankingSection(s) +
       '<section><h3>Tryb gry</h3>' + racePicker(s.race, 'set-race') + '<p class="muted seg-note">Zmiana działa od razu.</p></section>' +
+      '<section><h3>Handel frakcji AI</h3><label class="chk"><input type="checkbox" data-aitrade' + (s.aiTrade !== false ? ' checked' : '') + '>Frakcje AI wymieniają nadwyżki surowców w Targowisku na te, których brakuje do budowy i wojska</label>' +
+      '<p class="muted seg-note">Kurs bazowy, bez Twoich badań; tylko wioski AI z Targowiskiem, nie częściej niż co kilka minut. Zmiana działa od razu.</p></section>' +
       '<section><h3>Poziom trudności</h3>' + diffPicker(s.difficulty, 'set-diff') +
       '<p class="muted seg-note">' + E.diff(s).desc + ' Zmiana działa od razu.</p></section>' +
       '<section><h3>Zapis gry</h3><p class="muted">Gra zapisuje się sama. Czas płynie także przy zamkniętej grze – AI rozwija się wtedy dalej. ' +
@@ -2352,6 +2354,11 @@
     else if (t.hasAttribute && t.hasAttribute('data-akeep')) { UI.auto.keep = t.value; }
     else if (t.hasAttribute && t.hasAttribute('data-aevery')) { UI.auto.everyMin = Number(t.value); }
     else if (t.hasAttribute && t.hasAttribute('data-acoins')) { UI.auto.coins = t.checked; renderModal(); }
+    else if (t.hasAttribute && t.hasAttribute('data-aitrade')) {
+      const on = t.checked;
+      G.action(s => { s.aiTrade = on; }, { allowPaused: true });
+      toast('info', on ? 'Frakcje AI będą wymieniać surowce w Targowisku.' : 'Frakcje AI nie wymieniają już surowców.');
+    }
     else if (t.hasAttribute && t.hasAttribute('data-pon')) { UI.pilot.on = t.checked; }
     else if (t.hasAttribute && t.hasAttribute('data-pbuild')) { UI.pilot.build = t.checked; }
     else if (t.hasAttribute && t.hasAttribute('data-prec')) { UI.pilot.recruit = t.value; }

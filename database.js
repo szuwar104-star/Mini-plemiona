@@ -192,6 +192,7 @@
     if (!ok) throw new Error('Zapis jest uszkodzony lub niekompletny.');
     if (!Array.isArray(s.notices)) s.notices = [];
     if (!s.intel) s.intel = {};
+    if (typeof s.aiTrade !== 'boolean') s.aiTrade = true; // opcja „AI wymienia surowce”: starsze zapisy mają ją włączoną
     for (const id in s.villages) {
       const v = s.villages[id];
       if (!v.buildings || !v.units || !v.res || !Array.isArray(v.buildQueue) || !Array.isArray(v.recruitQueue)) {

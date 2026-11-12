@@ -133,6 +133,62 @@
     return null;
   }
 
+  /* ---------- 1b. handel: wymiana nadwyżek na brakujący surowiec (opcja gry state.aiTrade) ---------- */
+  // Wymienia tylko wtedy, gdy nadwyżki całkowicie pokrywają niedobór (czyli wymiana faktycznie odblokowuje budowę albo partię wojska).
+  // Celem jest koszt budynku, na który wioska oszczędza (reserve), a gdy go nie ma – partia ulubionej jednostki frakcji.
+  // Zwraca true, gdy wymiana się odbyła.
+  function manageTrade(state, v, P, t, reserve) {
+    const cfg = C.AI.trade;
+    if (!state.aiTrade || !cfg || !(E.merchantsTotal(v) > 0)) return false;
+    if (v.aiTradeAt != null && t - v.aiTradeAt < cfg.cooldownMin * 60000) return false;
+    let want = reserve;
+    if (!want) {
+      if (v.recruitQueue.length >= T().recruitQueue) return false;
+      let best = null;
+      Object.keys(C.UNITS).forEach(u => {
+        const U = C.UNITS[u], w = P.unitWeights[u] || 0;
+        if (U.conquer || U.settler || U.scout || v.buildings.barracks < U.barracks || w <= 0) return;
+        if (!best || w > best.w) best = { u, w };
+      });
+      if (!best) return false;
+      want = {};
+      E.RES.forEach(r => { want[r] = C.UNITS[best.u].cost[r] * cfg.batch; });
+    }
+    const cap = E.storageCap(v), rate = E.aiExchangeRate();
+    const deficit = {}, surplus = {};
+    let need = 0;
+    for (const r of E.RES) {
+      if (want[r] > cap) return false; // nie zmieści się w magazynie – to problem Ratusza, nie handlu
+      const have = Math.floor(v.res[r]);
+      deficit[r] = Math.max(0, want[r] - have);
+      surplus[r] = Math.max(0, have - Math.max(want[r], cap * cfg.keepShare));
+      need += deficit[r];
+    }
+    if (need < 1) return false;
+    let left = E.aiExchangeMax(v);
+    const plan = [];
+    const short = E.RES.filter(r => deficit[r] > 0).sort((a, b) => deficit[b] - deficit[a]);
+    for (const d of short) {
+      let gap = deficit[d];
+      const donors = E.RES.filter(r => deficit[r] === 0 && surplus[r] > 0).sort((a, b) => surplus[b] - surplus[a]);
+      for (const s of donors) {
+        if (gap <= 0) break;
+        let give = Math.ceil(gap / rate);
+        while (Math.floor(give * rate + 1e-9) < gap) give++;
+        give = Math.min(give, Math.floor(surplus[s]), left);
+        if (give < 1) continue;
+        plan.push([s, d, give]);
+        surplus[s] -= give; left -= give;
+        gap -= Math.floor(give * rate + 1e-9);
+      }
+      if (gap > 0) return false; // nadwyżek nie starcza na pokrycie niedoboru – nie wymienia nic
+    }
+    let done = false;
+    plan.forEach(p => { if (E.aiExchange(state, v, p[0], p[1], p[2]).ok) done = true; });
+    if (done) v.aiTradeAt = t;
+    return done;
+  }
+
   /* ---------- 2. wojsko ---------- */
   function manageRecruit(state, v, P, t, reserve, owned) {
     if (v.recruitQueue.length >= T().recruitQueue) return false;
@@ -377,7 +433,8 @@
     const vs = E.villagesOf(state, fid);
     for (const v of vs) {
       E.tickVillage(state, v, t);
-      const reserve = manageBuild(state, v, P, t);
+      let reserve = manageBuild(state, v, P, t);
+      if (manageTrade(state, v, P, t, reserve) && reserve) reserve = manageBuild(state, v, P, t); // po wymianie budowa może już ruszyć
       for (let i = 0; i < 3; i++) if (!manageRecruit(state, v, P, t, reserve, vs.length)) break;
     }
     sendReinforcements(state, fid, vs, P, t);
@@ -391,5 +448,5 @@
     }
   }
 
-  MP.AI = { think, villageCap, playerZoneNow, pressureOf };
+  MP.AI = { think, villageCap, playerZoneNow, pressureOf, manageTrade };
 })(typeof window !== 'undefined' ? window : globalThis);
