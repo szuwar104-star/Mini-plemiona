@@ -411,6 +411,7 @@
       (diploOffers(s) ? '<span class="warn">Oferty paktów: ' + diploOffers(s) + '</span>' : '') + '</p>' +
       '<div class="actions left"><button class="btn" data-act="gather-open"' + (own.length > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"') + '>' + ico('merchant') + 'Zbierz / rozdziel surowce</button>' +
       '<button class="btn" data-act="troops-open"' + (own.length > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"') + '>' + ico('spear') + 'Zbierz / rozdziel wojsko</button>' +
+      '<button class="btn" data-act="defense-open"' + (own.length > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"') + '>' + ico('shield') + 'Wyślij obronę</button>' +
       '<button class="btn" data-act="mass-open">' + ico('barracks') + 'Szkol we wszystkich wioskach</button>' +
       '<button class="btn" data-act="buildall-open">' + ico('hq') + 'Buduj we wszystkich wioskach</button>' +
       '<button class="btn" data-act="auto-open"' + (own.length > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"') + '>' + ico('merchant') + 'Konwoje' +
@@ -1092,6 +1093,11 @@
     const units = {}; E.UNITS.forEach(k => { units[k] = k !== 'settler' && k !== 'scout'; });
     return { target, mode: 'gather', stay: true, units, reserve: 0, capToRoom: true, off: {} };
   }
+  /* ustawienia „Wyślij obronę”: tylko jednostki defensywne (role: 'def'), zostaw 90% w wioskach wysyłających */
+  function defenseUnits() { const u = {}; E.UNITS.forEach(k => { u[k] = C.UNITS[k].role === 'def'; }); return u; }
+  function defenseDefaults(target) {
+    const g = troopsDefaults(target); g.units = defenseUnits(); g.reserve = 90; return g;
+  }
   function nz(v) { return (v === 0 || v === '0' || v === undefined || v === null) ? '' : esc(v); }
   function troopsArgs(g) { return { mode: g.mode, stay: g.stay, units: g.units, reservePct: g.reserve, capToRoom: g.capToRoom, off: g.off }; }
   function troopsModal() {
@@ -1106,7 +1112,7 @@
       '<label class="field">Rodzaj wysyłki <select data-tstay>' +
         '<option value="1"' + (g.stay ? ' selected' : '') + '>Przeniesienie na stałe (zajmuje farmę)</option>' +
         '<option value="0"' + (g.stay ? '' : ' selected') + '>Wsparcie (można odwołać)</option></select></label>' +
-      '<div class="gopts"><div class="field">Jednostki<span class="selbar"><button type="button" class="btn ghost" data-act="tunits-all" data-on="1">Zaznacz wszystkie</button><button type="button" class="btn ghost" data-act="tunits-all" data-on="0">Odznacz wszystkie</button></span><span class="gres ugrid">' + E.UNITS.map(k => '<label class="chk"><input type="checkbox" data-tunit="' + k + '"' + (g.units[k] ? ' checked' : '') + '>' + ico(k) + C.UNITS[k].name + '</label>').join('') + '</span></div>' +
+      '<div class="gopts"><div class="field">Jednostki<span class="selbar"><button type="button" class="btn ghost" data-act="tunits-all" data-on="1">Zaznacz wszystkie</button><button type="button" class="btn ghost" data-act="tunits-all" data-on="0">Odznacz wszystkie</button><button type="button" class="btn ghost" data-act="tunits-def">Tylko obrona</button></span><span class="gres ugrid">' + E.UNITS.map(k => '<label class="chk"><input type="checkbox" data-tunit="' + k + '"' + (g.units[k] ? ' checked' : '') + '>' + ico(k) + C.UNITS[k].name + '</label>').join('') + '</span></div>' +
       '<label class="field">Zostaw w wiosce wysyłającej (% wojska)<input type="number" inputmode="numeric" min="0" max="100" step="5" placeholder="0" data-treserve value="' + nz(g.reserve) + '"></label></div>' +
       (g.stay ? '<label class="chk"><input type="checkbox" data-tcap' + (g.capToRoom ? ' checked' : '') + '>Nie wysyłaj więcej, niż mieści farma ' + (spread ? 'celów' : 'celu') + '</label>' : '') +
       '<div id="troopsPlan"></div>' +
@@ -2013,6 +2019,13 @@
         break;
       }
       case 'troops-open': UI.troops = troopsDefaults(UI.vid || (cur() && cur().id)); openModal('troops'); break;
+      case 'defense-open': UI.troops = defenseDefaults(UI.vid || (cur() && cur().id)); openModal('troops'); break;
+      case 'tunits-def': {
+        UI.troops.units = defenseUnits();
+        document.querySelectorAll('[data-tunit]').forEach(i => { i.checked = !!UI.troops.units[i.dataset.tunit]; });
+        updateTroopsPlan();
+        break;
+      }
       case 'buildall-open': UI.buildall = buildAllDefaults(); openModal('buildall'); break;
       case 'ba-mode': UI.buildall.mode = b.dataset.m; renderModal(); break;
       case 'buildall-go': {
