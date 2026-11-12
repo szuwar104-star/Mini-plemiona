@@ -389,7 +389,7 @@
   }
 
   /* ---------- 5. ataki ---------- */
-  function tryAttack(state, v, P, t, owned, playerAll, press) {
+  function tryAttack(state, v, P, t, owned, playerAll, press, mine) {
     const out = state.movements.filter(m => m.from === v.id && m.type === 'attack' && m.owner === v.owner).length;
     if (out >= (P.waves || 1) + (press >= 0.5 ? 1 : 0)) return; // pod presją jedna wyprawa więcej
     if (incomingOn(state, v).length) return; // nie wysyła wojska, gdy samo jest atakowane
@@ -451,6 +451,8 @@
       if (raid && !P.raids) continue;
       if (target.owner === null && zone && playerAll.some(pv => E.dist(pv, target) <= zone)) continue;
       if (target.owner === 'player' && (grace || (state.lastHit && t - (state.lastHit[target.id] || -1e15) < cooldown))) continue;
+      // Gracz i frakcje: gdy w zasięgu celu są inne wioski frakcji, nie wysyła pojedynczej fali (ginie na obronie) – wojsko czeka na wspólne uderzenie (massStrike).
+      if (target.owner !== null && massCovers(mine, v, target)) continue;
       const d = E.dist(v, target);
       // pod presją sięga dalej po gracza: do x(1+rangeBoost) zasięgu, a na dużych mapach co najmniej rangeMapShare boku mapy
       const reach = target.owner === 'player' ? P.range + press * Math.max(P.range * C.AI.pressure.rangeBoost, state.map.size * C.AI.pressure.rangeMapShare - P.range) : P.range;
@@ -487,6 +489,20 @@
     }
   }
 
+  // Czy cel leży w zasięgu wspólnego uderzenia: oprócz wioski v frakcja ma w M.range od celu jeszcze co najmniej jedną wioskę z wojskiem ataku.
+  // Wtedy samotne wyprawy z pojedynczych wiosek nie mają sensu – siły łączy massStrike.
+  function massCovers(vs, v, target) {
+    const M = C.AI.mass;
+    if (!M || !vs || vs.length < 2 || E.dist(v, target) > M.range) return false;
+    return vs.some(o => o.id !== v.id && E.dist(o, target) <= M.range && E.attackPower(o.units) > 0);
+  }
+  // Wymagana liczebność uderzenia rośnie z czasem gry od minUnitsStart do minUnits (przez war.rampHours), żeby AI nie czekało na 10 tys. w młodej grze.
+  function massMinUnits(state, t) {
+    const M = C.AI.mass, start = M.minUnitsStart || M.minUnits;
+    const ramp = Math.min(1, Math.max(0, (t - state.created) / 3600000) / C.AI.war.rampHours);
+    return Math.round(start + (M.minUnits - start) * ramp);
+  }
+
   /* ---------- 5b. zmasowane uderzenia: wojsko ze wszystkich wiosek w jednej fali ---------- */
   // Pojedyncza wioska wysyła tylko to, co ma w domu, więc wyprawy były garstkami (setki–kilka tysięcy) i nie ruszały dobrze bronionych wiosek.
   // Tu frakcja liczy siłę wszystkich wiosek w zasięgu celu i posyła je naraz: najdalsze wychodzą od razu, bliższe z opóźnieniem (state.aiPending),
@@ -511,6 +527,7 @@
   function massStrike(state, fid, vs, P, t, press, playerAll) {
     const M = massCfg();
     if (!M || vs.length < 2) return;
+    const minUnits = massMinUnits(state, t);
     state.aiMass = state.aiMass || {};
     const last = state.aiMass[fid];
     if (last && t - last < M.everyMin * 60000) return;
@@ -552,9 +569,9 @@
       for (const c of pool) {
         if (use.length >= M.maxVillages) break;
         use.push(c); A += c.A; n += c.n;
-        if (A >= need * M.overkill && n >= M.minUnits) break;
+        if (A >= need * M.overkill && n >= minUnits) break;
       }
-      if (A < need || n < M.minUnits) continue;
+      if (A < need || n < minUnits) continue;
       let w = dw / (1 + E.dist(use[0].v, target));
       w *= 1 + Math.min(2, (target.res.wood + target.res.clay + target.res.iron) / T().lootScale);
       w *= 1 + Math.min(1, A / Math.max(1, Dv) / 6);
@@ -638,7 +655,7 @@
     for (const v of vs) {
       if (P.settle) trySettle(state, v, t);
       trySpy(state, v, P, t);
-      if (E.rand(state) < P.attackChance * E.diff(state).aiAggro * (1 + press * C.AI.pressure.chanceBoost)) tryAttack(state, v, P, t, vs.length, playerAll, press);
+      if (E.rand(state) < P.attackChance * E.diff(state).aiAggro * (1 + press * C.AI.pressure.chanceBoost)) tryAttack(state, v, P, t, vs.length, playerAll, press, vs);
     }
   }
 

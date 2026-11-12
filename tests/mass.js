@@ -39,10 +39,31 @@ function scene(owner, foeOwner) {
   const wave = s.movements.filter(m => m.type === 'attack' && m.owner === att && m.to === 'p1');
   const total = wave.reduce((n, m) => n + E.sumUnits(m.units), 0);
   ok(wave.length >= 2, 'AI posyła uderzenie z kilku wiosek naraz (fale: ' + wave.length + ')');
-  ok(total >= C.AI.mass.minUnits, 'uderzenie ma co najmniej ' + C.AI.mass.minUnits + ' żołnierzy (jest ' + total + ')');
+  ok(total >= C.AI.mass.minUnitsStart, 'uderzenie ma co najmniej ' + C.AI.mass.minUnitsStart + ' żołnierzy (jest ' + total + ')');
   const arr = wave.map(m => m.arrive);
   ok(Math.max.apply(null, arr) - Math.min.apply(null, arr) <= 60000, 'wszystkie fale dochodzą w ciągu minuty (rozrzut ' + (Math.max.apply(null, arr) - Math.min.apply(null, arr)) + ' ms)');
   ok(!(s.aiPending || []).length, 'po wysłaniu nie zostają opóźnione oddziały');
+}
+
+// --- AI: wioski w zasięgu celu nie wysyłają samotnych fal na gracza – tylko wspólne uderzenie ---
+{
+  const { s, base, att } = scene('ai', 'player');
+  const army = { axe: 3500, light: 300, spear: 600, archer: 200, guard: 100, ram: 20 };
+  const vs = [base, clone(s, base, 'a2', 3, 0, att), clone(s, base, 'a3', 0, 5, att), clone(s, base, 'a4', -6, 2, att)];
+  vs.forEach(v => { v.buildings.hq = 15; v.buildings.wall = 3; v.buildings.farm = 20; v.buildings.barracks = 15; Object.assign(v.units, army); v.res = { wood: 0, clay: 0, iron: 0 }; });
+  const tgt = clone(s, base, 'p1', 8, 3, 'player');
+  tgt.buildings.wall = 5; Object.assign(tgt.units, { guard: 1200, spear: 800 });
+  s.factions.player.upgrades = {};
+  let solo = 0, guard = 0;
+  while (guard++ < 400) {
+    const before = new Set(s.movements.map(m => m.id));
+    MP.AI.think(s, att, T + guard * 20000);
+    const fresh = s.movements.filter(m => !before.has(m.id) && m.type === 'attack' && m.owner === att && m.to === 'p1');
+    if (fresh.length === 1 && !(s.aiMass && s.aiMass[att])) solo++;
+    if (s.aiMass && s.aiMass[att]) break;
+  }
+  ok(solo === 0, 'AI nie wysyła pojedynczych fal na gracza przed wspólnym uderzeniem (samotne fale: ' + solo + ')');
+  ok(s.aiMass && s.aiMass[att], 'AI robi wspólne uderzenie');
 }
 
 // --- AI: za mało żołnierzy na uderzenie (poniżej minUnits) – brak zmasowanego uderzenia ---

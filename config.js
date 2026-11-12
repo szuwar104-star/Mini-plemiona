@@ -610,8 +610,9 @@
       // w promieniu range pól od celu i posyła je jednym uderzeniem, tak by wszystkie oddziały dotarły naraz (spreadSec – rozrzut dojścia). Uderzenie wymaga
       // co najmniej minUnits żołnierzy i przewagi ratio nad obroną celu; po drodze dokłada wioski, aż siła wyniesie overkill × wymagane minimum (i minUnits),
       // maks. maxVillages wiosek. defShare – jaka część jednostek obronnych każdej wioski idzie (reszta zostaje w domu; bez Dowódcy z tej wioski).
+      // minUnitsStart – wymagana liczebność w młodej grze, rośnie do minUnits przez war.rampHours. Wioski frakcji z innymi wioskami w zasięgu celu nie wysyłają już samotnych fal na gracza/frakcje (tryAttack → massCovers).
       // versusShare – ile uderzeń wolno mierzyć we frakcje AI zamiast w gracza (reszta tylko w gracza; wojny AI z AI nadal rzadkie dzięki versus).
-      mass: { everyMin: 5, chance: 0.7, minUnits: 10000, range: 22, ratio: 1.2, overkill: 3, maxVillages: 16, defShare: 0.15, versusShare: 0.1, spreadSec: 20 },
+      mass: { everyMin: 5, chance: 0.7, minUnitsStart: 2000, minUnits: 10000, range: 22, ratio: 1.2, overkill: 3, maxVillages: 16, defShare: 0.15, versusShare: 0.1, spreadSec: 20 },
       // Siła fal (ai.js): offShare (osobowość) – docelowy udział jednostek ofensywnych w armii wioski (liczony w populacji); pod presją rośnie o
       // offPressure. Poniżej tego udziału wioska rekrutuje tylko jednostki ataku; udział rośnie liniowo przez rampHours godzin gry od startu. waveDefShare – jaka część obrońców wolnej od keepHome idzie w
       // zwykłą wyprawę na gracza/frakcję (obrońcy dają mało ataku, a osłabiają dom; na wolne osady idą jak dawniej). reinforce – przy
