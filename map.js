@@ -70,8 +70,21 @@
 
   /* ---------- budowa planszy (raz na grę) ---------- */
   function ensureBoard(state) {
-    const key = state.created + ':' + state.map.size + ':' + Object.keys(state.villages).length;
-    if (builtFor === key) return false;
+    const key = state.created + ':' + state.map.size;
+    const nv = Object.keys(state.villages).length;
+    if (builtFor === key) {
+      // Nowa osada (np. założona przez AI) zmienia tylko drogi i place w terenie – przerysowujemy sam teren,
+      // bez przebudowy całej planszy (linijki, 2000+ pól, trasy wojsk).
+      if (layers.nv !== nv) {
+        layers.nv = nv;
+        const cv = A.terrain(state);
+        cv.className = 'layer'; cv.style.width = size() + 'px'; cv.style.height = size() + 'px';
+        world.querySelector('.terrain').replaceChildren(cv);
+        layers.terrain = cv;
+        layers.terrainDirty = true;
+      }
+      return false;
+    }
     builtFor = key;
     N_ = state.map.size;
     const N = N_, S = size();
@@ -95,7 +108,7 @@
     world.querySelector('.territory').appendChild(territoryCv);
     world.querySelector('.villages').appendChild(villagesCv);
     layers = { terrain: terrainCv, territory: territoryCv, villages: villagesCv,
-      tiles: world.querySelector('.tiles'), moves: world.querySelector('.moves') };
+      tiles: world.querySelector('.tiles'), moves: world.querySelector('.moves'), nv };
     return true;
   }
 
@@ -128,7 +141,8 @@
     const vs = Object.values(state.villages);
     const ownerKey = vs.map(v => v.id + ':' + v.owner).join('|');
     const tierKey = vs.map(v => v.id + ':' + v.owner + ':' + A.villageTier(E.points(v))).join('|');
-    let miniDirty = false;
+    let miniDirty = !!layers.terrainDirty;
+    layers.terrainDirty = false;
     if (rebuilt || layers.ownerKey !== ownerKey) {
       layers.ownerKey = ownerKey;
       A.territory(state, layers.territory);   // najdroższa warstwa (piksel po pikselu)
@@ -155,8 +169,13 @@
   function villageSig(state, v) { return v.owner + '|' + E.points(v) + '|' + v.name; }
   function syncVillageTiles(state, ctx) {
     Object.values(state.villages).forEach(v => {
-      const r = layers.vt.get(v.id);
-      if (!r) return;
+      let r = layers.vt.get(v.id);
+      if (!r) {   // nowa osada na planszy: pole było puste, podmieniamy je na pole osady
+        const old = layers.tiles.querySelector('.tile[data-x="' + v.x + '"][data-y="' + v.y + '"]');
+        if (!old) return;
+        r = { el: old, sig: null };
+        layers.vt.set(v.id, r);
+      }
       const sig = villageSig(state, v);
       if (sig !== r.sig) {   // zmienił się właściciel / punkty / nazwa – podmieniamy tylko to jedno pole
         const t = state.map.tiles.find(q => q.x === v.x && q.y === v.y);
