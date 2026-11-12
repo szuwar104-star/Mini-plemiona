@@ -303,7 +303,7 @@ function twoVillages() {
   ok(!f.s.movements.some(m => m.type === 'support') && f.A.units.spear === 20, 'bez wrogów w zasięgu nie ma garnizonów');
 }
 
-// 13b. Farmienie wiosek przeciwnika: zwiad -> grabież bez Dowódcy; nie zabiera obrońców, nie przejmuje wioski
+// 13b. Grabież wiosek przeciwnika: zwiad -> grabież bez Dowódcy; nie zabiera obrońców, nie przejmuje wioski
 {
   const mkFarm = (axe, foeSpear, opts) => {
     const s = E.newGame(T0, 31, 'normal', 'small');
@@ -322,18 +322,18 @@ function twoVillages() {
   E.advance(s, s.now + 12 * MIN);
   const rep = s.reports.filter(r => r.kind === 'attack' && r.to === foe.id);
   const mv = s.movements.filter(m => m.type === 'attack' && m.owner === 'player' && m.to === foe.id);
-  ok(s.pilot.stats.spied >= 1, 'farmienie: najpierw zwiad celu');
-  ok(rep.length + mv.length >= 1, 'farmienie: bot wysyła falę na wioskę przeciwnika');
+  ok(s.pilot.stats.spied >= 1, 'grabież: najpierw zwiad celu');
+  ok(rep.length + mv.length >= 1, 'grabież: bot wysyła falę na wioskę przeciwnika');
   ok(mv.every(m => m.units.noble === 0 && m.units.spear === 0 && m.units.guard === 0), 'fala bez Dowódcy i bez obrońców');
   ok(rep.every(r => !r.conquered) && foe.owner !== 'player', 'wioska nie jest przejmowana (grabież)');
   ok(A.units.spear === 300 && A.units.guard === 100, 'obrońcy zostają w domu');
-  ok(s.pilot.stats.farmed >= 1 && s.pilot.farmInfo, 'statystyki i podgląd farmienia (' + (s.pilot.farmInfo && s.pilot.farmInfo.text) + ')');
+  ok(s.pilot.stats.farmed >= 1 && s.pilot.farmInfo, 'statystyki i podgląd grabieży (' + (s.pilot.farmInfo && s.pilot.farmInfo.text) + ')');
   const weak = mkFarm(30, 4000);
   E.advance(weak.s, weak.s.now + 30 * MIN);
-  ok(!weak.s.reports.some(r => r.kind === 'attack' && r.to === weak.foe.id) && !weak.s.movements.some(m => m.type === 'attack' && m.to === weak.foe.id), 'za silny cel: bot go nie farmi');
+  ok(!weak.s.reports.some(r => r.kind === 'attack' && r.to === weak.foe.id) && !weak.s.movements.some(m => m.type === 'attack' && m.to === weak.foe.id), 'za silny cel: bot go nie grabi');
   const off = mkFarm(3000, 10, { farm: false });
   E.advance(off.s, off.s.now + 30 * MIN);
-  ok(!off.s.movements.some(m => m.type === 'attack') && !off.s.reports.some(r => r.kind === 'attack'), 'bez opcji nie farmi');
+  ok(!off.s.movements.some(m => m.type === 'attack') && !off.s.reports.some(r => r.kind === 'attack'), 'bez opcji nie grabi');
 }
 
 // 14. Podbój: zwiad -> fale z Dowódcą -> przejęcie wioski frakcji

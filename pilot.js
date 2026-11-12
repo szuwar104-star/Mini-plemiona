@@ -14,7 +14,7 @@
    5. Podbój (opcja „attack”) – Dowódcy (limit rośnie z liczbą wiosek), Tarany i armia ataku; zwiad celu, mniejsze stosy
       zbierane w najsilniejszej wiosce, duże atakują same. Cele: wioski frakcji (bez paktu) i wolne osady (te zdobywa
       zwykła armia). Uderzenie = pierwsza fala + kolejne z innych wiosek tuż po niej, by poparcie spadło do 0 za jednym razem.
-   6. Farmienie (opcja „farm”) – grabież wiosek wokoło, bez Dowódców.
+   6. Grabież (opcja „farm”) – grabież wiosek wokoło, bez Dowódców.
    Bot nie podgląda sił wroga bez zwiadu (tak jak Ty: „siła nieznana”). Wszystkie liczby: C.PILOT.
    ========================================================================= */
 (function (root) {
@@ -700,7 +700,7 @@
     }
   }
 
-  /* ---------- 7. farmienie: armia ataku grabi wszystko wokoło ---------- */
+  /* ---------- 7. grabież: armia ataku grabi wszystko wokoło ---------- */
   const farmUnits = v => { const u = attUnits(v); Object.keys(u).forEach(k => { if (C.UNITS[k].wallPower) u[k] = 0; }); return u; };
 
   function farmStep(state, p, vs, t, threatened, acts) {
@@ -768,7 +768,7 @@
       acts.farmed++; waves++; dg.sent++;
     }
     p.farmInfo = { t, text: 'cele w zasięgu ' + dg.inRange + ', wysłano ' + dg.sent + ', czeka na zwiad ' + dg.spy + ', za silne ' + dg.weak + ', ubogie ' + dg.poor };
-    if (dg.sent) note(state, p, t, 'Farmienie: ' + dg.sent + ' fal (' + p.farmInfo.text + ')');
+    if (dg.sent) note(state, p, t, 'Grabież: ' + dg.sent + ' fal (' + p.farmInfo.text + ')');
   }
 
   /* ---------- tura bota ---------- */
