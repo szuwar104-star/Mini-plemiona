@@ -221,24 +221,6 @@
       c.paint(S.ell(25.5, 26, 4.5, 3.2), COL.stoneD, 'r'); c.paint(S.ell(21.5, 27.6, 3, 2.2), COL.stone, 'r');
       c.dot(24.2, 24.6, COL.gold, 1.5); c.dot(21, 26.8, COL.gold, 1.2);
     },
-    mine(c) {
-      c.shadow(16, 30.2, 14, 1.3);
-      c.paint(S.poly([[1.5, 29.4], [4, 17], [10, 9.4], [17, 5], [24, 8.4], [29, 16], [30.6, 29.4]]), '#9c9a8c', 'd', { bev: 0.8 });
-      c.paint(S.poly([[17, 5], [24, 8.4], [29, 16], [30.6, 29.4], [19, 29.4], [21, 14]]), '#6c6a5f', 'v', { bev: 0, dith: 0.3 });
-      c.flat(S.poly([[10, 9.4], [13, 8], [8, 14.6], [5.2, 17]]), '#c4c1b0');
-      [[5.4, 22.6, '#7fd3e8'], [26, 12.6, COL.gold], [25.4, 20.4, '#7fd3e8'], [6.8, 14.8, COL.gold]].forEach(g => c.dot(g[0], g[1], g[2], 1.5));
-      // wejście: ciemny tunel z drewnianą obudową
-      c.flat(S.union(S.rect(10.6, 19.5, 10.8, 10.4), S.ell(16, 19.5, 5.4, 5.2)), '#140b06');
-      c.flat(S.ell(16, 28.6, 4.6, 1.2), '#3a2814');
-      c.paint(S.rect(8.6, 16, 2.4, 13.8), COL.brown, 'h', { bev: 0.5 }); c.paint(S.rect(21, 16, 2.4, 13.8), '#74461f', 'h', { bev: 0.5 });
-      c.paint(S.rect(7.6, 13.6, 16.8, 2.6), '#a8703a', 'v', { bev: 0.6 });
-      c.paint(S.rect(14.8, 16.2, 2.4, 0.9), COL.stoneD, 'flat', { bev: 0 });
-      c.paint(S.circle(16, 18.8, 1.3), '#ffd45a', 'r', { bev: 0 });
-      // wózek z rudą
-      c.paint(S.poly([[22.6, 24.2], [30.4, 24.2], [29.4, 28.6], [23.6, 28.6]]), '#6b4a2a', 'v', { bev: 0.5 });
-      c.paint(S.ell(26.5, 23.6, 3.6, 1.8), COL.gold, 'r', { bev: 0 });
-      c.flat(S.circle(24.6, 29.2, 1.3), '#2a1c10'); c.flat(S.circle(28.4, 29.2, 1.3), '#2a1c10');
-    },
     farm(c) {
       c.shadow(16, 29.6, 14, 1.4);
       c.paint(S.rect(4.5, 14, 23, 15), COL.red, 'v');
@@ -481,6 +463,6 @@
 
   MP.Sprites = {
     icon, village, terrain,
-    building: { hq: 'hq', wood: 'wood', clay: 'clay', iron: 'mine', farm: 'farm', barracks: 'barracks', market: 'market', wall: 'wall' }
+    building: { hq: 'hq', wood: 'wood', clay: 'clay', iron: 'iron', farm: 'farm', barracks: 'barracks', market: 'market', wall: 'wall' }
   };
 })(typeof window !== 'undefined' ? window : globalThis);
