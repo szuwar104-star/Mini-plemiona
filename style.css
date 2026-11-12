@@ -578,33 +578,8 @@ input:disabled { opacity: .4; }
 .tile.selected { z-index: 3; background: rgba(246, 207, 116, .14); box-shadow: inset 0 0 0 2px var(--gold-2), 0 0 18px rgba(246, 207, 116, .45); }
 .tile.current.selected::before { top: -7px; }
 
-.moves { position: absolute; inset: 0; pointer-events: none; overflow: visible; z-index: 5; }
-.route .trail { stroke: #000; stroke-opacity: .4; stroke-width: 7; stroke-linecap: round; }
-.route .path { stroke-width: 3.5; stroke-dasharray: 10 8; stroke-linecap: round; animation: march 1s linear infinite; }
-.route .dest { fill: none; stroke-width: 2.5; stroke-dasharray: 5 5; }
-.route .marker { stroke: #0e1318; stroke-width: 2.5; }
-.route .arrow { fill: #fff; }
-.route.out .path, .route.out .dest { stroke: #8fb6ff; }
-.route.out .marker { fill: var(--blue); }
-.route.ret .path, .route.ret .dest { stroke: #9fe0ae; }
-.route.ret .marker { fill: var(--green); }
-.route.inc .path, .route.inc .dest { stroke: #ff9a92; }
-.route.inc .marker { fill: var(--red); }
-.route.spy .path, .route.spy .dest { stroke: #d6c0ff; }
-.route.spy .marker { fill: var(--violet); }
-.route.trade .path, .route.trade .dest { stroke: #ffe08a; }
-.route.trade .marker { fill: #b88a26; }
-.route.settle .path, .route.settle .dest { stroke: #ffffff; }
-.route.settle .marker { fill: #8a6b4d; }
-.route.sup .path, .route.sup .dest { stroke: #8fe6d6; }
-.route.sup .marker { fill: var(--teal); }
-@keyframes march { to { stroke-dashoffset: -18; } }
-/* Wydajność: przy wielu marszach i podczas przeciągania mapy linie stoją (animacja przemalowywałaby całą warstwę co klatkę). */
-.moves.many .route .path { animation: none; stroke-width: 2; stroke-opacity: .6; }
-.moves.many .route .trail, .moves.many .route .dest { display: none; }
-.moves.many .route .marker { r: 6; stroke-width: 2; }
-.moves.many .route .arrow { transform: scale(.7); }
-.map-viewport.dragging .route .path { animation-play-state: paused; }
+/* Trasy wojsk rysuje canvas nad widokiem mapy (map.js); wygląd tras jest w stałych KIND_STYLE. */
+.moves-cv { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
 
 .map-ui { position: absolute; z-index: 6; }
 .map-tools { right: 14px; top: 14px; display: flex; flex-direction: column; gap: 6px; padding: 5px; border-radius: 14px; background: rgba(14, 19, 24, .75); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--line-2); }
