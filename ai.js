@@ -16,6 +16,9 @@
    5. Ataki – jedna lub dwie wyprawy naraz (osobowość), cele wybierane
       według siły obrony, odległości, łupu i poparcia oraz dyplomacji
       (pakt = brak ataku, zemsta za ataki, polowanie na lidera; diplomacy.js).
+   Wojny AI z AI są rzadkie i duże (C.AI.versus): osobny próg siły, większa wymagana
+   przewaga, przerwa między atakami tej samej pary frakcji i limit równoczesnych
+   wypraw – dzięki temu armie rosną, zamiast wykrwawiać się w ciągłych potyczkach.
    Wszystkie liczby: C.AI w config.js.
    ========================================================================= */
 (function (root) {
@@ -93,6 +96,18 @@
     const mine = state.lastHitBy && state.lastHitBy[fid];
     if (mine > last) last = mine; // presja liczona osobno dla każdej frakcji: cudze ataki jej nie zerują
     return Math.max(0, Math.min(1, ((t - last) / 60000 - cfg.startMin) / cfg.rampMin)) * k;
+  }
+
+  // Wojny AI z AI (C.AI.versus): ile wypraw frakcja ma teraz w drodze na inne frakcje AI i kiedy ostatnio uderzyła w daną.
+  const isAIOwner = (state, o) => o !== null && o !== 'player' && !!(state.factions[o] && state.factions[o].ai);
+  function aiWarsOut(state, fid) {
+    return state.movements.filter(m => m.type === 'attack' && m.owner === fid && isAIOwner(state, state.villages[m.to] && state.villages[m.to].owner)).length;
+  }
+  function aiWarReady(state, fid, target, t, dw) {
+    const V = C.AI.versus;
+    if (aiWarsOut(state, fid) >= V.maxConcurrent) return false;
+    const last = state.aiWar && state.aiWar[fid + '>' + target];
+    return !(last && t - last < V.cooldownMin * 60000 * (dw > 1.2 ? V.revengeCooldown : 1)); // zemsta/lider: krótsza przerwa
   }
 
   /* ---------- 1. gospodarka ---------- */
@@ -282,6 +297,9 @@
     const grace = minutes < D.graceMinutes;
     const cooldown = D.hitCooldownMin * 60000;
     const cap = villageCap(state, P, t);
+    // wyprawy już w drodze po nowe wioski (dowódcy, zajęcie wolnych osad) liczą się do limitu – inaczej kilka wiosek naraz przekracza sufit przy większych armiach
+    const noblesAway = state.movements.filter(m => m.type === 'attack' && m.owner === v.owner && (m.units.noble > 0 ||
+      (!m.raid && state.villages[m.to] && state.villages[m.to].owner === null))).length; // także wyprawy po wolne osady (zajęcie)
     const zone = playerZoneNow(state, t);
     const canTakeAny = P.targets === 'any' || minutes >= P.anyAfterMin;
     const busy = new Set(state.movements.filter(m => m.type === 'attack' && m.owner === v.owner).map(m => m.to));
@@ -293,8 +311,12 @@
       // dyplomacja: pakt = brak ataku; zemsta, lider i sympatia zmieniają atrakcyjność celu
       const dw = target.owner !== null && MP.Diplomacy ? MP.Diplomacy.targetWeight(state, v.owner, target.owner, t) : 1;
       if (dw <= 0) continue;
+      const vs = isAIOwner(state, target.owner); // cel to inna frakcja AI
+      if (vs && !aiWarReady(state, v.owner, target.owner, t, dw)) continue;
+      // większe armie nie mogą zamienić się w ciągły szturm na gracza: odstęp między wyprawami jednej frakcji na gracza
+      if (target.owner === 'player') { const lp = state.aiWar && state.aiWar[v.owner + '>player']; if (lp && t - lp < C.AI.versus.playerSpacingMin * 60000) continue; }
       // limit wiosek osiągnięty: wolne osady już tylko grabi (łup bez przejęcia)
-      const raid = target.owner === null && owned >= cap;
+      const raid = target.owner === null && owned + noblesAway >= cap;
       if (raid && !P.raids) continue;
       if (target.owner === null && zone && playerAll.some(pv => E.dist(pv, target) <= zone)) continue;
       if (target.owner === 'player' && (grace || (state.lastHit && t - (state.lastHit[target.id] || -1e15) < cooldown))) continue;
@@ -307,9 +329,9 @@
       E.tickVillage(state, target, t);
       const wall = Math.max(0, target.buildings.wall - Math.floor(E.ramCount(send) / C.RAM.fightPerLevel));
       const Dv = E.villageDefense(target, wall, E.upgradesOf(state, target.owner));
-      if (!(target.owner === null && !raid) && A < fullNeed) continue; // pełny próg: gracz, frakcje i grabież
-      if (A < Dv * P.attackRatio * (target.owner === 'player' ? D.aiCaution * (1 - press * (1 - C.AI.pressure.ratioFloor)) : 1)) continue;
-      let w = dw / (1 + d);
+      if (!(target.owner === null && !raid) && A < fullNeed * (vs ? C.AI.versus.powerMult : 1)) continue; // pełny próg: gracz, frakcje i grabież
+      if (A < Dv * P.attackRatio * (target.owner === 'player' ? D.aiCaution * (1 - press * (1 - C.AI.pressure.ratioFloor)) : vs ? C.AI.versus.ratioMult : 1)) continue;
+      let w = dw / (1 + d) * (vs ? C.AI.versus.weightMult : 1);
       w *= 1 + Math.min(2, (target.res.wood + target.res.clay + target.res.iron) / T().lootScale); // łup
       w *= 1 + Math.min(1, A / Math.max(1, Dv) / 6);                                              // łatwy cel
       if (raid) w *= P.raids;
@@ -317,13 +339,17 @@
       else {
         if (target.owner === 'player') w *= P.playerBias * D.playerBias * (1 + press * C.AI.pressure.biasBoost);
         if (P.nobles && target.loyalty != null && target.loyalty < 100) w *= 1 + (100 - target.loyalty) / 25; // dobijanie podboju
-        if (P.nobles && v.units.noble > 0 && owned < cap) w *= 1.5;
+        if (P.nobles && v.units.noble > 0 && owned + noblesAway < cap) w *= 1.5;
       }
       if (!best || w > best.w) best = { target, w, raid };
     }
     if (!best) return;
-    if (best.target.owner !== null && P.nobles && v.units.noble > 0 && owned < cap) send.noble = 1;
-    E.sendAttack(state, v.id, best.target.id, send, t, 'attack', { raid: best.raid });
+    if (best.target.owner !== null && P.nobles && v.units.noble > 0 && owned + noblesAway < cap) send.noble = 1;
+    const sent = E.sendAttack(state, v.id, best.target.id, send, t, 'attack', { raid: best.raid });
+    if ((best.target.owner === 'player' || isAIOwner(state, best.target.owner)) && !(sent && sent.ok === false)) {
+      state.aiWar = state.aiWar || {};
+      state.aiWar[v.owner + '>' + best.target.owner] = t;
+    }
   }
 
   /* ---------- 0. ulepszenia jednostek (odpowiednik Technologii gracza) ---------- */
