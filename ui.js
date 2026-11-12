@@ -389,16 +389,21 @@
   /* ---------- ekran: PRZEGLĄD WIOSEK ---------- */
   function renderOverview() {
     const s = st(), el = $('#screen-overview');
-    const own = E.villagesOf(s, 'player').sort((a, b) => a.name.localeCompare(b.name, 'pl'));
+    const allOwn = E.villagesOf(s, 'player').sort((a, b) => a.name.localeCompare(b.name, 'pl'));
+    // role z podziału wiosek Autopilota (ofensywna / defensywna); filtr działa tylko, gdy podział jest aktywny
+    const roles = (s.pilot && s.pilot.on && s.pilot.roles) || null;
+    const nOff = roles ? allOwn.filter(v => roles[v.id] === 'off').length : 0, nDef = roles ? allOwn.filter(v => roles[v.id] === 'def').length : 0;
+    const rf = roles && (UI.ovRole === 'off' || UI.ovRole === 'def') ? UI.ovRole : 'all';
+    const own = rf === 'all' ? allOwn : allOwn.filter(v => roles[v.id] === rf);
     // odświeżanie co 5 s albo przy zmianie struktury – liczniki czasu tykają same
-    const sig = JSON.stringify([own.map(v => [v.id, v.buildQueue.length, v.recruitQueue.length, E.sumUnits(v.units)]), incomingAttacks(s).length, diploOffers(s), UI.vid, Math.floor(s.now / 5000), (s.factions.player && s.factions.player.stat) || 0]);
+    const sig = JSON.stringify([own.map(v => [v.id, v.buildQueue.length, v.recruitQueue.length, E.sumUnits(v.units)]), incomingAttacks(s).length, diploOffers(s), UI.vid, rf, roles ? allOwn.map(v => roles[v.id] || '').join('') : '', Math.floor(s.now / 5000), (s.factions.player && s.factions.player.stat) || 0]);
     if (UI.sigs.overview === sig) return;
     // Użytkownik właśnie przewija – nie podmieniamy DOM (przerwałoby to przewijanie, także bezwładność na telefonie).
     // Sygnatura zostaje stara, więc przerysowanie nastąpi w najbliższym ticku po zakończeniu przewijania.
     if (userScrolling()) return;
     UI.sigs.overview = sig;
     const keep = saveScroll(el);
-    if (!own.length) { el.innerHTML = noVillages(); return; }
+    if (!allOwn.length) { el.innerHTML = noVillages(); return; }
     const inc = incomingAttacks(s);
     const pw = E.accountPower(s, 'player');
     const all = E.armyOf(s, 'player'), allTotal = E.sumUnits(all); // wszystkie jednostki: w wioskach, na wsparciu i w marszu
@@ -416,7 +421,7 @@
       const bq = v.buildQueue[0], rq = v.recruitQueue[0];
       const attacks = inc.filter(m => m.to === v.id).sort((a, b) => a.arrive - b.arrive);
       return '<tr' + (v.id === UI.vid ? ' class="cur"' : '') + '>' +
-        '<td class="vname"><button class="link" data-act="goto" data-id="' + v.id + '">' + esc(v.name) + '</button><small>' + xy(v.x, v.y) + ', ' + E.points(v) + ' pkt</small></td>' +
+        '<td class="vname"><button class="link" data-act="goto" data-id="' + v.id + '">' + esc(v.name) + '</button>' + roleTag(roles && roles[v.id]) + '<small>' + xy(v.x, v.y) + ', ' + E.points(v) + ' pkt</small></td>' +
         E.RES.map(resCell).join('') +
         '<td class="num farm"><b>' + fmt(used) + '</b><small> / ' + fmt(pc) + '</small></td>' +
         '<td>' + (bq ? ico(S.building[bq.building]) + C.BUILDINGS[bq.building].name + ' ' + bq.level + ' <span class="timer" data-end="' + bq.end + '"></span>' +
@@ -425,9 +430,12 @@
         '<td class="units-cell"><span class="units-wrap">' + unitsLine(v.units) + '</span></td>' +
         '<td>' + (attacks.length ? '<span class="alert">' + ico('sword') + attacks.length + ' <span class="timer" data-end="' + attacks[0].arrive + '"></span></span>' : '') + '</td></tr>';
     }).join('');
-    el.innerHTML = '<section class="ov-head panel"><div><h1>Przegląd wiosek</h1><p class="tags"><span>' + own.length + ' z ' + E.winVillages(s) + ' wiosek</span>' +
+    el.innerHTML = '<section class="ov-head panel"><div><h1>Przegląd wiosek</h1><p class="tags"><span>' + allOwn.length + ' z ' + E.winVillages(s) + ' wiosek</span>' +
+      (roles ? '<span class="rtag off">' + ico('axe') + nOff + ' ofensywnych</span><span class="rtag def">' + ico('wall') + nDef + ' defensywnych</span>' : '') +
       (inc.length ? '<span class="warn">Nadciągające ataki: ' + inc.length + '</span>' : '') +
       (diploOffers(s) ? '<span class="warn">Oferty paktów: ' + diploOffers(s) + '</span>' : '') + '</p>' +
+      (roles ? '<div class="actions left rolefilter"><span class="muted">Pokaż wioski:</span>' +
+        [['all', 'Wszystkie'], ['off', 'Ofensywne'], ['def', 'Defensywne']].map(f => '<button class="btn' + (rf === f[0] ? '' : ' ghost') + '" data-act="ov-role" data-role="' + f[0] + '">' + f[1] + '</button>').join('') + '</div>' : '') +
       '<div class="actions left"><button class="btn" data-act="gather-open"' + (own.length > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"') + '>' + ico('merchant') + 'Zbierz / rozdziel surowce</button>' +
       '<button class="btn" data-act="troops-open"' + (own.length > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"') + '>' + ico('spear') + 'Zbierz / rozdziel wojsko</button>' +
       '<button class="btn" data-act="defense-open"' + (own.length > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"') + '>' + ico('wall') + 'Wyślij obronę</button>' +
@@ -450,6 +458,10 @@
       '<thead><tr><th>Wioska</th><th>' + ico('wood') + 'Drewno</th><th>' + ico('clay') + 'Glina</th><th>' + ico('iron') + 'Żelazo</th><th>' + ico('pop') + 'Farma</th><th>Budowa</th><th>Rekrutacja</th><th>Wojsko</th><th>Ataki</th></tr></thead>' +
       '<tbody>' + rows + '</tbody></table></div></section>';
     restoreScroll(el, keep);
+  }
+
+  function roleTag(r) {
+    return r ? ' <span class="rtag ' + r + '" title="Wioska ' + (r === 'off' ? 'ofensywna' : 'defensywna') + ' (podział Autopilota)">' + ico(r === 'off' ? 'axe' : 'wall') + (r === 'off' ? 'ofensywna' : 'defensywna') + '</span>' : '';
   }
 
   // Karta statystyk gracza: zrabowane i utracone surowce, bitwy, podbite wioski, pokonani wrogowie.
@@ -2004,6 +2016,7 @@
         show('map');
         requestAnimationFrame(() => MP.Map.centerOn(UI.sel.x, UI.sel.y));
         break;
+      case 'ov-role': UI.ovRole = b.dataset.role; invalidate(); render(); break;
       case 'goto':
         UI.vid = b.dataset.id; UI.recruit = {};
         show('village');

@@ -1010,3 +1010,15 @@ html, body { max-width: 100%; overflow-x: clip; }
 .tb { display: inline-block; margin-left: .25rem; padding: 0 .3rem; border-radius: 3px; font-size: .68rem; font-weight: 800; font-style: normal; background: rgba(110, 190, 120, .18); color: #8fd69a; vertical-align: middle; }
 .u-stats .tb { display: block; margin: .1rem auto 0; width: fit-content; }
 .opt-field select[data-prec] { flex-basis: 100%; }
+
+/* Podział wiosek Autopilota: znaczniki na mapie i w Przeglądzie */
+.vlabel .vrole { font-style: normal; font-size: 11px; line-height: 16px; margin: 0 -1px 0 -2px; filter: drop-shadow(0 1px 0 rgba(0, 0, 0, .4)); }
+.map-world.far .vlabel .vrole { font-size: 11px; }
+.tile.role-off .vlabel { box-shadow: 0 0 0 1.5px var(--fc), 0 0 0 3px #e0574b, 0 2px 6px rgba(0, 0, 0, .4); }
+.tile.role-def .vlabel { box-shadow: 0 0 0 1.5px var(--fc), 0 0 0 3px #4f8ad6, 0 2px 6px rgba(0, 0, 0, .4); }
+.rtag { display: inline-flex; align-items: center; gap: .25rem; margin-left: .35rem; padding: .05rem .5rem; border-radius: 999px; font-size: .72rem; font-weight: 800; vertical-align: middle; }
+.rtag.off { background: rgba(224, 87, 75, .18); color: #ff9a92; }
+.rtag.def { background: rgba(79, 138, 214, .2); color: #9cc2f5; }
+.tags .rtag { margin-left: 0; }
+.rtag .ico { width: 1em; height: 1em; }
+.rolefilter { align-items: center; gap: .4rem; }

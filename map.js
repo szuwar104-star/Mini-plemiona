@@ -114,6 +114,11 @@
 
   /* ---------- warstwy zależne od stanu ---------- */
   function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+  function pilotRole(state, v) {
+    if (v.owner !== 'player') return null;
+    const p = state.pilot;
+    return (p && p.on && p.roles && p.roles[v.id]) || null;
+  }
   function tileHtml(state, t, ctx) {
     const v = t.village ? state.villages[t.village] : null;
     let cls = 'tile', inner = '', title;
@@ -124,8 +129,12 @@
       if (ctx.incoming.has(v.id)) cls += ' under-attack';
       if (ctx.outgoing.has(v.id)) cls += ' targeted';
       const color = E.ownerColor(state, v.owner);
-      inner = '<span class="vlabel" style="--fc:' + color + '"><i>' + E.points(v) + '</i>' + escapeHtml(v.name) + '</span>';
-      title = v.name + ' (' + t.x + ':' + t.y + ') – ' + E.ownerName(state, v.owner) + ', ' + E.points(v) + ' pkt';
+      const role = pilotRole(state, v);   // rola nadana przez Autopilota (podział wiosek): 'off' | 'def' | null
+      if (role) cls += ' role-' + role;
+      inner = '<span class="vlabel" style="--fc:' + color + '"><i>' + E.points(v) + '</i>' +
+        (role ? '<b class="vrole ' + role + '" aria-hidden="true">' + (role === 'off' ? '⚔' : '🛡') + '</b>' : '') + escapeHtml(v.name) + '</span>';
+      title = v.name + ' (' + t.x + ':' + t.y + ') – ' + E.ownerName(state, v.owner) + ', ' + E.points(v) + ' pkt' +
+        (role ? ', wioska ' + (role === 'off' ? 'ofensywna' : 'defensywna') + ' (Autopilot)' : '');
     } else {
       title = (t.terrain === 'forest' ? 'Las' : t.terrain === 'mountain' ? 'Góry' : 'Równina') + ' (' + t.x + ':' + t.y + ')';
     }
@@ -166,7 +175,7 @@
     if (miniDirty || !miniBase) miniBase = A.minimap(state, layers.terrain, layers.territory, MINI * 2);
     drawMini();
   }
-  function villageSig(state, v) { return v.owner + '|' + E.points(v) + '|' + v.name; }
+  function villageSig(state, v) { return v.owner + '|' + E.points(v) + '|' + v.name + '|' + (pilotRole(state, v) || ''); }
   function syncVillageTiles(state, ctx) {
     Object.values(state.villages).forEach(v => {
       let r = layers.vt.get(v.id);
