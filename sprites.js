@@ -306,7 +306,7 @@
       });
     },
     light(c, o) {
-      // lekka kawaleria: koń w galopie z rycerzem i kopią z proporcem (widok z boku)
+      // lekka kawaleria: koń bojowy w widoku z boku
       o = o || {};
       const coat = o.coat || '#a8622f', coatD = o.coatD || '#7a4320', mane = o.mane || '#2f1a0c', cloth = o.cloth || '#b8432b';
       c.shadow(16, 30.6, 13, 1.1);
@@ -324,24 +324,16 @@
       c.flat(S.line(26.6, 9.6, 29.6, 12, 0.8), cloth);
       c.paint(S.poly([[9.6, 13.4], [18.6, 13.4], [19.2, 20.4], [9, 20.4]]), cloth, 'v', { bev: 0.6 });                                    // czaprak
       c.flat(S.rect(9, 19.6, 10.2, 0.9), COL.gold);
-      // jeździec
-      c.paint(S.poly([[12.4, 19.4], [15.4, 19.4], [16.2, 25], [13.4, 25.6]]), '#4a5a72', 'v', { bev: 0.4 });
-      c.paint(S.poly([[11, 14.4], [17.6, 14.4], [18, 7.8], [13.6, 6.8], [11, 8.4]]), o.tunic || '#4f78b8', 'd', { bev: 0.6 });
-      c.paint(S.circle(14.6, 4.8, 2.9), COL.skin, 'r', { bev: 0 });
-      if (o.scout) {
-        c.paint(S.poly([[11.4, 6.2], [11.8, 2.4], [14.6, 0.8], [17.4, 2.4], [17.8, 6.2], [16, 4.4], [13, 4.4]]), '#5f8f3c', 'd', { bev: 0.5 });
-        c.paint(S.line(17, 9.2, 22.8, 5.6, 2), '#c99a3c', 'h', { bev: 0.4 }); c.flat(S.line(21.4, 6.4, 23, 5.4, 2.4), '#e8c25a');
-      } else {
-        c.paint(S.poly([[11.6, 5.4], [11.8, 2.2], [14.6, 0.8], [17.4, 2.2], [17.6, 5.4], [16, 4], [13.2, 4]]), COL.steel, 'd', { bev: 0.5 });
-        c.paint(S.poly([[14.4, 1.2], [11.2, 0.6], [10.6, 3.2], [13, 3]]), COL.red, 'd', { bev: 0 });
-        c.paint(S.line(8, 18.4, 30.4, 3.6, 1.4), '#8d5a2b', 'h', { bev: 0.3 });
-        c.paint(S.poly([[29, 5.2], [32, 1.6], [31.4, 5.6]]), COL.steel, 'h', { bev: 0.3 });
-        c.paint(S.poly([[24.4, 7.6], [28.6, 4.8], [27.6, 8.8]]), COL.red, 'v', { bev: 0.3 });
-        c.paint(S.line(17.2, 10.4, 20.6, 11.6, 2), '#4f78b8', 'v', { bev: 0 });
+      // ozdoby: płyta na pysku i pióropusz (tylko koń bojowy), zwiadowca ma samą uzdę
+      if (!o.scout) {
+        c.paint(S.poly([[25.4, 6.8], [28.8, 6], [31.2, 10.8], [29.8, 12.2], [26.8, 9.8]]), COL.steel, 'd', { bev: 0.5 });
+        c.paint(S.poly([[24.8, 5.4], [23.6, 1.6], [27, 2.2], [26.2, 5.2]]), COL.red, 'd', { bev: 0.3 });
       }
+      // siodło na czapraku
+      c.paint(S.rrect(11.4, 11.8, 6.2, 2.8, 1.2), '#4a2a14', 'v', { bev: 0.4 });
     },
     scout(c) {
-      DRAW.light(c, { coat: '#eeece6', coatD: '#b9bcc6', mane: '#8d95a6', cloth: '#3f6cc4', tunic: '#7a5a3a', scout: true });
+      DRAW.light(c, { coat: '#eeece6', coatD: '#b9bcc6', mane: '#8d95a6', cloth: '#3f6cc4', scout: true });
     },
     ram(c) {
       // taran: bela na kołach z wielką stalową głową barana
