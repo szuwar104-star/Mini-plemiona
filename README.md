@@ -140,6 +140,9 @@ Poziom wybierasz przy nowej grze (Menu → Zacznij od nowa) i możesz go zmieni�
 | Część magazynu ukryta przed łupieżcami | 40% | 25% | 10% |
 | Przerwa między atakami AI na tę samą wioskę | 15 min | 8 min | brak |
 | Strefa wokół Twoich wiosek, w której AI nie zajmuje osad | 4 pola | 3 pola | brak |
+| Presja AI na gracza | brak | brak | tak (patrz niżej) |
+
+**Presja na Trudnym.** Silnie bronionego gracza AI zwykle omijało, bo nie osiągało wymaganej przewagi. Na Trudnym frakcje są teraz odrobinę bardziej zaczepne (częstsze próby, wyższa waga gracza jako celu, niższa ostrożność) i dochodzi presja: po 20 minutach bez ataku AI na którąkolwiek Twoją wioskę (licząc od końca ochrony) rośnie ona liniowo przez 60 minut. Przy pełnej presji AI wystarcza 40% zwykłej przewagi, próg siły wyprawy jest o połowę niższy, a próby ataku i waga gracza jako celu są wyraźnie większe. Każdy atak na Ciebie zeruje presję. Wyprawy bywają wtedy słabsze od Twojej obrony, więc część z nich się nie powiedzie, ale dostajesz stały nacisk. Parametry: `C.AI.pressure` i `DIFFICULTY.hard.aiPressure` w `config.js`; test: `node tests/pressure.js`. Na Łatwym i Normalnym presja jest wyłączona.
 
 Koszty budynków rosną o ok. 30% na poziom (produkcja rośnie podobnie), więc kolejne poziomy nie zwracają się coraz wolniej. Tartak, Cegielnia i Kopalnia produkują tyle samo, a koszty budynków i jednostek są rozłożone mniej więcej po równo na trzy surowce.
 

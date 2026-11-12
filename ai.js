@@ -83,6 +83,18 @@
     return Math.floor(z * Math.max(0, 1 - hours / fade));
   }
 
+  // Presja na gracza (poziom Trudny): im dłużej AI nie uderzyło w żadną wioskę gracza, tym śmielej do tego dąży – niższe wymagane
+  // przewagi i próg siły wyprawy, częstsze próby i większa waga gracza jako celu. Po udanym uderzeniu presja spada do zera.
+  // Zwraca 0..1 (pomnożone przez DIFFICULTY.aiPressure; 0 = wyłączona na Łatwym i Normalnym).
+  function pressureOf(state, t) {
+    const D = E.diff(state), k = D.aiPressure || 0, cfg = C.AI.pressure;
+    if (!k || !cfg) return 0;
+    let last = state.created + D.graceMinutes * 60000;
+    const hits = state.lastHit || {};
+    for (const id in hits) if (hits[id] > last) last = hits[id];
+    return Math.max(0, Math.min(1, ((t - last) / 60000 - cfg.startMin) / cfg.rampMin)) * k;
+  }
+
   /* ---------- 1. gospodarka ---------- */
   // Zwraca koszt budynku, na który wioska oszczędza (albo null, gdy coś zakolejkowała / nie ma czego budować).
   function manageBuild(state, v, P, t) {
@@ -236,7 +248,7 @@
   }
 
   /* ---------- 5. ataki ---------- */
-  function tryAttack(state, v, P, t, owned, playerAll) {
+  function tryAttack(state, v, P, t, owned, playerAll, press) {
     const out = state.movements.filter(m => m.from === v.id && m.type === 'attack' && m.owner === v.owner).length;
     if (out >= (P.waves || 1)) return;
     if (incomingOn(state, v).length) return; // nie wysyła wojska, gdy samo jest atakowane
@@ -258,7 +270,7 @@
     // Próg rośnie z czasem gry, więc wyprawy są coraz większe (a nie stałe garstki, które co chwilę giną lub wykrwawiają wroga).
     const hoursPlayed = Math.max(0, (t - state.created) / 3600000);
     const growth = Math.min(T().waveGrowthMax, 1 + hoursPlayed * T().waveGrowthPerHour);
-    if (A < (P.minPower + E.points(v) * T().powerPerPoint) * growth) return;
+    if (A < (P.minPower + E.points(v) * T().powerPerPoint) * growth * (1 - press * C.AI.pressure.powerCut)) return;
 
     const D = E.diff(state);
     const minutes = (t - state.created) / 60000;
@@ -288,14 +300,14 @@
       E.tickVillage(state, target, t);
       const wall = Math.max(0, target.buildings.wall - Math.floor(E.ramCount(send) / C.RAM.fightPerLevel));
       const Dv = E.villageDefense(target, wall, E.upgradesOf(state, target.owner));
-      if (A < Dv * P.attackRatio * (target.owner === 'player' ? D.aiCaution : 1)) continue;
+      if (A < Dv * P.attackRatio * (target.owner === 'player' ? D.aiCaution * (1 - press * (1 - C.AI.pressure.ratioFloor)) : 1)) continue;
       let w = dw / (1 + d);
       w *= 1 + Math.min(2, (target.res.wood + target.res.clay + target.res.iron) / T().lootScale); // łup
       w *= 1 + Math.min(1, A / Math.max(1, Dv) / 6);                                              // łatwy cel
       if (raid) w *= P.raids;
       else if (target.owner === null) w *= P.neutralBias * (1 + (100 - target.loyalty) / 25); // dobija rozpoczęty podbój
       else {
-        if (target.owner === 'player') w *= P.playerBias * D.playerBias;
+        if (target.owner === 'player') w *= P.playerBias * D.playerBias * (1 + press * C.AI.pressure.biasBoost);
         if (P.nobles && target.loyalty != null && target.loyalty < 100) w *= 1 + (100 - target.loyalty) / 25; // dobijanie podboju
         if (P.nobles && v.units.noble > 0 && owned < cap) w *= 1.5;
       }
@@ -337,12 +349,13 @@
     sendReinforcements(state, fid, vs, P, t);
     gatherArmy(state, fid, vs, P, t);
     const playerAll = E.villagesOf(state, 'player');
+    const press = pressureOf(state, t);
     for (const v of vs) {
       if (P.settle) trySettle(state, v, t);
       trySpy(state, v, P, t);
-      if (E.rand(state) < P.attackChance * E.diff(state).aiAggro) tryAttack(state, v, P, t, vs.length, playerAll);
+      if (E.rand(state) < P.attackChance * E.diff(state).aiAggro * (1 + press * C.AI.pressure.chanceBoost)) tryAttack(state, v, P, t, vs.length, playerAll, press);
     }
   }
 
-  MP.AI = { think, villageCap, playerZoneNow };
+  MP.AI = { think, villageCap, playerZoneNow, pressureOf };
 })(typeof window !== 'undefined' ? window : globalThis);

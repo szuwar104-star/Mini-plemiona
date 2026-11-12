@@ -36,6 +36,7 @@
     // aiAggro: jak często AI atakuje; playerBias: jak chętnie AI wybiera gracza;
     // aiCaution: jakiej przewagi AI potrzebuje do ataku; lootProtect: część magazynu
     // gracza ukryta przed łupieniem; hitCooldownMin: przerwa między atakami AI na tę samą wioskę gracza;
+    // aiPressure: 0..1, jak mocno rośnie determinacja AI, gdy długo nie uderzyło w gracza (C.AI.pressure; tylko Trudny);
     // aiTech: tempo automatycznych ulepszeń jednostek AI (1 = poziom co AI.tech.minutesPerLevel minut gry);
     // aiExpand: mnożnik limitu wiosek AI; aiCatchUp: do jakiej części wiosek lidera (gracza) AI może dorosnąć mimo limitu czasowego; playerZone: promień (w polach) wokół wiosek gracza, w którym AI nie zajmuje wolnych osad ani pól.
     // Tryb Wyścig (state.race, wybierany przy nowej grze i w Menu): frakcja AI, która pierwsza zdobędzie cel wiosek świata, wygrywa.
@@ -50,8 +51,8 @@
                 playerProd: 1.15, aiProd: 0.72, graceMinutes: 25, aiAggro: 0.7, playerBias: 0.7, aiCaution: 1.2, lootProtect: 0.25, hitCooldownMin: 8,
                 aiExpand: 0.7, aiCatchUp: 0.7, playerZone: 3, aiTech: 0.8 },
       hard:   { label: 'Trudny',   desc: 'Agresywne i szybkie AI. Dla doświadczonych.',
-                playerProd: 1, aiProd: 0.95, graceMinutes: 10, aiAggro: 1, playerBias: 1, aiCaution: 1, lootProtect: 0.1, hitCooldownMin: 0,
-                aiExpand: 1, aiCatchUp: 0.9, playerZone: 0, aiTech: 1 }
+                playerProd: 1, aiProd: 0.95, graceMinutes: 10, aiAggro: 1.1, playerBias: 1.2, aiCaution: 0.95, lootProtect: 0.1, hitCooldownMin: 0,
+                aiExpand: 1, aiCatchUp: 0.9, playerZone: 0, aiTech: 1, aiPressure: 1 }
     },
     WIN_VILLAGES: 20,           // domyślny cel (stare zapisy); nowe gry biorą cel ze świata (WORLDS)
 
@@ -425,6 +426,10 @@
       // ceilingShareRace: sufit w trybie Wyścig (AI może dojść do celu zwycięstwa).
       // zoneFadeHours: po tylu godzinach gry strefa ochronna wokół wiosek gracza (DIFFICULTY.playerZone) znika.
       growth: { everyHours: 3, perStep: 1, ceilingShare: 0.5, ceilingShareRace: 1, zoneFadeHours: 24 },
+      // Presja na gracza (DIFFICULTY.*.aiPressure): po startMin minut bez ataku AI na gracza (licząc od końca ochrony) rośnie liniowo
+      // przez rampMin minut do pełnej. Przy pełnej: wymagana przewaga nad graczem spada do ratioFloor (część zwykłej), próg siły wyprawy
+      // o powerCut, częstość prób rośnie o chanceBoost, a waga gracza jako celu o biasBoost. Każdy atak na gracza zeruje presję.
+      pressure: { startMin: 20, rampMin: 60, ratioFloor: 0.4, powerCut: 0.5, chanceBoost: 0.6, biasBoost: 1.5 },
       // Taktyka wspólna dla wszystkich frakcji (ai.js)
       tactics: {
         buildQueue: 3,           // ile budów AI trzyma w kolejce
