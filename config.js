@@ -260,7 +260,7 @@
     },
     // Autopilot (pilot.js): bot rozwijający Twoje wioski. Czasy w sekundach/minutach CZASU GRY.
     PILOT: {
-      defaults: { on: false, build: true, recruit: 'defense', tech: true, defend: true, garrison: true, supply: true, defLevel: 40, convoy: false, hub: null, settle: false, settleMax: 0, attack: false, farm: false },
+      defaults: { on: false, build: true, recruit: 'defense', tech: true, defend: true, garrison: true, supply: true, defLevel: 40, convoy: false, hub: null, settle: false, settleMax: 0, attack: false, farm: false, split: false, splitRatio: 3 },
       tickSec: 60,               // co ile sekund bot sprawdza wioski
       alertDelaySec: 1,          // po wykryciu nowego ataku bot działa po tylu sekundach
       buildDepth: 2,             // ile budów trzyma w kolejce każda wioska
@@ -270,6 +270,12 @@
       storeUrgent: 0.85,         // zapełnienie magazynu, od którego Ratusz ma pierwszeństwo
       storeSpend: 0.9,           // od tego zapełnienia wydaje na wojsko wszystko (nic się nie marnuje)
       recruitShare: 0.8,         // jaką część nadwyżki (ponad rezerwę na budynek) wydaje na wojsko
+      // Podział wiosek (opcja „split”): wioski ofensywne szkolą tylko jednostki ataku i stąd wychodzą ataki/grabieże,
+      // wioski defensywne tylko obronę (posiłki i garnizony, także dla ofensywnych). Wymaga działań ofensywnych (podbój, grabież albo tryb zbalansowany).
+      split: {
+        ratio: 3,                // domyślnie: na 1 wioskę ofensywną przypada tyle defensywnych
+        offGarrison: 0.5         // cel garnizonu przygranicznej wioski ofensywnej = zwykły cel garnizonu × ta wartość (obrona idzie z defensywnych)
+      },
       scouts: 3,                 // tylu zwiadowców trzyma w każdej wiosce
       supportShare: 0.6,         // maks. część obrońców wysyłana z wioski jako posiłki
       supportMin: 5,             // mniejszych oddziałów nie wysyła
