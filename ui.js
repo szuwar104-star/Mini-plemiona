@@ -462,6 +462,9 @@
       kpi('Zrabowane surowce', fmt(t.looted.total), byRes(t.looted)) +
       kpi('Utracone w najazdach', fmt(t.lost.total), byRes(t.lost)) +
       kpi('Bitwy', fmt(battles), 'wygrane ' + fmt(t.won) + ' · przegrane ' + fmt(t.lostBattles)) +
+      kpi('Ataki', fmt(t.attWon + t.attLost), 'wygrane ' + fmt(t.attWon) + ' · przegrane ' + fmt(t.attLost)) +
+      kpi('Obrona', fmt(t.defWon + t.defLost), 'odparte ' + fmt(t.defWon) + ' · przegrane ' + fmt(t.defLost)) +
+      kpi('Utracone jednostki', fmt(t.lostUnits), 'w atakach i obronie') +
       kpi('Zdobyte wioski', fmt(t.conquered)) +
       kpi('Pokonane jednostki', fmt(t.kills.units), 'pkt: atak ' + fmt(Math.round(t.kills.att)) + ' · obrona ' + fmt(Math.round(t.kills.def))) +
       '</div></section>';

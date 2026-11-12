@@ -23,6 +23,8 @@ ok(rep.attackerWon && repLoot > 0, 'atak wygrany i zrabował surowce (' + repLoo
 ok(t.looted.total === repLoot, 'statystyka zrabowanych = łup z raportu (' + t.looted.total + ')');
 ok(t.looted.wood === rep.loot.wood && t.looted.iron === rep.loot.iron, 'podział na surowce zgodny z raportem');
 ok(t.won === 1 && t.lostBattles === 0, 'bitwa wygrana policzona');
+ok(t.attWon === 1 && t.attLost === 0 && t.defWon === 0 && t.defLost === 0, 'wygrany atak liczony jako atak, nie obrona');
+ok(t.lostUnits === Object.values(rep.attLoss).reduce((a, b) => a + b, 0), 'straty własnych jednostek = straty atakującego z raportu');
 
 if (fails) { console.error(fails + ' błędów'); process.exit(1); }
 console.log('Wszystko OK');

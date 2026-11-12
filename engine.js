@@ -111,7 +111,8 @@
     const st = (state.factions[owner] || {}).stat || {};
     const sum = pre => RES.reduce((a, r) => a + (st[pre + r] || 0), 0);
     const res = pre => { const o = {}; RES.forEach(r => { o[r] = st[pre + r] || 0; }); o.total = sum(pre); return o; };
-    return { looted: res('loot_'), lost: res('lost_'), won: st.won || 0, lostBattles: st.lostB || 0, conquered: st.conquered || 0, kills: killsOf(state, owner) };
+    return { looted: res('loot_'), lost: res('lost_'), won: st.won || 0, lostBattles: st.lostB || 0,
+      attWon: st.attW || 0, attLost: st.attL || 0, defWon: st.defW || 0, defLost: st.defL || 0, lostUnits: st.lostUnits || 0, conquered: st.conquered || 0, kills: killsOf(state, owner) };
   }
   // Ranking wszystkich frakcji. Nie zdradza siły wojska AI – tylko wioski, punkty budynków i pokonanych wrogów.
   function ranking(state, sortBy) {
@@ -1255,6 +1256,11 @@
     }
     bumpStats(state, m.owner, attackerWon ? 'won' : 'lostB', 1);
     bumpStats(state, defOwner, attackerWon ? 'lostB' : 'won', 1);
+    // rozbicie na atak/obronę oraz własne straty w jednostkach
+    bumpStats(state, m.owner, attackerWon ? 'attW' : 'attL', 1);
+    bumpStats(state, defOwner, attackerWon ? 'defL' : 'defW', 1);
+    bumpStats(state, m.owner, 'lostUnits', sumUnits(attLoss));
+    bumpStats(state, defOwner, 'lostUnits', sumUnits(defLoss));
 
     // Podbój
     let conquered = false;
