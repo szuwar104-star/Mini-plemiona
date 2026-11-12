@@ -350,7 +350,7 @@ function twoVillages() {
     MP.Pilot.configure(s, Object.assign({ on: true, build: false, recruit: 'off', tech: false, defend: false, garrison: false, attack: true }, opts || {}), s.now);
     return { s, A, foe };
   };
-  const army = { axe: 500, ram: 12, noble: 2, scout: 5 };
+  const army = { axe: 500, ram: 12, noble: 2, scout: 5, spear: 300, guard: 100 };   // baza armii musi mieć własnych obrońców (samo wojsko ofensywne się nie liczy)
   const { s, A, foe } = setup(army);
   E.advance(s, s.now + 2 * MIN);
   ok(s.pilot.stats.spied >= 1, 'bot najpierw zwiadowuje cel (' + (s.pilot.stats.spied || 0) + ' zwiadów)');
@@ -368,12 +368,12 @@ function twoVillages() {
   ok(E.villagesOf(s, 'player').length >= 2, 'przejęta wioska trafia pod opiekę bota');
 
   // za słaba armia: bot nie atakuje
-  const w = setup({ axe: 20, noble: 1, scout: 5 });
+  const w = setup({ axe: 20, noble: 1, scout: 5, spear: 300, guard: 100 });
   E.advance(w.s, w.s.now + 2 * HOUR);
   ok(!w.s.reports.some(r => r.kind === 'attack') && !w.s.movements.some(m => m.type === 'attack'), 'za słaba armia – bot czeka');
   ok(w.s.pilot.warWhy && w.s.pilot.warWhy.text && w.s.pilot.log.some(l => /^Brak ataku:/.test(l.text)), 'bot podaje powód braku ataku: ' + (w.s.pilot.warWhy && w.s.pilot.warWhy.text));
   // bez Dowódcy: tylko zwiad, bez ataku
-  const nn = setup({ axe: 500, ram: 12, scout: 5 });
+  const nn = setup({ axe: 500, ram: 12, scout: 5, spear: 300, guard: 100 });
   E.advance(nn.s, nn.s.now + 2 * HOUR);
   ok(!nn.s.reports.some(r => r.kind === 'attack'), 'bez Dowódcy bot nie atakuje');
   ok(nn.s.pilot.warWhy && /Dowódc/.test(nn.s.pilot.warWhy.text), 'powód: brak Dowódcy (' + (nn.s.pilot.warWhy && nn.s.pilot.warWhy.text) + ')');
@@ -444,7 +444,7 @@ function twoVillages() {
   const B = JSON.parse(JSON.stringify(A));
   Object.assign(B, { id: 'vgB', name: 'B', x: A.x + 2, y: A.y + 1, buildQueue: [], recruitQueue: [], support: {}, lastTick: s.now });
   s.villages.vgB = B;
-  A.units = Object.assign(E.emptyUnits(), { axe: 300, scout: 3 });
+  A.units = Object.assign(E.emptyUnits(), { axe: 300, scout: 3, spear: 300, guard: 100 });
   B.units = Object.assign(E.emptyUnits(), { axe: 100, noble: 1, spear: 50, scout: 3 });
   MP.Pilot.configure(s, { on: true, build: false, recruit: 'off', tech: false, defend: false, garrison: false, attack: true }, s.now);
   E.advance(s, s.now + 20 * MIN);
@@ -523,6 +523,24 @@ function twoVillages() {
   E.advance(s, t0 + 3000);
   const sup = s.movements.filter(m => m.type === 'support' && m.owner === 'player' && m.to === O.id);
   ok(sup.length >= 1 && sup.every(m => s.pilot.roles[m.from] === 'def'), 'posiłki dla wioski ofensywnej wysyłają wyłącznie wioski defensywne (' + sup.length + ')');
+}
+
+// 17. Jednostki ofensywne nie liczą się jako „własna obrona”: wioska z samymi toporami i LK dalej szkoli obrońców
+{
+  const s = E.newGame(T0, 31, 'normal', 'small');
+  Object.values(s.factions).forEach(f => { if (f.ai) f.nextThink = 1e15; });
+  const A = E.villagesOf(s, 'player')[0];
+  Object.keys(s.villages).forEach(id => { if (s.villages[id].owner !== 'player') delete s.villages[id]; });
+  A.buildings.barracks = 5; A.buildings.farm = C.MAX_LEVEL; A.buildings.storage = C.MAX_LEVEL;
+  const cap = E.storageCap(A); A.res = { wood: cap, clay: cap, iron: cap };
+  A.units = Object.assign(E.emptyUnits(), { axe: 1083, light: 277, scout: 3 });
+  ok(E.villageDefense(A, null, null) > E.villageDefenseDef(A, null, null), 'obrona z samych jednostek ofensywnych jest wyższa niż obrona z jednostek def');
+  MP.Pilot.configure(s, { on: true, build: false, recruit: 'defense', tech: false, defend: true, garrison: true, attack: true }, s.now);
+  E.advance(s, s.now + 3 * MIN);
+  const defKeys = Object.keys(C.UNITS).filter(k => C.UNITS[k].role === 'def');
+  const defHave = defKeys.reduce((n, k) => n + (A.units[k] || 0) + A.recruitQueue.reduce((q, e) => q + (e.unit === k ? e.count : 0), 0), 0);
+  const offNew = ['axe', 'light'].reduce((n, k) => n + (A.units[k] - (k === 'axe' ? 1083 : 277)), 0) + A.recruitQueue.reduce((q, e) => q + (C.UNITS[e.unit].role || C.UNITS[e.unit].scout ? 0 : e.count), 0);
+  ok(defHave > 0 && offNew === 0, 'wioska z samą ofensywą szkoli obrońców, nie kolejną ofensywę (' + defHave + ' obrońców, +' + offNew + ' ofensywy)');
 }
 
 if (fails) { console.error('\nBłędy: ' + fails); process.exit(1); }

@@ -92,7 +92,7 @@
       if (!p.defend) return;
       const first = Math.min.apply(null, list.map(m => m.arrive));
       const goal = E.points(v) * p.defLevel * P().supportGoal;
-      let have = E.villageDefense(v, null, ups);
+      let have = E.villageDefenseDef(v, null, ups);
       state.movements.forEach(m => { if (m.type === 'support' && m.owner === 'player' && m.to === v.id) have += E.defensePower(m.units, ups); });
       const helpers = vs.filter(h => h.id !== v.id && roleOf(p, h) !== 'off' && !incomingOn(state, h).length).sort((a, b) => E.dist(a, v) - E.dist(b, v));
       let sentFrom = 0, sentUnits = 0;
@@ -131,9 +131,9 @@
     vs.forEach(v => { if (exposed(state, v, t)) front.push(v); else if (roleOf(p, v) !== 'off') rear.push(v); });   // ofensywne z zaplecza nie oddają obrony – jej nie szkolą
     if (!front.length || !rear.length) return;
     const need = v => E.points(v) * p.defLevel * P().garrisonGoal * (roleOf(p, v) === 'off' ? P().split.offGarrison : 1);
-    front.sort((a, b) => (E.villageDefense(a, null, ups) / Math.max(1, need(a))) - (E.villageDefense(b, null, ups) / Math.max(1, need(b))));
+    front.sort((a, b) => (E.villageDefenseDef(a, null, ups) / Math.max(1, need(a))) - (E.villageDefenseDef(b, null, ups) / Math.max(1, need(b))));
     for (const f of front) {
-      let have = E.villageDefense(f, null, ups);
+      let have = E.villageDefenseDef(f, null, ups);
       state.movements.forEach(m => { if (m.type === 'support' && m.owner === 'player' && m.to === f.id) have += E.defensePower(m.units, ups); });
       const goal = need(f);
       if (have >= goal) continue;
@@ -141,7 +141,7 @@
       let sentUnits = 0, sentFrom = 0;
       for (const h of helpers) {
         if (have >= goal) break;
-        const hdef = E.villageDefense(h, null, ups), keep = E.points(h) * p.defLevel * P().garrisonKeep;
+        const hdef = E.villageDefenseDef(h, null, ups), keep = E.points(h) * p.defLevel * P().garrisonKeep;
         if (hdef <= keep) continue;
         const frac = Math.min(P().garrisonShare, (hdef - keep) / hdef);
         const spare = E.emptyUnits();
@@ -285,7 +285,7 @@
 
     const border = p.garrison !== false && exposed(state, v, t);
     const target = E.points(v) * p.defLevel * (threatened ? 1.5 : 1) * (border ? P().garrisonGoal : 1);
-    const needDef = E.villageDefense(v, null, ups) < target;
+    const needDef = E.villageDefenseDef(v, null, ups) < target;
     const split = roleOf(p, v);
     let role;
     if (split === 'off') role = 'att';                       // wioska ofensywna: tylko jednostki ataku (obronę dostarczają defensywne)
@@ -498,7 +498,7 @@
       if (threatened[v.id]) return no('atakowane');
       if (v.buildings.hq < U.hq) return no('Ratusz poniżej ' + U.hq);
       if (v.buildings.barracks < U.barracks) return no('brak Koszar');
-      if (E.villageDefense(v, null, ups) < E.points(v) * p.defLevel * P().settleDefMin) return no('za słaba obrona');
+      if (E.villageDefenseDef(v, null, ups) < E.points(v) * p.defLevel * P().settleDefMin) return no('za słaba obrona');
       if (v.recruitQueue.length >= E.queueMax(v, 'recruit')) return no('pełna kolejka wojska');
       if (E.RES.some(r => U.cost[r] > E.storageCap(v))) return no('za mały magazyn');
       cands.push({ v, ready: Math.min.apply(null, E.RES.map(r => v.res[r] / U.cost[r])) });
@@ -547,7 +547,7 @@
     if (vs.reduce((s2, v) => s2 + attPower(state, v), 0) < W.minPower) return null;
     const U = C.UNITS.noble, ups = E.upgradesOf(state, 'player');
     const cands = vs.filter(v => !threatened[v.id] && v.buildings.barracks >= U.barracks && v.recruitQueue.length < E.queueMax(v, 'recruit') &&
-      (p.roles ? roleOf(p, v) === 'off' : E.villageDefense(v, null, ups) >= E.points(v) * p.defLevel * P().settleDefMin) && !E.RES.some(r => U.cost[r] > E.storageCap(v)))
+      (p.roles ? roleOf(p, v) === 'off' : E.villageDefenseDef(v, null, ups) >= E.points(v) * p.defLevel * P().settleDefMin) && !E.RES.some(r => U.cost[r] > E.storageCap(v)))
       .map(v => ({ v, ready: Math.min.apply(null, E.RES.map(r => v.res[r] / U.cost[r])) })).sort((a, b) => b.ready - a.ready);
     if (!cands.length) return null;
     const best = cands[0].v, ri = E.recruitInfo(state, best, 'noble');
@@ -586,7 +586,7 @@
     if (r === 'def') return false;                                         // z wiosek defensywnych nic nie wychodzi na wroga
     if (r === 'off') return v.loyalty >= C.LOYALTY.max;                    // ofensywna nie ma obrony – chronią ją posiłki i garnizon z defensywnych
     return v.loyalty >= C.LOYALTY.max &&
-      E.villageDefense(v, null, E.upgradesOf(state, 'player')) >= E.points(v) * p.defLevel * P().garrisonGoal * 0.8;
+      E.villageDefenseDef(v, null, E.upgradesOf(state, 'player')) >= E.points(v) * p.defLevel * P().garrisonGoal * 0.8;
   }
 
   // Armia ataku (i Dowódcy) z zaplecza wędruje na stałe do najsilniejszej wioski – rozproszona nie zdobędzie obsadzonej wioski.

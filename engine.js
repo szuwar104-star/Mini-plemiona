@@ -46,6 +46,13 @@
     return (defensePower(units, ups) + C.COMBAT.baseDefense + ((ups && ups.__militia) || 0) + W.flat[L]) * (1 + W.bonus[L] * (1 + ((ups && ups.__fort) || 0)));
   }
   function villageDefense(v, wallLevel, ups) { return defenseFrom(defenders(v), wallLevel == null ? v.buildings.wall : wallLevel, ups); }
+  // Obrona wioski liczona WYŁĄCZNIE z jednostek obronnych (role: 'def') – własnych i ze wsparcia. Jednostki ofensywne (topornik, LK)
+  // mają niską, ale niezerową obronę; Autopilot nie może ich uznawać za „własną obronę”, bo wioska bez obrońców wygląda wtedy na bezpieczną.
+  function villageDefenseDef(v, wallLevel, ups) {
+    const all = defenders(v), u = emptyUnits();
+    UNITS.forEach(k => { if (C.UNITS[k].role === 'def') u[k] = all[k] || 0; });
+    return defenseFrom(u, wallLevel == null ? v.buildings.wall : wallLevel, ups);
+  }
   function upgradesOf(state, owner) {
     const f = state.factions[owner];
     if (!f) return null;
@@ -1500,7 +1507,7 @@
     notice, checkWin,
     buildInfo, queueBuild, recruitInfo, queueRecruit, recruitPer,
     travelTime, slowest, sendAttack, sendSpy, advance, nextEvent, gameClock, pauseGame, resumeGame,
-    unitsPop, supportRoom, sendSupport, withdrawSupport, defenders, defenseFrom, villageDefense,
+    unitsPop, supportRoom, sendSupport, withdrawSupport, defenders, defenseFrom, villageDefense, villageDefenseDef,
     merchantsTotal, merchantsBusy, merchantsFree, merchantTime, sendTransport, planGather, sendGather, planTroops, sendTroops, planRecruitAll, recruitAll, incomingRes, settleCheck, sendSettler
   };
 })(typeof window !== 'undefined' ? window : globalThis);
