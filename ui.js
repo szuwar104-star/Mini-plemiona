@@ -1331,13 +1331,16 @@
       fld('hq', 'Stolica', 'Wioska centralna dla konwojów', '<select data-phub>' + hubs + '</select>'));
 
     const mil = sec('spear', 'Obrona i wojsko',
-      fld('barracks', 'Szkolenie wojska', '', '<select data-prec>' + opt('defense', g.recruit, 'Tylko obrona (Pikinierzy, Łucznicy, Tarczownicy)') +
-        opt('balanced', g.recruit, 'Obrona, a po osiągnięciu celu także armia ataku') + opt('off', g.recruit, 'Nie szkol wojska') + '</select>') +
+      fld('barracks', 'Szkolenie wojska', g.split && g.recruit !== 'off' ? 'Przy podziale wiosek: ofensywne szkolą atak, defensywne obronę' : '', '<select data-prec>' +
+        (g.split
+          ? opt('balanced', g.recruit === 'off' ? 'off' : 'balanced', 'Wg podziału wiosek (ofensywne – atak, defensywne – obrona)')
+          : opt('defense', g.recruit, 'Tylko obrona (Pikinierzy, Łucznicy, Tarczownicy)') + opt('balanced', g.recruit, 'Obrona, a po osiągnięciu celu także armia ataku')) +
+        opt('off', g.recruit, 'Nie szkol wojska') + '</select>') +
       fld('wall', 'Cel obrony wioski', '', '<select data-pdef>' + opt(25, g.defLevel, 'Niski') + opt(40, g.defLevel, 'Średni') + opt(60, g.defLevel, 'Wysoki') + opt(90, g.defLevel, 'Twierdza') +
         ([25, 40, 60, 90].indexOf(Number(g.defLevel)) < 0 ? opt(g.defLevel, g.defLevel, 'Własny (' + g.defLevel + ')') : '') + '</select>') +
       row('data-pdefend', g.defend, 'sword', 'Obrona atakowanych wiosek', 'Wysyła wojsko z innych wiosek; po ataku wraca') +
       row('data-pgar', g.garrison, 'wall', 'Stałe garnizony', 'Wioski blisko wrogów mają więcej obrony – zaplecze przenosi tam nadwyżkę wojska') +
-      row('data-psplit', g.split, 'axe', 'Podział na wioski ofensywne i defensywne', 'Ofensywne szkolą tylko armię ataku i stąd wychodzą wszystkie ataki i grabieże; defensywne tylko obronę – stąd idą posiłki i garnizony (także dla ofensywnych). Armia ataku z wiosek defensywnych przechodzi do ofensywnych. Działa przy podboju, grabieży albo szkoleniu zbalansowanym') +
+      row('data-psplit', g.split, 'axe', 'Podział na wioski ofensywne i defensywne', 'Ofensywne szkolą tylko armię ataku i stąd wychodzą wszystkie ataki i grabieże; defensywne tylko obronę – stąd idą posiłki i garnizony (także dla ofensywnych). Armia ataku z wiosek defensywnych przechodzi do ofensywnych. Przy włączonym podziale ustawienie „Szkolenie wojska” nie decyduje już o rodzaju szkolonych jednostek (poza opcją „Nie szkol wojska”)') +
       fld('barracks', 'Proporcja wiosek', 'Ile wiosek defensywnych przypada na jedną ofensywną', '<select data-psplitn>' + [1, 2, 3, 4, 5, 6].map(n => opt(n, g.splitRatio, n + ' : 1')).join('') + '</select>') +
       (p && p.roles ? '<p class="pil-cap">Obecnie: ' + Object.keys(p.roles).filter(id => p.roles[id] === 'off').length + ' ofensywnych, ' + Object.keys(p.roles).filter(id => p.roles[id] === 'def').length + ' defensywnych</p>' : ''));
 
@@ -2426,7 +2429,7 @@
     else if (t.hasAttribute && t.hasAttribute('data-pdef')) { UI.pilot.defLevel = Number(t.value); }
     else if (t.hasAttribute && t.hasAttribute('data-pdefend')) { UI.pilot.defend = t.checked; }
     else if (t.hasAttribute && t.hasAttribute('data-pgar')) { UI.pilot.garrison = t.checked; }
-    else if (t.hasAttribute && t.hasAttribute('data-psplit')) { UI.pilot.split = t.checked; }
+    else if (t.hasAttribute && t.hasAttribute('data-psplit')) { UI.pilot.split = t.checked; renderModal(); }
     else if (t.hasAttribute && t.hasAttribute('data-psplitn')) { UI.pilot.splitRatio = Number(t.value); }
     else if (t.hasAttribute && t.hasAttribute('data-psup')) { UI.pilot.supply = t.checked; }
     else if (t.hasAttribute && t.hasAttribute('data-pset')) { UI.pilot.settle = t.checked; }

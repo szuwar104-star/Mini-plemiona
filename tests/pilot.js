@@ -490,6 +490,28 @@ function twoVillages() {
   ok(s.pilot.roles === null, 'wyłączenie podziału czyści role');
 }
 
+// 16b. Podział działa niezależnie od trybu „Tylko obrona”: ofensywne szkolą atak, defensywne obronę
+{
+  const s = E.newGame(T0, 30, 'normal', 'small');
+  Object.values(s.factions).forEach(f => { if (f.ai) f.nextThink = 1e15; });
+  const A = E.villagesOf(s, 'player')[0];
+  A.buildings.farm = 20; A.buildings.barracks = 5;
+  const vs = [A];
+  for (let i = 1; i < 4; i++) {
+    const v = JSON.parse(JSON.stringify(A));
+    Object.assign(v, { id: 'vd' + i, name: 'D' + i, x: A.x + i, y: A.y + 1, buildQueue: [], recruitQueue: [], support: {}, lastTick: s.now });
+    s.villages[v.id] = v; vs.push(v);
+  }
+  vs.forEach(v => { v.units = Object.assign(E.emptyUnits(), { scout: 3 }); v.res = { wood: 9000, clay: 9000, iron: 9000 }; });
+  MP.Pilot.configure(s, { on: true, build: false, tech: false, recruit: 'defense', split: true, splitRatio: 3, garrison: false }, s.now);
+  E.advance(s, s.now + 3 * HOUR);
+  const roles = s.pilot.roles || {};
+  ok(vs.filter(v => roles[v.id] === 'off').length === 1, 'przy „Tylko obrona” podział nadal działa (1 ofensywna z 4)');
+  MP.Pilot.configure(s, { recruit: 'off' }, s.now);
+  E.advance(s, s.now + 2 * MIN);
+  ok(s.pilot.roles === null, 'przy „Nie szkol wojska” bez ataku podział się wyłącza');
+}
+
 // 17. Podział: obrona idzie tylko z wiosek defensywnych, armia ataku z defensywnych wędruje do ofensywnej
 {
   const s = E.newGame(T0, 31, 'normal', 'small');

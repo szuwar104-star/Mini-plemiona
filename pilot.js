@@ -33,7 +33,8 @@
   const incomingOn = (state, v) => state.movements.filter(m => m.type === 'attack' && m.owner !== 'player' && m.to === v.id);
   const isDef = k => C.UNITS[k].role === 'def';
   // Podział wiosek: p.roles[id] = 'off' (ofensywna) | 'def' (defensywna); null, gdy podział wyłączony albo bot nie prowadzi działań ofensywnych.
-  const splitOn = p => !!p.split && (p.recruit === 'balanced' || !!p.attack || !!p.farm);
+  // Przy podziale lista „Szkolenie wojska” traci znaczenie (ofensywne szkolą atak, defensywne obronę); zostaje tylko wyłącznik „off”.
+  const splitOn = p => !!p.split && (p.recruit !== 'off' || !!p.attack || !!p.farm);
   const roleOf = (p, v) => (p.roles && p.roles[v.id]) || null;
   // Wioska przygraniczna: w zasięgu ataku leży wioska innej frakcji (z paktem o nieagresji nie liczy się).
   function exposed(state, v, t) {
@@ -363,7 +364,7 @@
   /* ---------- 4. technologia ---------- */
   function techAllowed(node, p) {
     if (node.branch !== 'war') return true;
-    return node.id === 'drill' || p.recruit === 'balanced' || !!p.attack || !!p.farm;
+    return node.id === 'drill' || p.recruit === 'balanced' || !!p.attack || !!p.farm || splitOn(p);
   }
   function techOrder(p) {
     const out = P().techPriority.slice();
