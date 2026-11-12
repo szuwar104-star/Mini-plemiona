@@ -368,21 +368,23 @@
       thinkInterval: 20,         // co ile sekund frakcja podejmuje decyzje
       prodFactor: 1.1,           // mnożnik produkcji AI (poziom trudności)
       graceMinutes: 10,          // przez tyle minut AI nie atakuje gracza
-      maxOrder: 40,              // maks. liczba jednostek w jednym zleceniu AI
+      maxOrder: 120,             // maks. liczba jednostek w jednym zleceniu AI
       // Ulepszenia jednostek AI (odpowiednik badań gracza): rosną same z czasem gry, tempo × DIFFICULTY.aiTech.
       // Każdy poziom = +TECH.unitBonus ataku i obrony, jak u gracza. Frakcja najpierw ulepsza jednostki, których używa najchętniej.
       tech: { minutesPerLevel: 45, startAfterMin: 30, max: 10 },
+      // Miejsce na farmach AI rośnie z czasem gry: +perHour na godzinę (ułamek bazy), do +max. Wyłączone, gdy poziom trudności ma aiTech 0.
+      popGrowth: { perHour: 0.015, max: 1.5 },
       // Limit wiosek AI rośnie z czasem: +perStep co everyHours (× mnożnik aiExpand trudności), do ceilingShare celu zwycięstwa świata.
       // ceilingShareRace: sufit w trybie Wyścig (AI może dojść do celu zwycięstwa).
       // zoneFadeHours: po tylu godzinach gry strefa ochronna wokół wiosek gracza (DIFFICULTY.playerZone) znika.
       growth: { everyHours: 3, perStep: 1, ceilingShare: 0.5, ceilingShareRace: 1, zoneFadeHours: 24 },
       // Taktyka wspólna dla wszystkich frakcji (ai.js)
       tactics: {
-        buildQueue: 2,           // ile budów AI trzyma w kolejce
-        recruitQueue: 3,         // ile zleceń rekrutacji AI trzyma w kolejce
+        buildQueue: 3,           // ile budów AI trzyma w kolejce
+        recruitQueue: 5,         // ile zleceń rekrutacji AI trzyma w kolejce
         farmUrgent: 0.85,        // zajętość farmy, od której Farma ma pierwszeństwo
         storeUrgent: 0.8,        // zapełnienie magazynu, od którego Ratusz (magazyn) ma pierwszeństwo
-        storeSpend: 0.75,        // od tego zapełnienia AI wydaje na wojsko wszystko (nic się nie marnuje)
+        storeSpend: 0.55,        // od tego zapełnienia AI wydaje na wojsko wszystko (nic się nie marnuje)
         settleChance: 0.8,       // szansa na turę, że wolna wioska zacznie szkolić osadnika
         settleRange: 5,          // maks. odległość nowej osady od wioski macierzystej
         supportRange: 6,         // z jak daleka AI wysyła posiłki do atakowanej wioski
@@ -426,10 +428,10 @@
           diplo: { baseline: -10, cap: 25, warm: 1.5, heal: 3, minAttitude: 5, repLimit: 3, offerChance: 0.004, betray: 0.006, revenge: 30, leaderBias: 0.5 },
           buildWeights: { hq: 1, wood: 1, clay: 1, iron: 1.2, farm: 1.2, barracks: 1.5, market: 0.4, wall: 0.6 },
           unitWeights: { spear: 1, axe: 4, scout: 0.3, light: 3, ram: 0.5, archer: 0.5, guard: 0.4 },
-          recruitShare: 0.7, attackChance: 0.6, attackRatio: 1.3, keepHome: 0.2,
+          recruitShare: 0.9, attackChance: 0.6, attackRatio: 1.3, keepHome: 0.2,
           minPower: 250, range: 8, targets: 'any', anyAfterMin: 0,
           neutralBias: 1, playerBias: 1.6, nobles: true, maxVillages: 12, settle: false, spyChance: 0.15,
-          homeDef: 28, waves: 2, gatherChance: 0.08, raids: 1.2
+          homeDef: 28, waves: 2, gatherChance: 0.15, raids: 1.2
         },
         economic: {
           label: 'gospodarcza',
@@ -439,10 +441,10 @@
           diplo: { baseline: 10, cap: 60, warm: 3, heal: 5, minAttitude: -5, repLimit: 2, offerChance: 0.02, betray: 0, revenge: 60, leaderBias: 1 },
           buildWeights: { hq: 1.3, wood: 1.5, clay: 1.5, iron: 1.4, farm: 1, barracks: 0.7, market: 0.6, wall: 0.8 },
           unitWeights: { spear: 2, axe: 1, scout: 0.2, light: 1, ram: 0.1, archer: 2, guard: 1.5 },
-          recruitShare: 0.35, attackChance: 0.25, attackRatio: 2.0, keepHome: 0.5,
+          recruitShare: 0.65, attackChance: 0.25, attackRatio: 2.0, keepHome: 0.5,
           minPower: 300, range: 6, targets: 'neutral', anyAfterMin: 30,
           neutralBias: 2, playerBias: 0.8, nobles: true, maxVillages: 8, settleMax: 12, settle: true, spyChance: 0.05,
-          homeDef: 30, waves: 1, gatherChance: 0.04, raids: 1
+          homeDef: 30, waves: 1, gatherChance: 0.1, raids: 1
         },
         defensive: {
           label: 'obronna',
@@ -452,7 +454,7 @@
           diplo: { baseline: 5, cap: 60, warm: 2.5, heal: 4, minAttitude: 0, repLimit: 2, offerChance: 0.015, betray: 0, revenge: 50, leaderBias: 0.8 },
           buildWeights: { hq: 1.2, wood: 1.2, clay: 1.2, iron: 1, farm: 1.4, barracks: 1, market: 0.4, wall: 1.4 },
           unitWeights: { spear: 5, axe: 1, scout: 0.5, light: 0.5, ram: 0, archer: 4, guard: 5 },
-          recruitShare: 0.5, attackChance: 0.2, attackRatio: 2.5, keepHome: 0.8,
+          recruitShare: 0.75, attackChance: 0.2, attackRatio: 2.5, keepHome: 0.8,
           minPower: 300, range: 5, targets: 'neutral', anyAfterMin: 45,
           neutralBias: 2, playerBias: 0.6, nobles: false, maxVillages: 6, settleMax: 7, settle: true, spyChance: 0.05,
           homeDef: 45, waves: 1, gatherChance: 0, raids: 0.5
@@ -465,10 +467,10 @@
           diplo: { baseline: -5, cap: 40, warm: 2, heal: 3, minAttitude: 10, repLimit: 3, offerChance: 0.006, betray: 0.004, revenge: 35, leaderBias: 0.7 },
           buildWeights: { hq: 1.2, wood: 1.1, clay: 1.1, iron: 1.1, farm: 1.2, barracks: 1.3, market: 0.4, wall: 0.6 },
           unitWeights: { spear: 1, axe: 3, scout: 0.3, light: 2, ram: 0.3, archer: 0.5, guard: 0.4 },
-          recruitShare: 0.55, attackChance: 0.5, attackRatio: 1.5, keepHome: 0.3,
+          recruitShare: 0.85, attackChance: 0.5, attackRatio: 1.5, keepHome: 0.3,
           minPower: 200, range: 9, targets: 'any', anyAfterMin: 0,
           neutralBias: 2.5, playerBias: 1, nobles: true, maxVillages: 13, settleMax: 17, settle: true, spyChance: 0.1,
-          homeDef: 25, waves: 2, gatherChance: 0.06, raids: 0.8
+          homeDef: 25, waves: 2, gatherChance: 0.12, raids: 0.8
         }
       }
     },

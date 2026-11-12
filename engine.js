@@ -261,7 +261,13 @@
   }
   // Część magazynu ukryta przed łupieżcami: ochrona z poziomu trudności + badanie Skrytki (maks. 90%).
   function hideShare(state) { return Math.min(0.9, diff(state).lootProtect + FX.hide); }
-  function useDifficulty(state) { D = diff(state); FX = techEffects(state.factions && state.factions.player); }
+  // AI: miejsce na farmach rośnie z czasem gry (odpowiednik Rolnictwa gracza) – bez tego pełna farma blokuje rozwój armii.
+  let AIPOP = 1;
+  function useDifficulty(state) {
+    D = diff(state); FX = techEffects(state.factions && state.factions.player);
+    const G = C.AI.popGrowth, hours = Math.max(0, ((state.now || 0) - (state.created || 0)) / 3600000);
+    AIPOP = 1 + Math.min(G.max, hours * G.perHour) * (D.aiTech ? 1 : 0);
+  }
   function prodFactor(v) {
     if (v.owner === null) return C.NEUTRAL.prodFactor;
     return v.owner === 'player' ? D.playerProd : D.aiProd;
@@ -281,7 +287,7 @@
   function popMult() { return FX.pop; }
   function popCap(v) {
     const base = C.BUILDINGS.farm.pop[v.buildings.farm];
-    return v.owner === 'player' ? Math.floor(base * FX.pop) : base;
+    return v.owner === 'player' ? Math.floor(base * FX.pop) : Math.floor(base * AIPOP);
   }
   function popUsed(state, v) {
     let p = 0;
