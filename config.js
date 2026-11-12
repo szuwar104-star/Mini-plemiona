@@ -282,6 +282,7 @@
       garrisonShare: 0.4,        // maks. część obrońców oddawana z jednej wioski zaplecza w jednej turze
       garrisonEveryMin: 5,       // jak często bot przesuwa obronę na front (minuty)
       supplyKeep: 0.3,           // wioska-dawca zostawia sobie tyle magazynu (i rezerwę na własny budynek), reszta idzie do wiosek z pustą kolejką budowy
+      supplyFill: 0.8,           // wioska z pustą kolejką budowy jest dopełniana do tej części magazynu (każdy surowiec), nie tylko do kosztu budynku
       coinFrom: 0.85, coinTo: 0.6, // zakup monet: gdy magazyn > coinFrom, schodzi do coinTo
       logMax: 30,
       settleRanges: [5, 8],      // w jakim promieniu od wioski macierzystej bot szuka miejsca na osadę (najpierw bliżej)

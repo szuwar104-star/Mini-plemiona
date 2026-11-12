@@ -1288,7 +1288,7 @@
         ([25, 40, 60, 90].indexOf(Number(g.defLevel)) < 0 ? opt(g.defLevel, g.defLevel, 'Własny (' + g.defLevel + ')') : '') + '</select></label>' +
       '<label class="chk"><input type="checkbox" data-pdefend' + (g.defend ? ' checked' : '') + '>Wysyłaj obronę z innych wiosek do atakowanych (po ataku wraca)</label>' +
       '<label class="chk"><input type="checkbox" data-pgar' + (g.garrison ? ' checked' : '') + '>Stałe garnizony: wioski blisko wrogów mają więcej obrony (zaplecze przenosi tam nadwyżkę wojska)</label>' +
-      '<label class="chk"><input type="checkbox" data-psup' + (g.supply ? ' checked' : '') + '>Zasilaj surowcami wioski z pustą kolejką budowy (bogatsze wioski wysyłają brakujące surowce; wymaga Targowiska)</label>' +
+      '<label class="chk"><input type="checkbox" data-psup' + (g.supply ? ' checked' : '') + '>Zasilaj surowcami wioski, którym brakuje na budowę (bogatsze wioski dopełniają ich magazyny do 80%; wymaga Targowiska)</label>' +
       '<label class="chk"><input type="checkbox" data-ptech' + (g.tech ? ' checked' : '') + '>Kupuj monety z nadwyżek surowców i badaj Technologię (wymaga Targowiska)</label>' +
       '<label class="chk"><input type="checkbox" data-pset' + (g.settle ? ' checked' : '') + '>Szkol osadników i zakładaj nowe wioski w pobliżu (jeden osadnik naraz)</label>' +
       '<label class="field">Maks. liczba wiosek (puste = bez limitu)<input type="number" inputmode="numeric" min="1" max="200" placeholder="bez limitu" data-psmax value="' + nz(g.settleMax) + '"></label>' +
