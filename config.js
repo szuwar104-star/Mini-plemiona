@@ -454,7 +454,8 @@
         joinBonus: 6,            // wzrost wzajemnego nastawienia po utworzeniu/rozszerzeniu sojuszu
         betrayMult: 0.25,        // zdrada sojusznika: ułamek szansy `betray` osobowości na minutę
         leaveGraceMin: 180,      // po wyjściu z sojuszu byli sojusznicy nie wypowiedzą sobie wojny przez tyle minut
-        leavePenalty: 25         // spadek nastawienia byłych sojuszników do zdrajcy
+        leavePenalty: 25,        // spadek nastawienia byłych sojuszników do zdrajcy (także gdy gracz sam opuszcza sojusz)
+        pactFirstMin: 60         // sojusz z graczem wymaga wcześniejszego paktu o nieagresji trwającego co najmniej tyle minut
       },
       // Wojny AI z AI toczą się tylko po wypowiedzeniu (albo przeciw „liderowi”) i są ograniczone: czas, liczba bitew, potem rozejm.
       war: {

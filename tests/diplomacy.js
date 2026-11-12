@@ -387,6 +387,108 @@ const minDist = (s, a, b) => { let m = Infinity; E.villagesOf(s, a).forEach(x =>
   ok(D.targetWeight(s, a, 'player', 2 * MIN) > 0, 'gracz pozostaje celem niezależnie od wojen AI');
 }
 
+/* ---------- sojusz gracza z AI ---------- */
+{
+  const s = E.newGame(0, 16, 'normal', 'medium');
+  const fid = aiIds(s).find(id => s.factions[id].personality === 'economic') || aiIds(s)[0];
+  const MINS = C.DIPLO.alliance.pactFirstMin;
+  D.adjust(s, fid, 'player', 60);
+  let a = D.assessAlliance(s, fid, 0);
+  ok(!a.ok && a.code === 'pact', 'sojusz wymaga wcześniejszego paktu: ' + a.reason);
+  D.signPact(s, 'player', fid, 0);
+  a = D.assessAlliance(s, fid, (MINS - 1) * MIN);
+  ok(!a.ok && a.code === 'pact', 'pakt musi trwać co najmniej ' + MINS + ' min');
+  a = D.assessAlliance(s, fid, (MINS + 1) * MIN);
+  ok(a.ok, 'po ' + MINS + ' min paktu i przy wysokim nastawieniu frakcja się zgadza');
+  const r = D.proposeAllianceFromPlayer(s, fid, (MINS + 1) * MIN);
+  ok(r.ok && D.allied(s, 'player', fid) && D.allianceOf(s, 'player').members.length === 2, 'propozycja gracza zawiera sojusz');
+  ok(D.pactsOf(s, 'player', (MINS + 2) * MIN).length === 0, 'sojusz zastępuje pakt (zwalnia miejsce na pakt)');
+  ok(D.targetWeight(s, fid, 'player', (MINS + 2) * MIN) === 0, 'sojusznik AI nie wybiera gracza na cel');
+  const me = E.villagesOf(s, 'player')[0], his = E.villagesOf(s, fid)[0];
+  me.units = Object.assign(E.emptyUnits(), { axe: 50 });
+  const at = E.sendAttack(s, me.id, his.id, { axe: 50 }, (MINS + 2) * MIN);
+  ok(!at.ok && /Sojusz/.test(at.reason), 'silnik blokuje atak gracza na sojusznika: ' + at.reason);
+  ok(!D.proposeFromPlayer(s, fid, (MINS + 3) * MIN).ok, 'pakt z sojusznikiem nie jest potrzebny');
+  ok(s.notices.some(n => /Sojusz:/.test(n.text)), 'gracz dostaje komunikat o sojuszu');
+}
+{
+  // za niskie nastawienie: odmowa i karencja; wysokie nastawienie bloku jest wymagane
+  const s = E.newGame(0, 17, 'normal', 'medium');
+  const [fid, other] = aiIds(s);
+  D.signPact(s, 'player', fid, 0);
+  D.adjust(s, fid, 'player', -200);
+  const t = 90 * MIN;
+  const a = D.assessAlliance(s, fid, t);
+  ok(!a.ok && a.code === 'cold' && a.need > 0, 'zbyt niskie nastawienie blokuje sojusz (brakuje ' + a.need + ')');
+  const r = D.proposeAllianceFromPlayer(s, fid, t);
+  ok(!r.ok && D.assessAlliance(s, fid, t + MIN).code === 'cooldown', 'odmowa daje karencję na ponowną propozycję');
+  // blok AI, w którym członek nie ufa graczowi, nie przyjmie go
+  const s2 = E.newGame(0, 17, 'normal', 'medium');
+  const [x, y] = aiIds(s2);
+  D.formAlliance(s2, x, y, 0);
+  D.signPact(s2, 'player', x, 0); D.adjust(s2, x, 'player', 80);
+  D.adjust(s2, y, 'player', -200);
+  const a2 = D.assessAlliance(s2, x, 90 * MIN);
+  ok(!a2.ok && a2.code === 'ally', 'członek bloku bez zaufania do gracza blokuje wstąpienie: ' + a2.reason);
+  D.adjust(s2, y, 'player', 300);
+  ok(D.assessAlliance(s2, x, 90 * MIN).ok, 'gdy cały blok ufa graczowi, może wstąpić');
+  ok(D.proposeAllianceFromPlayer(s2, x, 90 * MIN).ok && D.allianceOf(s2, 'player').members.length === 3, 'gracz dołącza do istniejącego sojuszu AI');
+  ok(D.blocOf(s2, 'player').length === 3 && D.allied(s2, 'player', y), 'wszyscy członkowie bloku są sojusznikami gracza');
+}
+{
+  // AI sama proponuje sojusz graczowi
+  const s = E.newGame(0, 18, 'normal', 'medium');
+  const fid = aiIds(s).find(id => C.AI.personalities[s.factions[id].personality].diplo.allyChance >= 0.008);
+  D.signPact(s, 'player', fid, 0); D.ensure(s).pacts[0].end = 1e15;
+  D.adjust(s, fid, 'player', 90);
+  const d = D.ensure(s); d.last = 1;
+  let offer = null;
+  for (let m = 2; m < 6000 && !offer; m++) { D.tick(s, m * MIN); offer = d.offers.find(o => o.from === fid && o.alliance); }
+  ok(!!offer, 'przychylna frakcja po paktach sama proponuje sojusz');
+  const r = D.answerOffer(s, offer.id, true, s.now || 7000 * MIN);
+  ok(r.ok && r.alliance && D.allied(s, 'player', fid), 'przyjęcie oferty zawiera sojusz');
+  ok(!D.ensure(s).alliances.some(al => al.members.indexOf('player') >= 0 && al.members.some(m => m !== 'player' && !s.factions[m])), 'sojusz gracza zawiera tylko istniejące frakcje');
+}
+{
+  // sojusznik broni gracza; wojny nie obejmują gracza
+  const s = E.newGame(0, 19, 'normal', 'medium');
+  const ids = aiIds(s);
+  const ally = ids[0];
+  const foe = ids.filter(id => id !== ally).sort((x, y) => minDist(s, ally, x) - minDist(s, ally, y))[0];
+  D.formAlliance(s, 'player', ally, 0);
+  const before = D.attitude(s, ally, foe);
+  D.onBattle(s, foe, 'player', true, false, MIN);
+  ok(D.attitude(s, ally, foe) < before, 'atak na gracza obniża nastawienie jego sojusznika do napastnika');
+  ok(!!D.warBetween(s, ally, foe, 2 * MIN), 'sojusznik wypowiada wojnę napastnikowi gracza (jest w zasięgu)');
+  ok(s.notices.some(n => /w obronie sojuszu/.test(n.text)), 'gracz dostaje komunikat o obronie');
+  ok(D.ensure(s).wars.every(w => w.a !== 'player' && w.b !== 'player'), 'wojny AI nigdy nie dotyczą gracza');
+  const s2 = E.newGame(0, 19, 'normal', 'medium');
+  const [x, y, z] = aiIds(s2);
+  D.formAlliance(s2, x, y, 0); D.formAlliance(s2, 'player', x, 1);
+  D.declareWar(s2, z, x, 2 * MIN);
+  ok(D.ensure(s2).wars.every(w => w.a !== 'player' && w.b !== 'player') && !!D.warBetween(s2, z, y, 3 * MIN), 'wojna z członkiem sojuszu z graczem obejmuje sojuszników AI, ale nie gracza');
+}
+{
+  // wyjście gracza z sojuszu i lider
+  const s = E.newGame(0, 20, 'normal', 'medium');
+  const [x, y] = aiIds(s);
+  D.formAlliance(s, x, y, 0); D.formAlliance(s, 'player', x, 1);
+  const before = D.attitude(s, x, 'player');
+  const r = D.leavePlayerAlliance(s, 10 * MIN);
+  ok(r.ok && !D.allied(s, 'player', x) && D.allied(s, x, y), 'gracz opuszcza sojusz, reszta zostaje w sojuszu');
+  ok(D.attitude(s, x, 'player') < before && D.ensure(s).rep.player >= 1, 'opuszczenie sojuszu obniża zaufanie (jak zerwanie paktu)');
+  ok(!D.leavePlayerAlliance(s, 11 * MIN).ok, 'bez sojuszu nie ma czego opuszczać');
+  const s2 = E.newGame(0, 20, 'normal', 'medium');
+  const [p, q] = aiIds(s2);
+  D.formAlliance(s2, 'player', p, 0);
+  const need = Math.ceil(E.winVillages(s2) * C.DIPLO.leaderShare);
+  const free = Object.values(s2.villages).filter(v => v.owner === null);
+  for (let i = E.villagesOf(s2, 'player').length; i < need; i++) free.pop().owner = 'player';
+  const d = D.ensure(s2); d.last = 1;
+  D.tick(s2, 2 * MIN);
+  ok(!D.allied(s2, 'player', p) && s2.notices.some(n => /zbyt blisko zwycięstwa/.test(n.text)), 'gdy gracz zbliża się do zwycięstwa, sojusznicy odchodzą (z komunikatem)');
+}
+
 /* ---------- stary zapis bez sojuszy i wojen ---------- */
 {
   const s = E.newGame(0, 15, 'normal');
