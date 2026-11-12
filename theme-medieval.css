@@ -674,3 +674,17 @@ input[type=checkbox], input[type=radio] { accent-color: var(--gold); width: 1.05
 .wave { border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(194, 70, 60, .4); }
 .wno { border-radius: 4px; background: linear-gradient(180deg, #c2463c, #8e2a20); box-shadow: inset 0 0 0 1px #17120e; }
 .threat-banner { border-radius: 3px; background: var(--grain), rgba(194, 70, 60, .16); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .4); }
+/* Przegląd 2.0 – motyw średniowieczny */
+.ov-summary { border-top: 2px solid var(--gold); background: radial-gradient(520px 220px at 0% 0%, rgba(201, 160, 67, .14), transparent 70%), var(--grain), linear-gradient(180deg, #31281e, var(--surface)); }
+.ovs-sub b, .ovs-kpi b, .ovs-res b { color: #f4e6c8; font-family: var(--serif, inherit); }
+.ovs-kpi, .ovs-res { border-radius: 3px; background: rgba(0, 0, 0, .25); box-shadow: inset 0 0 0 1px var(--line); border: 0; border-top: 2px solid var(--line-2); }
+.ovs-resrow .ovs-res:nth-child(1) { border-top-color: #a8703a; }
+.ovs-resrow .ovs-res:nth-child(2) { border-top-color: #d2694a; }
+.ovs-resrow .ovs-res:nth-child(3) { border-top-color: var(--steel); }
+.ovs-res em { color: #9fc27c; }
+.vcard { border-radius: 4px; background: var(--grain), linear-gradient(180deg, #2c241b, var(--surface)); }
+.vcard.cur { box-shadow: 0 0 0 1px var(--gold), var(--shadow); }
+.vcard.hit { background: linear-gradient(180deg, rgba(229, 83, 75, .16), #2a211a 60%); }
+.vc-name { font-family: var(--serif, inherit); color: var(--gold-2); }
+.fchip.on { background: linear-gradient(180deg, var(--gold-2), var(--gold)); }
+.ova-main { border-radius: 4px; }

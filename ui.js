@@ -485,16 +485,28 @@
   }
 
   /* ---------- ekran: PRZEGLĄD WIOSEK ---------- */
+  const OV_FILTERS = [['all', 'Wszystkie'], ['off', 'Ofensywne'], ['def', 'Defensywne'], ['threat', 'Zagrożone'], ['idle', 'Bez budowy']];
+  const OV_SORTS = [['name', 'Nazwa'], ['points', 'Punkty'], ['threat', 'Zagrożenie']];
   function renderOverview() {
     const s = st(), el = $('#screen-overview');
     const allOwn = E.villagesOf(s, 'player').sort((a, b) => a.name.localeCompare(b.name, 'pl'));
-    // role z podziału wiosek Autopilota (ofensywna / defensywna); filtr działa tylko, gdy podział jest aktywny
+    // role z podziału wiosek Autopilota (ofensywna / defensywna); filtr roli działa tylko, gdy podział jest aktywny
     const roles = (s.pilot && s.pilot.on && s.pilot.roles) || null;
     const nOff = roles ? allOwn.filter(v => roles[v.id] === 'off').length : 0, nDef = roles ? allOwn.filter(v => roles[v.id] === 'def').length : 0;
-    const rf = roles && (UI.ovRole === 'off' || UI.ovRole === 'def') ? UI.ovRole : 'all';
-    const own = rf === 'all' ? allOwn : allOwn.filter(v => roles[v.id] === rf);
+    let rf = OV_FILTERS.some(f => f[0] === UI.ovRole) ? UI.ovRole : 'all';
+    if ((rf === 'off' || rf === 'def') && !roles) rf = 'all';
+    const view = UI.ovView === 'table' ? 'table' : 'cards';
+    const sort = OV_SORTS.some(f => f[0] === UI.ovSort) ? UI.ovSort : 'name';
+    const open = UI.ovOpen || (UI.ovOpen = {});
+    const inc = incomingAttacks(s);
+    const hit = {}; inc.forEach(m => { (hit[m.to] = hit[m.to] || []).push(m); });
+    Object.keys(hit).forEach(k => hit[k].sort((a, b) => a.arrive - b.arrive));
+    let own = allOwn.filter(v => rf === 'all' || (rf === 'threat' ? !!hit[v.id] : rf === 'idle' ? !v.buildQueue.length : roles[v.id] === rf));
+    if (sort === 'points') own = own.slice().sort((a, b) => E.points(b) - E.points(a));
+    else if (sort === 'threat') own = own.slice().sort((a, b) => (hit[a.id] ? hit[a.id][0].arrive : Infinity) - (hit[b.id] ? hit[b.id][0].arrive : Infinity));
     // odświeżanie co 5 s albo przy zmianie struktury – liczniki czasu tykają same
-    const sig = JSON.stringify([own.map(v => [v.id, v.buildQueue.length, v.recruitQueue.length, E.sumUnits(v.units)]), incomingAttacks(s).length, diploOffers(s), UI.vid, rf, roles ? allOwn.map(v => roles[v.id] || '').join('') : '', Math.floor(s.now / 5000), (s.factions.player && s.factions.player.stat) || 0]);
+    const sig = JSON.stringify([own.map(v => [v.id, v.buildQueue.length, v.recruitQueue.length, E.sumUnits(v.units)]), inc.length, diploOffers(s), UI.vid, rf, view, sort, open.units || 0, open.stats || 0,
+      roles ? allOwn.map(v => roles[v.id] || '').join('') : '', Math.floor(s.now / 5000), (s.factions.player && s.factions.player.stat) || 0]);
     if (UI.sigs.overview === sig) return;
     // Użytkownik właśnie przewija – nie podmieniamy DOM (przerwałoby to przewijanie, także bezwładność na telefonie).
     // Sygnatura zostaje stara, więc przerysowanie nastąpi w najbliższym ticku po zakończeniu przewijania.
@@ -502,22 +514,104 @@
     UI.sigs.overview = sig;
     const keep = saveScroll(el);
     if (!allOwn.length) { el.innerHTML = noVillages(); return; }
-    const inc = incomingAttacks(s);
     const pw = E.accountPower(s, 'player');
     const all = E.armyOf(s, 'player'), allTotal = E.sumUnits(all); // wszystkie jednostki: w wioskach, na wsparciu i w marszu
-    const total = { wood: 0, clay: 0, iron: 0 }, prod = { wood: 0, clay: 0, iron: 0 };
-    let army = 0;
-    const rows = own.map(v => {
+    const total = { wood: 0, clay: 0, iron: 0 }, prod = { wood: 0, clay: 0, iron: 0 }, capSum = { wood: 0, clay: 0, iron: 0 };
+    let army = 0, farmUsed = 0, farmCap = 0;
+    allOwn.forEach(v => {
       const cap = E.storageCap(v), p = E.productionPerMin(v);
-      E.RES.forEach(r => { total[r] += v.res[r]; prod[r] += p[r]; });
-      army += E.sumUnits(v.units);
+      E.RES.forEach(r => { total[r] += v.res[r]; prod[r] += p[r]; capSum[r] += cap; });
+      army += E.sumUnits(v.units); farmUsed += E.popUsed(s, v); farmCap += E.popCap(v);
+    });
+
+    const nodeCount = (n, one, few, many) => n + ' ' + (n === 1 ? one : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) ? few : many);
+    const off = (n) => n > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"';
+    const multi = own.length > 1 || allOwn.length > 1;
+    const seg = (act, opts, curv) => '<div class="seg ov-seg" role="group">' + opts.map(o =>
+      '<button class="' + (curv === o[0] ? 'on' : '') + '" aria-pressed="' + (curv === o[0]) + '" data-act="' + act + '" data-v="' + o[0] + '">' + o[1] + '</button>').join('') + '</div>';
+
+    /* 1. alarm: nadciągające ataki i oferty paktów */
+    let alert = '';
+    if (inc.length || diploOffers(s)) {
+      const first = inc.slice().sort((a, b) => a.arrive - b.arrive)[0];
+      alert = '<section class="ov-alert" role="alert">' +
+        (first ? '<div class="ova-main">' + ico('sword') + '<div><b>' + nodeCount(inc.length, 'nadciągający atak', 'nadciągające ataki', 'nadciągających ataków') + '</b>' +
+          '<span>Najbliższy na ' + esc(s.villages[first.to].name) + ' za <span class="timer" data-end="' + first.arrive + '"></span></span></div>' +
+          '<button class="btn" data-act="ov-role" data-v="threat">Pokaż zagrożone</button><button class="btn ghost" data-screen="threats">Zakładka Ataki</button><button class="btn ghost" data-act="defense-open"' + off(allOwn.length) + '>Wyślij obronę</button></div>' : '') +
+        (diploOffers(s) ? '<div class="ova-main ova-diplo">' + ico('scroll') + '<div><b>' + nodeCount(diploOffers(s), 'oferta paktu', 'oferty paktów', 'ofert paktów') + '</b><span>Frakcje czekają na odpowiedź</span></div>' +
+          '<button class="btn ghost" data-act="diplo-open">Dyplomacja</button></div>' : '') +
+        '</section>';
+    }
+
+    /* 2. podsumowanie imperium */
+    const goal = E.winVillages(s);
+    const resTile = r => {
+      const pct = Math.min(100, total[r] / Math.max(1, capSum[r]) * 100);
+      return '<div class="ovs-res' + (pct >= 90 ? ' near' : '') + '" title="' + C.RESOURCES[r].name + ': ' + fmt(Math.round(total[r])) + ' z ' + fmt(capSum[r]) + ' w magazynach">' + ico(r) +
+        '<div><small>' + C.RESOURCES[r].name + '</small><b>' + fmt(total[r]) + '</b><span class="mini"><i style="width:' + pct.toFixed(0) + '%"></i></span>' +
+        '<em>+' + fmt(Math.round(prod[r])) + ' / min</em></div></div>';
+    };
+    const summary = '<section class="panel ov-summary"><div class="ovs-top"><div class="ovs-title"><h1>Przegląd wiosek</h1>' +
+      '<p class="ovs-sub"><b>' + allOwn.length + '</b> z ' + goal + ' wiosek' +
+      (roles ? '<span class="rtag off">' + ico('axe') + nOff + '</span><span class="rtag def">' + ico('wall') + nDef + '</span>' : '') + '</p>' +
+      '<span class="meter goal"><i style="width:' + Math.min(100, allOwn.length / Math.max(1, goal) * 100).toFixed(1) + '%"></i></span></div>' +
+      '<div class="ovs-stats">' +
+        '<div class="ovs-kpi" title="Zajęta i dostępna farma we wszystkich wioskach">' + ico('pop') + '<div><small>Farma</small><b>' + fmt(farmUsed) + '</b><span class="mini"><i style="width:' + Math.min(100, farmUsed / Math.max(1, farmCap) * 100).toFixed(0) + '%"></i></span><em>z ' + fmt(farmCap) + '</em></div></div>' +
+        '<div class="ovs-kpi" title="Wszystkie jednostki: w wioskach, na wsparciu i w marszu">' + ico('spear') + '<div><small>Jednostki</small><b>' + fmt(allTotal) + '</b><em>w wioskach ' + fmt(army) + (allTotal > army ? ' · poza ' + fmt(allTotal - army) : '') + '</em></div></div>' +
+        '<div class="ovs-kpi" title="Budynki + wojsko">' + ico('noble') + '<div><small>Moc konta</small><b>' + fmt(pw.total) + '</b><em>bud. ' + fmt(pw.buildings) + ' · woj. ' + fmt(pw.army) + '</em></div></div>' +
+      '</div></div><div class="ovs-resrow">' + E.RES.map(resTile).join('') + '</div>' +
+      '<div class="ovs-fold"><button class="btn ghost" data-act="ov-toggle" data-k="units" aria-expanded="' + !!open.units + '">' + ico('barracks') + 'Jednostki wg rodzaju <span class="caret">' + (open.units ? '▴' : '▾') + '</span></button>' +
+      '<button class="btn ghost" data-act="ov-toggle" data-k="stats" aria-expanded="' + !!open.stats + '">' + ico('sword') + 'Statystyki <span class="caret">' + (open.stats ? '▴' : '▾') + '</span></button></div>' +
+      (open.units ? '<div class="ov-units-list">' + (allTotal ? E.UNITS.filter(k => all[k] > 0).map(k => '<span class="uov" title="' + C.UNITS[k].name + ': ' + fmt(all[k]) + '">' + ico(k) + '<span class="uov-txt"><small>' + C.UNITS[k].name + '</small><b>' + fmt(all[k]) + '</b></span></span>').join('') : '<span class="muted">brak</span>') + '</div>' : '') +
+      '</section>' + (open.stats ? statsCard(s) : '');
+
+    /* 3. akcje zbiorcze, pogrupowane */
+    const grp = (title, btns) => '<div class="ova-grp"><small>' + title + '</small><div class="ova-btns">' + btns.join('') + '</div></div>';
+    const act = (a, ic, label, extra) => '<button class="btn ghost" data-act="' + a + '"' + (extra || '') + '>' + ico(ic) + label + '</button>';
+    const actions = '<section class="panel ov-actions">' +
+      grp('Surowce', [act('gather-open', 'merchant', 'Zbierz / rozdziel', off(allOwn.length)), act('auto-open', 'merchant', 'Konwoje' + (s.auto && s.auto.on ? ' <small>(wł.)</small>' : ''), off(allOwn.length))]) +
+      grp('Wojsko', [act('troops-open', 'spear', 'Zbierz / rozdziel', off(allOwn.length)), act('defense-open', 'wall', 'Wyślij obronę', off(allOwn.length)), act('mass-open', 'barracks', 'Szkol wszędzie')]) +
+      grp('Rozwój', [act('buildall-open', 'hq', 'Buduj wszędzie'), act('tech-open', 'scroll', 'Technologia')]) +
+      grp('Automat i dyplomacja', [act('pilot-open', 'wall', 'Autopilot' + (s.pilot && s.pilot.on ? ' <span class="pdot" title="Autopilot działa"></span>' : '')), act('diplo-open', 'scroll', 'Dyplomacja' + (diploOffers(s) ? ' <small>(' + diploOffers(s) + ')</small>' : ''))]) +
+      '</section>';
+
+    /* 4. lista wiosek: karty lub tabela */
+    const cnt = f => f === 'all' ? allOwn.length : f === 'threat' ? allOwn.filter(v => hit[v.id]).length : f === 'idle' ? allOwn.filter(v => !v.buildQueue.length).length : allOwn.filter(v => roles && roles[v.id] === f).length;
+    const filters = OV_FILTERS.filter(f => roles || (f[0] !== 'off' && f[0] !== 'def')).map(f =>
+      '<button class="fchip' + (rf === f[0] ? ' on' : '') + (f[0] === 'threat' && cnt('threat') ? ' hot' : '') + '" data-act="ov-role" data-v="' + f[0] + '">' + f[1] + ' <b>' + cnt(f[0]) + '</b></button>').join('');
+    const toolbar = '<div class="ov-toolbar"><div class="ov-filters">' + filters + '</div><div class="ov-opts"><span class="muted">Sortuj</span>' + seg('ov-sort', OV_SORTS, sort) +
+      '<span class="muted">Widok</span>' + seg('ov-view', [['cards', 'Karty'], ['table', 'Tabela']], view) + '</div></div>';
+
+    const qslot = (ic, body, idle) => '<div class="vq' + (body ? '' : ' idle') + '">' + ic + (body || '<span class="idle">' + idle + '</span>') + '</div>';
+    const card = v => {
+      const cap = E.storageCap(v), used = E.popUsed(s, v), pc = E.popCap(v);
+      const bq = v.buildQueue[0], rq = v.recruitQueue[0], at = hit[v.id];
+      const full = E.RES.some(r => v.res[r] >= cap);
+      const resRow = r => {
+        const pct = Math.min(100, v.res[r] / cap * 100);
+        return '<div class="vcr' + (pct >= 100 ? ' full' : pct >= 85 ? ' near' : '') + '">' + ico(r) + '<span class="vcr-bar"><i style="width:' + pct.toFixed(0) + '%"></i></span><b>' + fmt(v.res[r]) + '</b></div>';
+      };
+      return '<article class="vcard' + (v.id === UI.vid ? ' cur' : '') + (at ? ' hit' : '') + (roles && roles[v.id] ? ' r-' + roles[v.id] : '') + '">' +
+        '<header><div class="vc-id"><button class="link vc-name" data-act="goto" data-id="' + v.id + '">' + esc(v.name) + '</button>' + roleTag(roles && roles[v.id]) +
+          '<small>' + xy(v.x, v.y) + ' · ' + fmt(E.points(v)) + ' pkt</small></div>' +
+          (at ? '<span class="alert vc-alert" title="' + nodeCount(at.length, 'nadciągający atak', 'nadciągające ataki', 'nadciągających ataków') + '">' + ico('sword') + (at.length > 1 ? '×' + at.length + ' · ' : '') + '<span class="timer" data-end="' + at[0].arrive + '"></span></span>' : '') + '</header>' +
+        '<div class="vc-res">' + E.RES.map(resRow).join('') + (full ? '<p class="vc-warn">Magazyn pełny – wydaj surowce</p>' : '') + '</div>' +
+        '<div class="vc-farm" title="Farma"><span>' + ico('pop') + fmt(used) + ' / ' + fmt(pc) + '</span><span class="mini"><i style="width:' + Math.min(100, used / Math.max(1, pc) * 100).toFixed(0) + '%"></i></span></div>' +
+        '<div class="vc-queues">' +
+          qslot(ico('hq'), bq ? '<span class="vq-t">' + buildName(bq.building) + ' ' + bq.level + '</span><span class="timer" data-end="' + bq.end + '"></span>' + (v.buildQueue.length > 1 ? '<small class="muted">+' + (v.buildQueue.length - 1) + '</small>' : '') : '', 'budowa wolna') +
+          qslot(ico('barracks'), rq ? ico(rq.unit) + '<span class="vq-t">' + (rq.count - rq.done) + '</span><span class="timer" data-end="' + (rq.start + rq.count * rq.per) + '"></span>' : '', 'koszary wolne') +
+        '</div>' +
+        '<div class="vc-army">' + unitsLine(v.units) + '</div>' +
+        '<footer><button class="btn" data-act="goto" data-id="' + v.id + '">Otwórz</button><button class="btn ghost" data-act="show-on-map" data-x="' + v.x + '" data-y="' + v.y + '" title="Pokaż na mapie">' + ico('map') + '</button></footer></article>';
+    };
+
+    const tableRow = v => {
+      const cap = E.storageCap(v), used = E.popUsed(s, v), pc = E.popCap(v);
+      const bq = v.buildQueue[0], rq = v.recruitQueue[0], attacks = hit[v.id] || [];
       const resCell = r => {
         const pct = Math.min(100, v.res[r] / cap * 100);
         return '<td class="num' + (pct >= 100 ? ' full' : pct >= 85 ? ' near' : '') + '"><b>' + fmt(v.res[r]) + '</b><span class="mini"><i style="width:' + pct.toFixed(0) + '%"></i></span></td>';
       };
-      const used = E.popUsed(s, v), pc = E.popCap(v);
-      const bq = v.buildQueue[0], rq = v.recruitQueue[0];
-      const attacks = inc.filter(m => m.to === v.id).sort((a, b) => a.arrive - b.arrive);
       return '<tr' + (v.id === UI.vid ? ' class="cur"' : '') + '>' +
         '<td class="vname"><button class="link" data-act="goto" data-id="' + v.id + '">' + esc(v.name) + '</button>' + roleTag(roles && roles[v.id]) + '<small>' + xy(v.x, v.y) + ', ' + E.points(v) + ' pkt</small></td>' +
         E.RES.map(resCell).join('') +
@@ -527,34 +621,16 @@
         '<td>' + (rq ? ico(rq.unit) + (rq.count - rq.done) + ' <span class="timer" data-end="' + (rq.start + rq.count * rq.per) + '"></span>' : '<span class="idle">wolne</span>') + '</td>' +
         '<td class="units-cell"><span class="units-wrap">' + unitsLine(v.units) + '</span></td>' +
         '<td>' + (attacks.length ? '<span class="alert">' + ico('sword') + attacks.length + ' <span class="timer" data-end="' + attacks[0].arrive + '"></span></span>' : '') + '</td></tr>';
-    }).join('');
-    el.innerHTML = '<section class="ov-head panel"><div><h1>Przegląd wiosek</h1><p class="tags"><span>' + allOwn.length + ' z ' + E.winVillages(s) + ' wiosek</span>' +
-      (roles ? '<span class="rtag off">' + ico('axe') + nOff + ' ofensywnych</span><span class="rtag def">' + ico('wall') + nDef + ' defensywnych</span>' : '') +
-      (inc.length ? '<span class="warn"><button class="link" data-screen="threats">Nadciągające ataki: ' + inc.length + '</button></span>' : '') +
-      (diploOffers(s) ? '<span class="warn">Oferty paktów: ' + diploOffers(s) + '</span>' : '') + '</p>' +
-      (roles ? '<div class="actions left rolefilter"><span class="muted">Pokaż wioski:</span>' +
-        [['all', 'Wszystkie'], ['off', 'Ofensywne'], ['def', 'Defensywne']].map(f => '<button class="btn' + (rf === f[0] ? '' : ' ghost') + '" data-act="ov-role" data-role="' + f[0] + '">' + f[1] + '</button>').join('') + '</div>' : '') +
-      '<div class="actions left"><button class="btn" data-act="gather-open"' + (own.length > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"') + '>' + ico('merchant') + 'Zbierz / rozdziel surowce</button>' +
-      '<button class="btn" data-act="troops-open"' + (own.length > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"') + '>' + ico('spear') + 'Zbierz / rozdziel wojsko</button>' +
-      '<button class="btn" data-act="defense-open"' + (own.length > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"') + '>' + ico('wall') + 'Wyślij obronę</button>' +
-      '<button class="btn" data-act="mass-open">' + ico('barracks') + 'Szkol we wszystkich wioskach</button>' +
-      '<button class="btn" data-act="buildall-open">' + ico('hq') + 'Buduj we wszystkich wioskach</button>' +
-      '<button class="btn" data-act="auto-open"' + (own.length > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"') + '>' + ico('merchant') + 'Konwoje' +
-        (s.auto && s.auto.on ? ' <small>(wł.)</small>' : '') + '</button>' +
-      '<button class="btn" data-act="tech-open">' + ico('scroll') + 'Technologia</button>' +
-      '<button class="btn" data-act="pilot-open">' + ico('wall') + 'Autopilot' + (s.pilot && s.pilot.on ? ' <span class="pdot" title="Autopilot działa"></span>' : '') + '</button>' +
-      '<button class="btn" data-act="diplo-open">' + ico('scroll') + 'Dyplomacja' + (diploOffers(s) ? ' <small>(' + diploOffers(s) + ')</small>' : '') + '</button></div></div>' +
-      '<div class="army-kpis ov-kpis">' + E.RES.map(r => '<div class="kpi"><small>' + C.RESOURCES[r].name + ' razem</small><b>' + fmt(total[r]) + '</b><small>+' + Math.round(prod[r]) + ' / min</small></div>').join('') +
-      '<div class="kpi"><small>Jednostki łącznie</small><b>' + fmt(allTotal) + '</b>' +
-        '<small>w wioskach ' + fmt(army) + (allTotal > army ? ' + poza ' + fmt(allTotal - army) : '') + '</small></div>' +
-      '<div class="kpi"><small>Moc konta</small><b>' + fmt(pw.total) + '</b><small>bud. ' + fmt(pw.buildings) + ' + woj. ' + fmt(pw.army) + '</small></div>' +
-      '<div class="kpi ov-units"><small>Wszystkie jednostki wg rodzaju (wioski, wsparcie, marsz)</small><div class="ov-units-list">' +
-        (allTotal ? E.UNITS.filter(k => all[k] > 0).map(k => '<span class="uov" title="' + C.UNITS[k].name + ': ' + fmt(all[k]) + '">' + ico(k) + '<span class="uov-txt"><small>' + C.UNITS[k].name + '</small><b>' + fmt(all[k]) + '</b></span></span>').join('') : '<span class="muted">brak</span>') +
-      '</div></div></div></section>' +
-      statsCard(s) +
-      '<section class="panel"><div class="tablewrap"><table class="units ov">' +
+    };
+
+    let list;
+    if (!own.length) list = '<section class="panel ov-empty"><p class="muted">Żadna wioska nie spełnia tego filtra.</p><button class="btn ghost" data-act="ov-role" data-v="all">Pokaż wszystkie</button></section>';
+    else if (view === 'cards') list = '<div class="vgrid">' + own.map(card).join('') + '</div>';
+    else list = '<section class="panel"><div class="tablewrap"><table class="units ov">' +
       '<thead><tr><th>Wioska</th><th>' + ico('wood') + 'Drewno</th><th>' + ico('clay') + 'Glina</th><th>' + ico('iron') + 'Żelazo</th><th>' + ico('pop') + 'Farma</th><th>Budowa</th><th>Rekrutacja</th><th>Wojsko</th><th>Ataki</th></tr></thead>' +
-      '<tbody>' + rows + '</tbody></table></div></section>';
+      '<tbody>' + own.map(tableRow).join('') + '</tbody></table></div></section>';
+
+    el.innerHTML = alert + summary + actions + toolbar + list;
     restoreScroll(el, keep);
   }
 
@@ -2064,7 +2140,7 @@
     else if (UI.screen === 'threats') renderThreats();
     else if (UI.screen === 'reports') renderReports();
     else if (UI.screen === 'tech') renderTech();
-    else if (UI.screen === 'overview' && !(document.activeElement && document.activeElement.closest && document.activeElement.closest('#screen-overview'))) renderOverview();
+    else if (UI.screen === 'overview' && !(document.activeElement && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName) && document.activeElement.closest('#screen-overview'))) renderOverview();
     else if (UI.screen === 'map') renderMap(false);
     renderQuick();
     restoreFocus(kept);
@@ -2191,7 +2267,10 @@
         show('map');
         requestAnimationFrame(() => MP.Map.centerOn(UI.sel.x, UI.sel.y));
         break;
-      case 'ov-role': UI.ovRole = b.dataset.role; invalidate(); render(); break;
+      case 'ov-role': UI.ovRole = b.dataset.v || b.dataset.role; invalidate(); render(); break;
+      case 'ov-sort': UI.ovSort = b.dataset.v; invalidate(); render(); break;
+      case 'ov-view': UI.ovView = b.dataset.v; invalidate(); render(); break;
+      case 'ov-toggle': UI.ovOpen = UI.ovOpen || {}; UI.ovOpen[b.dataset.k] = !UI.ovOpen[b.dataset.k]; invalidate(); render(); break;
       case 'goto':
         UI.vid = b.dataset.id; UI.recruit = {};
         show('village');
