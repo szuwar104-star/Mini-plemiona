@@ -252,6 +252,8 @@
     if (cfg.tech !== undefined) o.tech = !!cfg.tech;
     if (cfg.defend !== undefined) o.defend = !!cfg.defend;
     if (cfg.recruit !== undefined && ['defense', 'balanced', 'off'].indexOf(cfg.recruit) >= 0) o.recruit = cfg.recruit;
+    if (cfg.convoy !== undefined) o.convoy = !!cfg.convoy;
+    if (cfg.hub !== undefined) o.hub = cfg.hub || null;
     if (cfg.defLevel !== undefined) { const n = Number(cfg.defLevel); if (n >= 5 && n <= 400) o.defLevel = Math.round(n); }
     return o;
   }
@@ -261,6 +263,14 @@
     p.log = old.log || []; p.stats = old.stats || {}; p.seen = old.seen || {}; p.threat = old.threat || {};
     p.deployed = old.deployed || {}; p.last = old.last || null;
     p.next = p.on ? t + 1000 : null;
+    // Konwoje do stolicy: bot włącza wbudowane Konwoje (nadwyżki z wiosek > 80% magazynu wracają do wioski centralnej).
+    const a = state.auto || {};
+    if (p.on && p.convoy) {
+      const r = E.setAuto(state, { on: true, hub: p.hub, high: a.high, keep: a.keep, everyMin: a.everyMin, coins: a.coins !== undefined ? a.coins : true }, t);
+      if (!r.ok) return r;
+    } else if (old.convoy && a.on) {
+      E.setAuto(state, Object.assign({}, a, { on: false }), t);
+    }
     state.pilot = p;
     return { ok: true };
   }

@@ -258,7 +258,7 @@
     },
     // Autopilot (pilot.js): bot rozwijający Twoje wioski. Czasy w sekundach/minutach CZASU GRY.
     PILOT: {
-      defaults: { on: false, build: true, recruit: 'defense', tech: true, defend: true, defLevel: 40 },
+      defaults: { on: false, build: true, recruit: 'defense', tech: true, defend: true, defLevel: 40, convoy: false, hub: null },
       tickSec: 60,               // co ile sekund bot sprawdza wioski
       alertDelaySec: 1,          // po wykryciu nowego ataku bot działa po tylu sekundach
       buildDepth: 2,             // ile budów trzyma w kolejce każda wioska
