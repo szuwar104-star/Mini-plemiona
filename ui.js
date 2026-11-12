@@ -401,6 +401,7 @@
     if (!own.length) { el.innerHTML = noVillages(); return; }
     const inc = incomingAttacks(s);
     const pw = E.accountPower(s, 'player');
+    const all = E.armyOf(s, 'player'), allTotal = E.sumUnits(all); // wszystkie jednostki: w wioskach, na wsparciu i w marszu
     const total = { wood: 0, clay: 0, iron: 0 }, prod = { wood: 0, clay: 0, iron: 0 };
     let army = 0;
     const rows = own.map(v => {
@@ -438,7 +439,8 @@
       '<button class="btn" data-act="pilot-open">' + ico('wall') + 'Autopilot' + (s.pilot && s.pilot.on ? ' <small>(wł.)</small>' : '') + '</button>' +
       '<button class="btn" data-act="diplo-open">' + ico('scroll') + 'Dyplomacja' + (diploOffers(s) ? ' <small>(' + diploOffers(s) + ')</small>' : '') + '</button></div></div>' +
       '<div class="army-kpis ov-kpis">' + E.RES.map(r => '<div class="kpi"><small>' + C.RESOURCES[r].name + ' razem</small><b>' + fmt(total[r]) + '</b><small>+' + Math.round(prod[r]) + ' / min</small></div>').join('') +
-      '<div class="kpi"><small>Wojsko w wioskach</small><b>' + fmt(army) + '</b></div>' +
+      '<div class="kpi" title="' + E.UNITS.filter(k => all[k] > 0).map(k => C.UNITS[k].name + ': ' + fmt(all[k])).join(', ') + '"><small>Jednostki łącznie</small><b>' + fmt(allTotal) + '</b>' +
+        '<small>w wioskach ' + fmt(army) + (allTotal > army ? ' + poza ' + fmt(allTotal - army) : '') + '</small></div>' +
       '<div class="kpi"><small>Moc konta</small><b>' + fmt(pw.total) + '</b><small>bud. ' + fmt(pw.buildings) + ' + woj. ' + fmt(pw.army) + '</small></div></div></section>' +
       '<section class="panel"><div class="tablewrap"><table class="units ov">' +
       '<thead><tr><th>Wioska</th><th>' + ico('wood') + 'Drewno</th><th>' + ico('clay') + 'Glina</th><th>' + ico('iron') + 'Żelazo</th><th>' + ico('pop') + 'Farma</th><th>Budowa</th><th>Rekrutacja</th><th>Wojsko</th><th>Ataki</th></tr></thead>' +
