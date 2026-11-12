@@ -1297,7 +1297,7 @@
       '<label class="chk"><input type="checkbox" data-ptech' + (g.tech ? ' checked' : '') + '>Kupuj monety z nadwyżek surowców i badaj Technologię (wymaga Targowiska)</label>' +
       '<label class="chk"><input type="checkbox" data-pset' + (g.settle ? ' checked' : '') + '>Szkol osadników i zakładaj nowe wioski w pobliżu (jeden osadnik naraz)</label>' +
       '<label class="field">Maks. liczba wiosek (puste = bez limitu)<input type="number" inputmode="numeric" min="1" max="200" placeholder="bez limitu" data-psmax value="' + nz(g.settleMax) + '"></label>' +
-      '<label class="chk"><input type="checkbox" data-patk' + (g.attack ? ' checked' : '') + '>Atakuj i zajmuj wioski wrogich frakcji (szkoli Dowódców i Tarany, zwiadem sprawdza obronę, zbiera armię w najsilniejszej wiosce; wymaga szkolenia wojska, nie atakuje frakcji z paktem)</label>' +
+      '<label class="chk"><input type="checkbox" data-patk' + (g.attack ? ' checked' : '') + '>Atakuj i zajmuj wioski wrogich frakcji oraz wolne osady (szkoli Dowódców i Tarany, zwiadem sprawdza obronę, kilka wiosek uderza naraz; wolne osady zdobywa zwykłą armią; wymaga szkolenia wojska, nie atakuje frakcji z paktem)</label>' +
       '<label class="chk"><input type="checkbox" data-pfarm' + (g.farm ? ' checked' : '') + '>Farmuj: armia ataku grabi wolne osady i wioski wokoło (po zwiadzie, bez Dowódców; wymaga szkolenia wojska i zwiadowców; nie grabi frakcji z paktem)</label>' +
       '<label class="chk"><input type="checkbox" data-pconv' + (g.convoy ? ' checked' : '') + '>Wysyłaj nadwyżki surowców do stolicy (Konwoje co 15 min)</label>' +
       '<label class="field">Stolica (wioska centralna) <select data-phub>' + E.villagesOf(s, 'player').sort((x, y) => x.name.localeCompare(y.name, 'pl')).map(v =>
