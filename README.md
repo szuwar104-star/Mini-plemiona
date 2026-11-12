@@ -76,6 +76,8 @@ Wolną osadę przejmujesz, wygrywając bitwę. Wioskę frakcji AI – wysyłają
 | `diplomacy.js` | dyplomacja: nastawienie, pakty o nieagresji, dary, zdrada, lider |
 | `ai.js` | skrypt czterech frakcji AI (agresywna, gospodarcza, obronna, ekspansywna) |
 | `database.js` | zapis IndexedDB + kopia w localStorage, wersjonowanie, eksport/import JSON |
+| `cloud.js` | synchronizacja zapisu między urządzeniami (klient: kod, wysyłanie, pobieranie) |
+| `worker.mjs`, `wrangler.jsonc`, `.assetsignore` | worker Cloudflare: statyczne pliki gry + API zapisu w KV (`/api/save/<kod>`) |
 | `sprites.js` | małe ikony pikselowe (surowce, jednostki, budynki) |
 | `art.js` | grafika proceduralna mapy: teren, drogi, lasy, góry, terytoria, osady |
 | `map.js` | mapa 15 × 15: warstwy, trasy wojsk, minimapa, przesuwanie, przybliżanie, szczypanie |
@@ -107,6 +109,12 @@ Menu → „Moc konta” (z licznikiem pokonanych wrogów; skrót: panel „Impe
 ## Zapis
 
 Autozapis co 5 s, po każdej akcji i przy zamykaniu karty (synchroniczna kopia w localStorage). Przy starcie wczytywany jest nowszy z dwóch zapisów. Menu → „Pobierz kopię zapisu” / „Wczytaj zapis z pliku”. **Pauza**: Menu → „Wstrzymaj grę” albo „Zapisz do pliku i wstrzymaj”. W pauzie czas gry stoi (AI się nie rozwija, nic nie nadrabia się po powrocie), a rozkazy są zablokowane; po wznowieniu (pasek u góry) gra liczy dalej od tego samego momentu. Pauza i łączny czas pauz (`skew`) są w zapisie, więc działają też po wczytaniu pliku na innym urządzeniu. Czas gry = zegar − `skew` (`Engine.gameClock`). Test: `node tests/pause.js`. Zapis ma numer wersji (`SAVE_VERSION` w `config.js`); przy zmianie struktury dopisz migrację w `database.js` (`MIGRATIONS`).
+
+### Synchronizacja między urządzeniami
+
+Menu → „Synchronizacja między urządzeniami”. Na pierwszym urządzeniu „Utwórz kod synchronizacji” (losowy kod `XXXXX-XXXXX-XXXXX-XXXXX-XXXXX`, bez konta), potem „Wyślij do chmury i wstrzymaj”. Na drugim wpisujesz ten sam kod, „Pobierz z chmury” i wznawiasz grę przyciskiem u góry – czas stoi od chwili wysłania, więc gra liczy dalej od tego samego momentu. Kod ma 125 bitów losowości i działa jak hasło do zapisu: kto go zna, może go pobrać i nadpisać. Przycisk „Wyślij do chmury” (bez pauzy) też jest; wtedy po stronie drugiego urządzenia gra nadrabia upływ czasu jak po zwykłym wczytaniu pliku. Urządzenie pamięta numer ostatnio zsynchronizowanej wersji; jeśli w chmurze jest nowsza, której nie pobrało, przed nadpisaniem pyta o potwierdzenie.
+
+Technicznie: `worker.mjs` obsługuje `GET`/`PUT /api/save/<kod>` i zapisuje w KV (binding `SAVES`) pod kluczem SHA-256 z kodu, z ważnością odnawianą o rok przy każdym wysłaniu; resztę ruchu oddaje statycznym plikom (`wrangler.jsonc`, `.assetsignore`). Namespace KV tworzy się sam przy pierwszym wdrożeniu (wrangler ≥ 4.45); jeśli nie, utwórz go w panelu Cloudflare i podepnij jako `SAVES`. Poza Cloudflare (np. `node serve.js`) przyciski pokazują, że serwer nie obsługuje synchronizacji. Test: `node tests/cloud.js`.
 
 ## Balans i poziomy trudności
 

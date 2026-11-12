@@ -1420,6 +1420,62 @@
     return top ? '<p class="muted seg-note">Wyścig: najdalej jest ' + flag(s, top.f.id) + ' (' + top.n + ' z ' + E.winVillages(s) + ').</p>' : '';
   }
   /* ---------- menu ---------- */
+
+  /* ---------- synchronizacja między urządzeniami ---------- */
+  function syncSection() {
+    const C2 = MP.Cloud, sy = UI.sync || (UI.sync = {});
+    const code = C2 && C2.code();
+    const status = sy.msg ? '<p class="' + (sy.kind === 'bad' ? 'why' : 'muted') + '" role="status">' + esc(sy.msg) + '</p>' : '';
+    const dis = sy.busy ? ' disabled' : '';
+    let h = '<section><h3>Synchronizacja między urządzeniami</h3>';
+    if (!code) {
+      h += '<p class="muted">Zapis trafia do chmury pod Twoim kodem – bez konta. Utwórz kod na tym urządzeniu, a na drugim wpisz ten sam kod i pobierz zapis.</p>' +
+        '<div class="actions left"><button class="btn"' + dis + ' data-act="sync-new">Utwórz kod synchronizacji</button></div>' +
+        '<p class="muted">Masz już kod z innego urządzenia?</p>' +
+        '<div class="actions left"><input type="text" id="syncCodeIn" placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" autocomplete="off" autocapitalize="characters" spellcheck="false">' +
+        '<button class="btn ghost"' + dis + ' data-act="sync-use">Użyj kodu</button></div>';
+    } else {
+      h += '<p class="muted">Kod synchronizacji (wpisz go na drugim urządzeniu, nie pokazuj nikomu): <b style="font-family:monospace;user-select:all">' + esc(code) + '</b></p>' +
+        '<p class="muted">Przejście na inne urządzenie: tu „Wyślij do chmury i wstrzymaj”, tam „Pobierz z chmury”, potem wznów grę.</p>' +
+        '<div class="actions left"><button class="btn"' + dis + ' data-act="sync-push-pause">Wyślij do chmury i wstrzymaj</button>' +
+        '<button class="btn ghost"' + dis + ' data-act="sync-push">Wyślij do chmury</button>' +
+        '<button class="btn ghost"' + dis + ' data-act="sync-pull">Pobierz z chmury</button>' +
+        '<button class="btn ghost"' + dis + ' data-act="sync-off">Odłącz kod</button></div>';
+    }
+    return h + status + '</section>';
+  }
+  async function syncRun(fn) {
+    const sy = UI.sync || (UI.sync = {});
+    sy.busy = true; sy.msg = 'Chwileczkę…'; sy.kind = 'info'; renderModal();
+    try { sy.msg = await fn(); sy.kind = 'good'; }
+    catch (err) { sy.msg = err.message || String(err); sy.kind = 'bad'; }
+    sy.busy = false;
+    if (UI.modal && UI.modal.type === 'menu') renderModal();
+  }
+  const fmtAt = ts => new Date(ts).toLocaleString('pl-PL');
+  async function syncPush(pause) {
+    const G = MP.Game, C2 = MP.Cloud;
+    if (pause) G.pause();
+    let r = await C2.push(st());
+    if (r.conflict) {
+      if (!window.confirm('W chmurze jest inny zapis (z ' + fmtAt(r.savedAt) + '), którego to urządzenie jeszcze nie pobrało. Nadpisać go zapisem z tego urządzenia?')) {
+        return 'Wysyłanie anulowane. Zapis w chmurze został bez zmian.';
+      }
+      r = await C2.push(st(), { force: true });
+    }
+    return (pause ? 'Gra wstrzymana. ' : '') + 'Zapis wysłany do chmury (' + fmtAt(r.savedAt) + '). Na drugim urządzeniu użyj „Pobierz z chmury”.';
+  }
+  async function syncPull() {
+    const G = MP.Game, C2 = MP.Cloud;
+    const m = await C2.meta();
+    if (!m) return 'W chmurze nie ma jeszcze zapisu pod tym kodem.';
+    if (!window.confirm('Zapis w chmurze pochodzi z ' + fmtAt(m.savedAt) + '. Wczytanie zastąpi zapis gry na tym urządzeniu. Kontynuować?')) return 'Wczytywanie anulowane.';
+    const r = await C2.pull();
+    await G.importText(r.text);
+    C2.markSynced(r.savedAt);
+    return 'Wczytano zapis z chmury (' + fmtAt(r.savedAt) + ').' + (st().paused ? ' Gra jest wstrzymana – wznów ją przyciskiem u góry.' : '');
+  }
+
   function menuModal() {
     const s = st();
     const own = E.villagesOf(s, 'player').length;
@@ -1443,6 +1499,7 @@
       '<button class="btn ghost" data-act="export">Pobierz kopię zapisu (JSON)</button>' +
       '<button class="btn ghost" data-act="import">Wczytaj zapis z pliku</button>' +
       '<input type="file" id="importFile" accept=".json,application/json" hidden></div></section>' +
+      syncSection() +
       '<section><h3>Jak grać</h3><ul class="help">' +
       '<li>Surowce rosną same, także gdy gra jest zamknięta. Rozbudowuj Tartak, Cegielnię i Kopalnię.</li>' +
       '<li>Ratusz powiększa magazyn i pozwala budować wyżej. Farma daje miejsce na wojsko.</li>' +
@@ -2109,6 +2166,30 @@
         break;
       }
       case 'import': $('#importFile').click(); break;
+      case 'sync-new': {
+        const sy = UI.sync || (UI.sync = {});
+        MP.Cloud.setCode(MP.Cloud.newCode(), 0);
+        sy.msg = 'Kod utworzony. Wyślij zapis do chmury, a potem wpisz ten kod na drugim urządzeniu.'; sy.kind = 'good';
+        renderModal();
+        break;
+      }
+      case 'sync-use': {
+        const sy = UI.sync || (UI.sync = {}), inp = $('#syncCodeIn');
+        try {
+          MP.Cloud.setCode(inp ? inp.value : '', 0);
+          sy.msg = 'Kod zapisany. Użyj „Pobierz z chmury”, żeby wczytać grę z drugiego urządzenia.'; sy.kind = 'good';
+        } catch (err) { sy.msg = err.message; sy.kind = 'bad'; }
+        renderModal();
+        break;
+      }
+      case 'sync-push-pause': syncRun(() => syncPush(true)); break;
+      case 'sync-push': syncRun(() => syncPush(false)); break;
+      case 'sync-pull': syncRun(syncPull); break;
+      case 'sync-off':
+        if (window.confirm('Odłączyć kod synchronizacji na tym urządzeniu? Zapis w chmurze zostanie, a kod będzie trzeba wpisać ponownie.')) {
+          MP.Cloud.clear(); UI.sync = {}; renderModal();
+        }
+        break;
       case 'new-game': openModal('newgame', { diff: st().difficulty, world: st().world || C.DEFAULT_WORLD, race: !!st().race }); break;
       case 'pick-diff': UI.modal.diff = b.dataset.d; renderModal(); break;
       case 'pick-world': UI.modal.world = b.dataset.w; renderModal(); break;
