@@ -11,7 +11,9 @@
    3. Wojsko – jednostki obronne do celu zależnego od rozbudowy wioski, kilku zwiadowców,
       opcjonalnie armia ataku; przy zagrożeniu wszystkie surowce idą na obronę.
    4. Technologia – nadwyżki surowców -> monety (Targowisko) -> badania wg priorytetów.
-   Bot nie podgląda sił wroga (tak jak Ty: „siła nieznana”). Wszystkie liczby: C.PILOT.
+   5. Podbój (opcja „attack”) – Dowódcy, Tarany i armia ataku; zwiad celu, zbiórka armii w najsilniejszej wiosce,
+      fale z Dowódcą na wioski innych frakcji (bez paktu), aż poparcie spadnie do 0.
+   Bot nie podgląda sił wroga bez zwiadu (tak jak Ty: „siła nieznana”). Wszystkie liczby: C.PILOT.
    ========================================================================= */
 (function (root) {
   'use strict';
@@ -251,9 +253,24 @@
     const needDef = E.villageDefense(v, null, ups) < target;
     let role;
     if (needDef) role = 'def';
-    else if (p.recruit === 'balanced') role = 'att';
+    else if (p.recruit === 'balanced' || p.attack) role = 'att';
     else if (full) role = 'def';            // pełny magazyn: nadwyżka idzie na dodatkową obronę, nic się nie marnuje
     else return;
+
+    // podbój: kilka Taranów w każdej wiosce, żeby mur nie zatrzymał fali
+    if (role === 'att' && p.attack && !threatened) {
+      let rams = 0;
+      v.recruitQueue.forEach(e => { if (C.UNITS[e.unit].wallPower) rams += e.count - e.done; });
+      const ramKey = Object.keys(C.UNITS).find(k => C.UNITS[k].wallPower);
+      if (ramKey) {
+        rams += v.units[ramKey] || 0;
+        const ri = E.recruitInfo(state, v, ramKey);
+        if (rams < P().war.rams && ri.ok) {
+          const n = afford(C.UNITS[ramKey], Math.min(ri.max, P().war.rams - rams));
+          if (n >= 1 && E.queueRecruit(state, v, ramKey, n, t).ok !== false) { acts.recruited += n; return; }
+        }
+      }
+    }
 
     let best = null;
     Object.keys(C.UNITS).forEach(k => {
@@ -274,7 +291,7 @@
   /* ---------- 4. technologia ---------- */
   function techAllowed(node, p) {
     if (node.branch !== 'war') return true;
-    return node.id === 'drill' || p.recruit === 'balanced';
+    return node.id === 'drill' || p.recruit === 'balanced' || !!p.attack;
   }
   function techOrder(p) {
     const out = P().techPriority.slice();
@@ -434,6 +451,135 @@
     return { id: best.v.id, cost: U.cost };       // jeszcze nie stać – ta wioska odkłada surowce
   }
 
+  /* ---------- 6. podbój: zwiad, zbiórka armii, fale z Dowódcą ---------- */
+  const isAtt = k => { const U = C.UNITS[k]; return !U.role && !U.conquer && !U.settler && !U.scout; };
+  const attUnits = v => { const u = E.emptyUnits(); Object.keys(C.UNITS).forEach(k => { if (isAtt(k)) u[k] = v.units[k] || 0; }); return u; };
+  const attPower = (state, v) => E.attackPower(attUnits(v), E.upgradesOf(state, 'player'));
+  const foeBlocked = (state, o, t) => !!(MP.Diplomacy && MP.Diplomacy.blocked(state, 'player', o.owner, t));
+
+  function noblesTotal(state, vs) {
+    let n = 0;
+    vs.forEach(v => {
+      n += v.units.noble || 0;
+      v.recruitQueue.forEach(e => { if (e.unit === 'noble') n += e.count - e.done; });
+    });
+    state.movements.forEach(m => { if (m.owner === 'player' && m.units && m.units.noble > 0 && (m.type === 'attack' || m.type === 'return' || m.type === 'support')) n += m.units.noble; });
+    return n;
+  }
+
+  // Szkoli Dowódców do limitu P().war.nobles – dopiero gdy armia ma sensowną siłę. Zwraca { id, cost }, gdy wioska odkłada surowce.
+  function nobleStep(state, p, vs, t, threatened, acts) {
+    const W = P().war;
+    if (noblesTotal(state, vs) >= W.nobles) return null;
+    if (vs.reduce((s2, v) => s2 + attPower(state, v), 0) < W.minPower) return null;
+    const U = C.UNITS.noble, ups = E.upgradesOf(state, 'player');
+    const cands = vs.filter(v => !threatened[v.id] && v.buildings.barracks >= U.barracks && v.recruitQueue.length < E.queueMax(v, 'recruit') &&
+      E.villageDefense(v, null, ups) >= E.points(v) * p.defLevel * P().settleDefMin && !E.RES.some(r => U.cost[r] > E.storageCap(v)))
+      .map(v => ({ v, ready: Math.min.apply(null, E.RES.map(r => v.res[r] / U.cost[r])) })).sort((a, b) => b.ready - a.ready);
+    if (!cands.length) return null;
+    const best = cands[0].v, ri = E.recruitInfo(state, best, 'noble');
+    if (ri.ok && ri.max >= 1 && E.queueRecruit(state, best, 'noble', 1, t).ok !== false) {
+      acts.recruited++;
+      note(state, p, t, 'Szkolenie Dowódcy podboju w ' + best.name);
+      return null;
+    }
+    return ri.code === 'resources' ? { id: best.id, cost: U.cost } : null;
+  }
+
+  // Wyniki fal bota: przejęcie wioski albo przegrana (podnosi wymagany zapas siły dla tego celu).
+  function warReports(state, p, t, acts) {
+    const seen = p.repT || 0;
+    if (state.reports.length) p.repT = Math.max(seen, state.reports[0].time);
+    for (const r of state.reports) {
+      if (r.time <= seen) break;
+      if (r.kind !== 'attack' || r.attacker !== 'player' || !p.ops[r.to] || r.time < p.ops[r.to].t) continue;
+      if (r.conquered) {
+        acts.conquered++;
+        note(state, p, t, 'Przejęto wioskę ' + r.toName + ' (' + r.toX + ':' + r.toY + ')');
+        delete p.ops[r.to]; delete p.fail[r.to]; delete p.spied[r.to];
+      } else if (!r.attackerWon) {
+        const f = p.fail[r.to] || { n: 0 };
+        p.fail[r.to] = { n: f.n + 1, t };
+        note(state, p, t, 'Fala na ' + r.toName + ' przegrała – wymagana większa przewaga');
+      }
+    }
+    Object.keys(p.fail).forEach(id => { if (t - p.fail[id].t > P().war.retryMin * 60000) delete p.fail[id]; });
+    Object.keys(p.ops).forEach(id => { if (t - p.ops[id].t > 3 * 3600000) delete p.ops[id]; });
+  }
+
+  // Armia ataku (i Dowódcy) z zaplecza wędruje na stałe do najsilniejszej wioski – rozproszona nie zdobędzie obsadzonej wioski.
+  function gather(state, p, vs, t, threatened) {
+    const W = P().war;
+    if (p.gatherAt && t < p.gatherAt) return;
+    p.gatherAt = t + W.gatherEveryMin * 60000;
+    const free = vs.filter(v => !threatened[v.id] && !incomingOn(state, v).length);
+    if (free.length < 2) return;
+    const front = free.slice().sort((a, b) => attPower(state, b) - attPower(state, a))[0];
+    let room = E.supportRoom(state, front);
+    free.forEach(v => {
+      if (v.id === front.id || room < 20 || E.dist(v, front) > W.gatherRange) return;
+      const u = attUnits(v); u.noble = v.units.noble || 0;
+      const pop = E.unitsPop(u);
+      if (pop > room) { const sc = room / pop; Object.keys(u).forEach(k => { u[k] = Math.floor(u[k] * sc); }); }
+      if (E.sumUnits(u) < W.gatherMin && !u.noble) return;
+      if (E.sendSupport(state, v.id, front.id, u, t, 'stay').ok) room -= E.unitsPop(u);
+    });
+  }
+
+  function warStep(state, p, vs, t, threatened, acts) {
+    const W = P().war, ups = E.upgradesOf(state, 'player');
+    p.ops = p.ops || {}; p.fail = p.fail || {}; p.spied = p.spied || {};
+    warReports(state, p, t, acts);
+    gather(state, p, vs, t, threatened);
+
+    const foes = Object.values(state.villages).filter(o => o.owner && o.owner !== 'player' && !foeBlocked(state, o, t));
+    if (!foes.length) return;
+    const out = state.movements.filter(m => m.type === 'attack' && m.owner === 'player');
+    const busy = new Set(out.map(m => m.to));
+    const sources = vs.filter(v => !threatened[v.id] && !incomingOn(state, v).length)
+      .map(v => ({ v, A: attPower(state, v) })).filter(s2 => s2.A >= W.minPower).sort((a, b) => b.A - a.A);
+    if (!sources.length) return;
+    const nobles = noblesTotal(state, vs);
+    let best = null, spies = 0;
+    for (const src of sources) {
+      const v = src.v;
+      foes.forEach(o => {
+        const d = E.dist(v, o);
+        if (d > W.range || busy.has(o.id)) return;
+        const intel = state.intel[o.id];
+        if (!intel || intel.owner !== o.owner || t - intel.time > W.intelMaxMin * 60000) {
+          // brak świeżego zwiadu – zwiadowcy z najbliższej wioski (tylko gdy jest czym zdobywać)
+          if (!nobles || spies >= W.spyPerTurn || (p.spied[o.id] && t - p.spied[o.id] < W.spyEveryMin * 60000)) return;
+          const sc = vs.filter(h => (h.units.scout || 0) >= W.spyScouts && !incomingOn(state, h).length).sort((a, b) => E.dist(a, o) - E.dist(b, o))[0];
+          if (!sc || E.dist(sc, o) > W.range + 4) return;
+          if (E.sendSpy(state, sc.id, o.id, W.spyScouts, t).ok) { p.spied[o.id] = t; acts.spied++; spies++; }
+          return;
+        }
+        if (!v.units.noble) return;
+        const send = attUnits(v);
+        const loy = Math.min(C.LOYALTY.max, intel.loyalty + (t - intel.time) / 60000 * C.LOYALTY.regenPerMin);
+        if (loy <= 0) return;
+        const wall = intel.buildings ? intel.buildings.wall : W.wallGuess;
+        const wallEff = Math.max(0, wall - Math.floor(E.ramCount(send) / C.RAM.fightPerLevel));
+        const need = E.defenseFrom(intel.units, wallEff, null) * W.ratio * (1 + W.failPenalty * ((p.fail[o.id] || { n: 0 }).n));
+        if (src.A < need) return;
+        // dobijanie rozpoczętego podboju najpierw, potem blisko i z dużą przewagą
+        const w = (1 + (C.LOYALTY.max - loy) / 25) / (1 + d) * (1 + Math.min(1, src.A / need / 4));
+        if (!best || w > best.w) best = { v, o, w, send };
+      });
+    }
+    if (!best || out.length >= W.maxWaves) return;
+    const send = best.send;
+    send.noble = 1;
+    send.scout = Math.max(0, Math.min(W.waveScouts, (best.v.units.scout || 0) - 1));
+    const r = E.sendAttack(state, best.v.id, best.o.id, send, t, 'attack');
+    if (r.ok) {
+      p.ops[best.o.id] = { t, from: best.v.id };
+      acts.attacked++;
+      note(state, p, t, 'Atak na ' + best.o.name + ' (' + best.o.x + ':' + best.o.y + ') z ' + best.v.name + ' z Dowódcą podboju');
+    }
+  }
+
   /* ---------- tura bota ---------- */
   function run(state, t) {
     const p = state.pilot;
@@ -442,7 +588,7 @@
     const vs = own(state);
     if (!vs.length) return;
     vs.forEach(v => E.tickVillage(state, v, t));
-    const acts = { built: 0, recruited: 0, support: 0, research: 0, coins: 0, recalled: 0, settled: 0, garrisoned: 0, supplied: 0 };
+    const acts = { built: 0, recruited: 0, support: 0, research: 0, coins: 0, recalled: 0, settled: 0, garrisoned: 0, supplied: 0, attacked: 0, spied: 0, conquered: 0 };
     const threatened = {};
 
     defend(state, p, vs, t, acts, threatened);
@@ -459,12 +605,20 @@
         reserves[sv.id] = { wood: Math.max(cur.wood, sv.cost.wood), clay: Math.max(cur.clay, sv.cost.clay), iron: Math.max(cur.iron, sv.cost.iron) };
       }
     }
+    if (p.attack) {
+      const nv = nobleStep(state, p, vs, t, threatened, acts);
+      if (nv) {
+        const cur = reserves[nv.id] || { wood: 0, clay: 0, iron: 0 };
+        reserves[nv.id] = { wood: Math.max(cur.wood, nv.cost.wood), clay: Math.max(cur.clay, nv.cost.clay), iron: Math.max(cur.iron, nv.cost.iron) };
+      }
+    }
     if (p.recruit !== 'off') vs.forEach(v => recruitVillage(state, v, p, t, reserves[v.id], !!threatened[v.id], acts));
     if (p.tech) manageTech(state, p, vs, t, acts);
+    if (p.attack) warStep(state, p, vs, t, threatened, acts);
     recall(state, p, t, acts);
 
-    ['built', 'recruited', 'support', 'research', 'coins', 'recalled', 'settled', 'garrisoned', 'supplied'].forEach(k => { p.stats[k] = (p.stats[k] || 0) + acts[k]; });
-    p.last = { t, built: acts.built, recruited: acts.recruited, support: acts.support, research: acts.research, settled: acts.settled, supplied: acts.supplied };
+    ['built', 'recruited', 'support', 'research', 'coins', 'recalled', 'settled', 'garrisoned', 'supplied', 'attacked', 'spied', 'conquered'].forEach(k => { p.stats[k] = (p.stats[k] || 0) + acts[k]; });
+    p.last = { t, built: acts.built, recruited: acts.recruited, support: acts.support, research: acts.research, settled: acts.settled, supplied: acts.supplied, attacked: acts.attacked, conquered: acts.conquered };
   }
 
   /* ---------- konfiguracja ---------- */
@@ -479,6 +633,7 @@
     if (cfg.supply !== undefined) o.supply = !!cfg.supply;
     if (cfg.convoy !== undefined) o.convoy = !!cfg.convoy;
     if (cfg.settle !== undefined) o.settle = !!cfg.settle;
+    if (cfg.attack !== undefined) o.attack = !!cfg.attack;
     if (cfg.settleMax !== undefined) { const n = Math.floor(Number(cfg.settleMax)); o.settleMax = n >= 1 && n <= 200 ? n : 0; }
     if (cfg.hub !== undefined) o.hub = cfg.hub || null;
     if (cfg.defLevel !== undefined) { const n = Number(cfg.defLevel); if (n >= 5 && n <= 400) o.defLevel = Math.round(n); }

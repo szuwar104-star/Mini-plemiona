@@ -260,7 +260,7 @@
     },
     // Autopilot (pilot.js): bot rozwijający Twoje wioski. Czasy w sekundach/minutach CZASU GRY.
     PILOT: {
-      defaults: { on: false, build: true, recruit: 'defense', tech: true, defend: true, garrison: true, supply: true, defLevel: 40, convoy: false, hub: null, settle: false, settleMax: 0 },
+      defaults: { on: false, build: true, recruit: 'defense', tech: true, defend: true, garrison: true, supply: true, defLevel: 40, convoy: false, hub: null, settle: false, settleMax: 0, attack: false },
       tickSec: 60,               // co ile sekund bot sprawdza wioski
       alertDelaySec: 1,          // po wykryciu nowego ataku bot działa po tylu sekundach
       buildDepth: 2,             // ile budów trzyma w kolejce każda wioska
@@ -290,6 +290,27 @@
       settleFarMax: 14,          // gdy wioska nie ma wolnego pola w zasięgu, osadnik może iść na pole przy innej własnej wiosce, maks. tyle pól
       settleDefMin: 0.5,         // osadników szkoli tylko wioska z obroną co najmniej tej części celu
       settleFoeDist: 2.5,        // nie zakłada osad bliżej niż tyle pól od wioski innej frakcji (wolne osady bez właściciela nie liczą się)
+      // Ataki i podbój wiosek frakcji (opcja „attack”): bot zwiadem sprawdza obronę celu, zbiera armię w najsilniejszej wiosce
+      // i wysyła kolejne fale z Dowódcą podboju, aż poparcie spadnie do 0. Bot nie widzi ulepszeń ani posiłków wroga – stąd zapas (ratio).
+      war: {
+        range: 14,               // maks. odległość celu od wioski, z której wyrusza fala
+        ratio: 1.5,              // wymagana siła ataku = szacowana obrona celu × ratio
+        failPenalty: 0.5,        // każda przegrana fala na ten cel podnosi wymagane ratio o tę część
+        minPower: 1500,          // poniżej tej siły ataku bot nie zwiadowuje ani nie atakuje
+        nobles: 2,               // tylu Dowódców bot utrzymuje (w wioskach, w szkoleniu i w drodze)
+        rams: 12,                // tyle Taranów szkoli w każdej wiosce (gdy Koszary pozwalają)
+        waveScouts: 2,           // zwiadowcy w fali (po bitwie dają nowy obraz celu: mur, poparcie, wojsko)
+        spyScouts: 3,            // tylu zwiadowców wysyła na zwiad
+        spyEveryMin: 15,         // jak często ponawia zwiad tego samego celu
+        spyPerTurn: 2,           // maks. zwiadów wysłanych w jednej turze
+        intelMaxMin: 40,         // zwiad starszy niż tyle minut jest nieaktualny
+        wallGuess: 8,            // zakładany mur, gdy nie ma raportu o budynkach
+        maxWaves: 2,             // maks. liczba fal naraz w drodze
+        gatherRange: 14,         // z jakiej odległości wioski przenoszą armię do najsilniejszej wioski
+        gatherEveryMin: 5,       // jak często bot zbiera armię
+        gatherMin: 5,            // mniejszych oddziałów nie przenosi
+        retryMin: 90             // po tylu minutach od przegranej fali bot zapomina o karze za ten cel
+      },
       buildWeights: { hq: 1, wood: 1.1, clay: 1.1, iron: 1.1, farm: 1, barracks: 0.8, market: 0.5, wall: 0.7 },
       techPriority: [['militia', 2], ['tools', 2], ['trade', 1], ['store', 3], ['u_spear', 3], ['u_archer', 3], ['u_guard', 3],
         ['p_wood', 3], ['p_clay', 3], ['p_iron', 3], ['agri', 3], ['build', 3], ['drill', 2], ['militia', 5], ['hide', 3], ['fort', 3],
