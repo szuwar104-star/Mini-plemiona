@@ -16,6 +16,21 @@
     pendingSave: false,
     lastSave: 0,
 
+    // Blokada uśpienia ekranu, gdy Autopilot pracuje (przeglądarka zwalnia ją sama po ukryciu karty).
+    wakeLock: null, wakeTry: 0,
+    async keepAwake(force) {
+      if (!this.state || !('wakeLock' in navigator)) return;
+      const want = !!(this.state.pilot && this.state.pilot.on) && !this.state.paused && document.visibilityState === 'visible';
+      if (!want) { if (this.wakeLock) { try { await this.wakeLock.release(); } catch (e) { /* już zwolniona */ } this.wakeLock = null; } return; }
+      if (this.wakeLock || (!force && Date.now() - this.wakeTry < 30000)) return;
+      this.wakeTry = Date.now();
+      try {
+        const lock = await navigator.wakeLock.request('screen');
+        this.wakeLock = lock;
+        lock.addEventListener('release', () => { if (this.wakeLock === lock) this.wakeLock = null; });
+      } catch (e) { /* przeglądarka odmówiła – bot działa dalej, ekran może się wygasić */ }
+    },
+
     // Czas gry: rzeczywisty minus czas spędzony w pauzie (w pauzie stoi w miejscu).
     clock() { return this.state ? E.gameClock(this.state, Date.now()) : Date.now(); },
     // Czas z gry -> czas na zegarku (do wyświetlania godzin w raportach).
@@ -62,7 +77,7 @@
       setInterval(() => this.save(), 5000);
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') { this.tick(true); MP.DB.saveSync(this.state); this.save(); }
-        else this.tick(false);
+        else { this.tick(false); this.keepAwake(true); }
       });
       window.addEventListener('pagehide', () => { MP.DB.saveSync(this.state); });
       this.registerSW();
@@ -74,6 +89,7 @@
       if (this.state.paused) return;
       const n = E.advance(this.state, this.clock());
       if (n > 0) { this.dirty = true; UI().invalidate(); }
+      this.keepAwake(false);
       if (!silent) {
         UI().drainNotices(false);
         UI().render();

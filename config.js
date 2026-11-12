@@ -256,6 +256,32 @@
       all:   { label: 'Pełna rozbudowa', desc: 'Wszystkie budynki do maksymalnego poziomu, po równo. Drogie i długie – pochłania nadwyżki surowców.',
                items: [['hq', LEVELS], ['wood', LEVELS], ['clay', LEVELS], ['iron', LEVELS], ['farm', LEVELS], ['barracks', LEVELS], ['market', LEVELS], ['wall', LEVELS]] }
     },
+    // Autopilot (pilot.js): bot rozwijający Twoje wioski. Czasy w sekundach/minutach CZASU GRY.
+    PILOT: {
+      defaults: { on: false, build: true, recruit: 'defense', tech: true, defend: true, defLevel: 40 },
+      tickSec: 60,               // co ile sekund bot sprawdza wioski
+      alertDelaySec: 1,          // po wykryciu nowego ataku bot działa po tylu sekundach
+      buildDepth: 2,             // ile budów trzyma w kolejce każda wioska
+      recruitDepth: 2,           // ile zleceń rekrutacji trzyma w kolejce
+      batchMin: 20,              // maks. czas jednego zlecenia (minuty) – bot reaguje na zmiany
+      farmUrgent: 0.85,          // zajętość farmy, od której Farma ma pierwszeństwo
+      storeUrgent: 0.85,         // zapełnienie magazynu, od którego Ratusz ma pierwszeństwo
+      storeSpend: 0.9,           // od tego zapełnienia wydaje na wojsko wszystko (nic się nie marnuje)
+      recruitShare: 0.8,         // jaką część nadwyżki (ponad rezerwę na budynek) wydaje na wojsko
+      scouts: 3,                 // tylu zwiadowców trzyma w każdej wiosce
+      supportShare: 0.6,         // maks. część obrońców wysyłana z wioski jako posiłki
+      supportMin: 5,             // mniejszych oddziałów nie wysyła
+      supportGoal: 3,            // cel obrony atakowanej wioski = punkty × defLevel × ta wartość
+      recallMin: 10,             // po tylu minutach od ostatniego ataku posiłki wracają do domu
+      coinFrom: 0.85, coinTo: 0.6, // zakup monet: gdy magazyn > coinFrom, schodzi do coinTo
+      logMax: 30,
+      buildWeights: { hq: 1, wood: 1.1, clay: 1.1, iron: 1.1, farm: 1, barracks: 0.8, market: 0.5, wall: 0.7 },
+      techPriority: [['militia', 2], ['tools', 2], ['trade', 1], ['store', 3], ['u_spear', 3], ['u_archer', 3], ['u_guard', 3],
+        ['p_wood', 3], ['p_clay', 3], ['p_iron', 3], ['agri', 3], ['build', 3], ['drill', 2], ['militia', 5], ['hide', 3], ['fort', 3],
+        ['u_spear', 6], ['u_archer', 6], ['u_guard', 6], ['tools', 5], ['store', 6], ['agri', 6], ['build', 6],
+        ['p_wood', 6], ['p_clay', 6], ['p_iron', 6], ['fort', 6], ['hide', 5], ['mint', 3], ['caravan', 2], ['admin', 2]]
+    },
+
     // Konwoje (automatyczne odsyłanie nadwyżek do wioski centralnej)
     AUTO: { everyMin: [5, 15, 30], defaults: { high: 80, keep: 40, everyMin: 15, coins: true } },
 
