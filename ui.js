@@ -1273,7 +1273,7 @@
     const s = st(), p = s.pilot || {}, D = C.PILOT.defaults;
     return { on: p.on !== undefined ? p.on : true, build: p.build !== undefined ? p.build : D.build, recruit: p.recruit || D.recruit,
       tech: p.tech !== undefined ? p.tech : D.tech, defend: p.defend !== undefined ? p.defend : D.defend, garrison: p.garrison !== undefined ? p.garrison : D.garrison, supply: p.supply !== undefined ? p.supply : D.supply, defLevel: p.defLevel || D.defLevel,
-      settle: !!p.settle, settleMax: p.settleMax || 0, attack: !!p.attack, convoy: !!p.convoy, hub: p.hub || (s.auto && s.auto.hub) || (autoDefaults().hub) };
+      settle: !!p.settle, settleMax: p.settleMax || 0, attack: !!p.attack, farm: !!p.farm, convoy: !!p.convoy, hub: p.hub || (s.auto && s.auto.hub) || (autoDefaults().hub) };
   }
   function pilotModal() {
     const s = st(), g = UI.pilot, p = s.pilot;
@@ -1298,6 +1298,7 @@
       '<label class="chk"><input type="checkbox" data-pset' + (g.settle ? ' checked' : '') + '>Szkol osadników i zakładaj nowe wioski w pobliżu (jeden osadnik naraz)</label>' +
       '<label class="field">Maks. liczba wiosek (puste = bez limitu)<input type="number" inputmode="numeric" min="1" max="200" placeholder="bez limitu" data-psmax value="' + nz(g.settleMax) + '"></label>' +
       '<label class="chk"><input type="checkbox" data-patk' + (g.attack ? ' checked' : '') + '>Atakuj i zajmuj wioski wrogich frakcji (szkoli Dowódców i Tarany, zwiadem sprawdza obronę, zbiera armię w najsilniejszej wiosce; wymaga szkolenia wojska, nie atakuje frakcji z paktem)</label>' +
+      '<label class="chk"><input type="checkbox" data-pfarm' + (g.farm ? ' checked' : '') + '>Farmuj: armia ataku grabi wolne osady i wioski wokoło (po zwiadzie, bez Dowódców; wymaga szkolenia wojska i zwiadowców; nie grabi frakcji z paktem)</label>' +
       '<label class="chk"><input type="checkbox" data-pconv' + (g.convoy ? ' checked' : '') + '>Wysyłaj nadwyżki surowców do stolicy (Konwoje co 15 min)</label>' +
       '<label class="field">Stolica (wioska centralna) <select data-phub>' + E.villagesOf(s, 'player').sort((x, y) => x.name.localeCompare(y.name, 'pl')).map(v =>
         '<option value="' + v.id + '"' + (v.id === g.hub ? ' selected' : '') + '>' + esc(v.name) + ' ' + xy(v.x, v.y) + ((v.buildings.market || 0) > 0 ? '' : ' – bez Targowiska') + '</option>').join('') + '</select></label>' +
@@ -1307,8 +1308,9 @@
       (ago !== null ? '<div class="wide"><span>Ostatnia tura (' + ago + ' min temu)</span><b>budowy: ' + p.last.built + ', wojsko: ' + p.last.recruited +
         ', posiłki: ' + p.last.support + ', badania: ' + p.last.research + ', osadnicy: ' + (p.last.settled || 0) + (p.attack ? ', ataki: ' + (p.last.attacked || 0) : '') + '</b></div>' : '') +
       (p && p.on && p.attack && p.warWhy ? '<div class="wide"><span>Atak (' + Math.max(0, Math.round((s.now - p.warWhy.t) / 60000)) + ' min temu)</span><b>' + esc(p.warWhy.key === 'sent' ? p.warWhy.text : 'brak fali – ' + p.warWhy.text) + '</b></div>' : '') +
+      (p && p.on && p.farm && p.farmInfo ? '<div class="wide"><span>Farmienie (' + Math.max(0, Math.round((s.now - p.farmInfo.t) / 60000)) + ' min temu)</span><b>' + esc(p.farmInfo.text) + '</b></div>' : '') +
       (p ? '<div class="wide"><span>Łącznie od włączenia</span><b>budowy ' + (stat.built || 0) + ', wojsko ' + fmt(stat.recruited || 0) + ', wysłane posiłki ' + (stat.support || 0) +
-        ', zasilone surowce ' + fmt(stat.supplied || 0) + ', badania ' + (stat.research || 0) + ', monety ' + (stat.coins || 0) + ', nowe osady ' + (stat.settled || 0) + (p.attack || stat.attacked ? ', fale ataku ' + (stat.attacked || 0) + ', zwiady ' + (stat.spied || 0) + ', przejęte wioski ' + (stat.conquered || 0) : '') + '</b></div>' : '') + '</div>' + log +
+        ', zasilone surowce ' + fmt(stat.supplied || 0) + ', badania ' + (stat.research || 0) + ', monety ' + (stat.coins || 0) + ', nowe osady ' + (stat.settled || 0) + (p.farm || stat.farmed ? ', fale farmienia ' + (stat.farmed || 0) : '') + (p.attack || stat.attacked ? ', fale ataku ' + (stat.attacked || 0) + ', zwiady ' + (stat.spied || 0) + ', przejęte wioski ' + (stat.conquered || 0) : '') + '</b></div>' : '') + '</div>' + log +
       '<div class="actions"><button class="btn ghost" data-act="close">Anuluj</button><button class="btn" data-act="pilot-save">Zapisz</button></div>';
   }
 
@@ -2374,6 +2376,7 @@
     else if (t.hasAttribute && t.hasAttribute('data-psup')) { UI.pilot.supply = t.checked; }
     else if (t.hasAttribute && t.hasAttribute('data-pset')) { UI.pilot.settle = t.checked; }
     else if (t.hasAttribute && t.hasAttribute('data-patk')) { UI.pilot.attack = t.checked; }
+    else if (t.hasAttribute && t.hasAttribute('data-pfarm')) { UI.pilot.farm = t.checked; }
     else if (t.hasAttribute && t.hasAttribute('data-psmax')) { UI.pilot.settleMax = t.value; }
     else if (t.hasAttribute && t.hasAttribute('data-pconv')) { UI.pilot.convoy = t.checked; }
     else if (t.hasAttribute && t.hasAttribute('data-phub')) { UI.pilot.hub = t.value; }

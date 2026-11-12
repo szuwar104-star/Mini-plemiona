@@ -260,7 +260,7 @@
     },
     // Autopilot (pilot.js): bot rozwijający Twoje wioski. Czasy w sekundach/minutach CZASU GRY.
     PILOT: {
-      defaults: { on: false, build: true, recruit: 'defense', tech: true, defend: true, garrison: true, supply: true, defLevel: 40, convoy: false, hub: null, settle: false, settleMax: 0, attack: false },
+      defaults: { on: false, build: true, recruit: 'defense', tech: true, defend: true, garrison: true, supply: true, defLevel: 40, convoy: false, hub: null, settle: false, settleMax: 0, attack: false, farm: false },
       tickSec: 60,               // co ile sekund bot sprawdza wioski
       alertDelaySec: 1,          // po wykryciu nowego ataku bot działa po tylu sekundach
       buildDepth: 2,             // ile budów trzyma w kolejce każda wioska
@@ -311,6 +311,20 @@
         gatherMin: 5,            // mniejszych oddziałów nie przenosi
         farmReserve: 0.35,       // tyle farmy wioski zbiórki zostaje wolne na szkolenie obrońców (armia ataku nie zapycha jej do pełna)
         retryMin: 90             // po tylu minutach od przegranej fali bot zapomina o karze za ten cel
+      },
+      // Farmienie (opcja „farm”): armia ataku grabi wolne osady i wioski frakcji wokół (bez Dowódców), po zwiadzie.
+      farm: {
+        range: 18,               // maks. odległość celu od wioski wysyłającej
+        ratio: 1.3,              // wymagana siła ataku = szacowana obrona celu × ratio
+        failPenalty: 0.5,        // każda przegrana fala na cel podnosi wymagane ratio o tę część
+        minPower: 300,           // poniżej tej siły ataku wioska nie farmi
+        minUnits: 10,            // mniejszych fal nie wysyła
+        minLoot: 250,            // cel z mniejszą ilością surowców (wg zwiadu) pomija
+        maxWaves: 60,            // maks. liczba fal farmienia naraz w drodze
+        perTurn: 15,             // maks. nowych fal w jednej turze
+        cooldownMin: 20,         // przerwa przed ponownym grabieniem tego samego celu
+        waveScouts: 1,           // zwiadowca w fali odświeża obraz celu po bitwie
+        spyScouts: 3, spyEveryMin: 20, spyPerTurn: 8, intelMaxMin: 60, wallGuess: 4
       },
       buildWeights: { hq: 1, wood: 1.1, clay: 1.1, iron: 1.1, farm: 1, barracks: 0.8, market: 0.5, wall: 0.7 },
       techPriority: [['militia', 2], ['tools', 2], ['trade', 1], ['store', 3], ['u_spear', 3], ['u_archer', 3], ['u_guard', 3],
