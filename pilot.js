@@ -251,35 +251,65 @@
     }
     return null;
   }
+  // Miejsce dla osadnika z wioski v: wolne pole w jej zasięgu, a gdy tam nic nie zostało (wioska w środku terytorium) –
+  // najbliższe wolne pole przy innej własnej wiosce (osadnik idzie dalej, ale nie dalej niż settleFarMax pól).
+  function findSpotFor(state, v, vs, spotOf) {
+    const own = spotOf(v);
+    if (own) return own;
+    let best = null;
+    vs.forEach(o => {
+      if (o.id === v.id) return;
+      const sp = spotOf(o);
+      if (!sp) return;
+      const d = E.dist(v, sp);
+      if (d <= P().settleFarMax && (!best || d < best.d)) best = { x: sp.x, y: sp.y, d };
+    });
+    return best;
+  }
+  function settleWhy(state, p, t, text) {
+    if (p.settleInfo === text) return;
+    p.settleInfo = text;
+    note(state, p, t, 'Osadnicy: ' + text);
+  }
   // Wysyła gotowych osadników, a gdy żadnego nie ma w grze – zleca kolejnego. Zwraca { id, cost }: wioska, która odkłada surowce na osadnika.
   function settleStep(state, p, vs, t, threatened, acts) {
     const cap = Math.min(p.settleMax > 0 ? p.settleMax : Infinity, E.winVillages(state));
+    let memo = {};
+    const spotOf = v => (v.id in memo ? memo[v.id] : (memo[v.id] = findSpot(state, v)));
     for (const v of vs) {
       while (v.units.settler >= 1) {
-        const spot = findSpot(state, v);
-        if (!spot || !E.sendSettler(state, v.id, spot.x, spot.y, t).ok) break;
+        const spot = findSpotFor(state, v, vs, spotOf);
+        if (!spot || !E.sendSettler(state, v.id, spot.x, spot.y, t).ok) { settleWhy(state, p, t, 'osadnik w ' + v.name + ' czeka – brak wolnego pola do zasiedlenia'); break; }
+        memo = {};                                   // zajęte pole zmienia obraz wolnych miejsc
         acts.settled++;
         note(state, p, t, 'Osadnik z ' + v.name + ' wyrusza na ' + spot.x + ':' + spot.y);
       }
     }
-    if (vs.length + settlersTotal(state, vs) >= cap) return null;
+    if (vs.length + settlersTotal(state, vs) >= cap) { settleWhy(state, p, t, 'osiągnięty limit wiosek (' + cap + ')'); return null; }
     if (settlersTotal(state, vs) > 0) return null;
     const U = C.UNITS.settler, ups = E.upgradesOf(state, 'player');
-    let best = null;
+    let best = null, eligible = 0;
     vs.forEach(v => {
       if (threatened[v.id] || v.buildings.hq < U.hq || v.buildings.barracks < U.barracks) return;
       if (E.villageDefense(v, null, ups) < E.points(v) * p.defLevel * P().settleDefMin) return;
       if (v.recruitQueue.length >= E.queueMax(v, 'recruit')) return;
       if (E.RES.some(r => U.cost[r] > E.storageCap(v))) return;
+      eligible++;
+      if (!findSpotFor(state, v, vs, spotOf)) return;      // wolne pole musi być osiągalne z TEJ wioski (a nie tylko z najbogatszej)
       const ready = Math.min.apply(null, E.RES.map(r => v.res[r] / U.cost[r]));
       if (!best || ready > best.ready) best = { v, ready };
     });
-    if (!best || !findSpot(state, best.v)) return null;
+    if (!best) {
+      settleWhy(state, p, t, eligible ? 'brak wolnego pola na równinie w zasięgu wiosek (poza polami zbyt blisko cudzych wiosek)' : 'żadna wioska nie spełnia warunków (Ratusz 4, Koszary 1, obrona, magazyn, brak ataku)');
+      return null;
+    }
     const ri = E.recruitInfo(state, best.v, 'settler');
     if (ri.ok && ri.max >= 1 && E.queueRecruit(state, best.v, 'settler', 1, t).ok !== false) {
+      p.settleInfo = '';
       note(state, p, t, 'Szkolenie osadnika w ' + best.v.name);
       return null;
     }
+    settleWhy(state, p, t, 'odkłada surowce na osadnika w ' + best.v.name);
     return { id: best.v.id, cost: U.cost };       // jeszcze nie stać – ta wioska odkłada surowce
   }
 

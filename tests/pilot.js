@@ -187,5 +187,29 @@ function twoVillages() {
   ok(E.villagesOf(s2, 'player').length === 1 && v2.units.settler === 0, 'bez opcji osadnicy nie powstają');
 }
 
+// 11. Osadnicy: wioska w środku terytorium (bez wolnych pól w zasięgu) nie blokuje ekspansji – osadnik idzie na pole przy innej wiosce
+{
+  const s = mk(9);
+  Object.values(s.factions).forEach(f => { if (f.ai) f.nextThink = 1e15; });
+  s.winVillages = 60;
+  Object.keys(s.villages).forEach(id => { if (!s.villages[id].owner) delete s.villages[id]; });   // pusta okolica
+  const v0 = E.villagesOf(s, 'player')[0];
+  const mkfull = v => { v.buildings.hq = 8; v.buildings.barracks = 3; v.buildings.farm = 12; v.buildings.storage = 12; v.units.spear = 2000; };
+  mkfull(v0);
+  const v1 = JSON.parse(JSON.stringify(v0));
+  Object.assign(v1, { id: 'edge', name: 'Edge', x: 2, y: 2, buildQueue: [], recruitQueue: [], support: {}, lastTick: s.now });
+  v1.units = E.emptyUnits(); v1.units.spear = 2000; s.villages.edge = v1;
+  const cap = E.storageCap(v0); v0.res = { wood: cap, clay: cap, iron: cap }; v1.res = { wood: cap / 2, clay: cap / 2, iron: cap / 2 };
+  // wolne pola (równina) są tylko daleko od v0 (dalej niż 8 pól), za to blisko v1; reszta to las
+  const N = s.map.size;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) s.map.tiles[y * N + x].terrain = E.dist(v0, { x, y }) <= 8.5 ? 'forest' : 'plain';
+  {
+    ok(MP.Pilot.findSpot(s, v0) === null && MP.Pilot.findSpot(s, v1) !== null, 'v0 nie ma wolnego pola w zasięgu, v1 ma');
+    MP.Pilot.configure(s, { on: true, build: false, recruit: 'off', tech: false, settle: true, settleMax: 3 }, s.now);
+    E.advance(s, s.now + 40 * MIN);
+    ok(E.villagesOf(s, 'player').length >= 3, 'ekspansja nie zatrzymuje się na wiosce bez wolnych pól (' + E.villagesOf(s, 'player').length + ' wiosek)');
+  }
+}
+
 if (fails) { console.error('\nBłędy: ' + fails); process.exit(1); }
 console.log('\nWszystkie testy Autopilota przeszły.');
