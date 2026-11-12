@@ -51,6 +51,45 @@
   const homeDefTarget = (v, P) => E.points(v) * P.homeDef;
   const incomingOn = (state, v) => state.movements.filter(m => m.type === 'attack' && m.to === v.id && m.owner !== v.owner);
 
+  /* ---------- siła fal: skład armii i posiłki gracza ---------- */
+  const isOffUnit = k => { const U = C.UNITS[k]; return U.role !== 'def' && !U.conquer && !U.settler && !U.scout; };
+  // Udział jednostek ofensywnych (wg populacji) w armii wioski, razem z tym, co czeka w kolejce rekrutacji.
+  function offShareOf(v) {
+    let off = 0, all = 0;
+    const add = (k, n) => { const U = C.UNITS[k]; if (!n || U.conquer || U.settler || U.scout) return; all += n * U.pop; if (isOffUnit(k)) off += n * U.pop; };
+    Object.keys(C.UNITS).forEach(k => add(k, v.units[k]));
+    (v.recruitQueue || []).forEach(q => add(q.unit, Math.max(0, q.count - (q.done || 0))));
+    return all > 0 ? off / all : 0;
+  }
+  // Docelowy udział ofensywy rośnie z czasem gry (do pełnej wartości po rampHours), żeby świeża gra nie zaczynała się od wojny totalnej.
+  const offTarget = (state, t, P, press) => {
+    const ramp = Math.min(1, Math.max(0, (t - state.created) / 3600000) / C.AI.war.rampHours);
+    return Math.min(C.AI.war.offMax, ((P.offShare || 0) + press * C.AI.war.offPressure) * ramp);
+  };
+
+  // Obrona celu gracza z dodatkiem na posiłki: obrońcy z sąsiednich wiosek (Autopilot wysyła pomoc) liczą się częściowo,
+  // inaczej AI szturmuje wioskę, która po drodze dostaje wsparcie, i fala ginie. Wynik zapamiętany na kilka minut gry.
+  const reinfCache = new WeakMap();
+  function playerDefenseWithHelp(state, target, Dv, t) {
+    const R = C.AI.war.reinforce;
+    if (!R || target.owner !== 'player') return Dv;
+    let c = reinfCache.get(state);
+    const bucket = Math.floor(t / 180000);
+    if (!c || c.bucket !== bucket) { c = { bucket, map: {} }; reinfCache.set(state, c); }
+    let extra = c.map[target.id];
+    if (extra === undefined) {
+      const ups = E.upgradesOf(state, 'player'), own = E.emptyUnits();
+      extra = 0;
+      for (const o of E.villagesOf(state, 'player')) {
+        if (o.id === target.id || E.dist(o, target) > R.range) continue;
+        Object.keys(C.UNITS).forEach(k => { own[k] = C.UNITS[k].role === 'def' ? (o.units[k] || 0) : 0; });
+        extra += E.defensePower(own, ups);
+      }
+      c.map[target.id] = extra;
+    }
+    return Dv + Math.min(extra * R.share, Dv * R.capMult);
+  }
+
   // Największa liczba wiosek w rękach jednej frakcji (z graczem) – liczona raz na moment, nie dla każdej wioski.
   const leaderCache = new WeakMap();
   function leaderVillages(state, t) {
@@ -236,13 +275,19 @@
     const def = E.villageDefense(v, null, E.upgradesOf(state, v.owner));
     const threatened = incomingOn(state, v).length > 0;
     const needDef = def < homeDefTarget(v, P) * (threatened ? 1.5 : 1);
-    const pool = Object.keys(C.UNITS).filter(u => {
+    const canBuild = u => {
       const U = C.UNITS[u];
       if (U.conquer || U.settler || v.buildings.barracks < U.barracks) return false;
       if (u === 'scout' && inProgress(state, v, 'scout') >= T().scoutCap) return false;
       if (U.wallPower && E.ramCount(v.units) >= T().siegeCap) return false;
-      return needDef ? U.role === 'def' : (P.unitWeights[u] || 0) > 0;
-    });
+      return true;
+    };
+    let pool = Object.keys(C.UNITS).filter(u => canBuild(u) && (needDef ? C.UNITS[u].role === 'def' : (P.unitWeights[u] || 0) > 0));
+    // za mało ofensywy w wiosce: rekrutuje wyłącznie jednostki ataku (inaczej armie AI to prawie same piki i łucznicy)
+    if (!needDef && offShareOf(v) < offTarget(state, t, P, pressureOf(state, t, v.owner))) {
+      const offPool = pool.filter(u => isOffUnit(u) && u !== 'scout');
+      if (offPool.length) pool = offPool;
+    }
     if (!pool.length) return false;
     const unit = pickWeighted(state, pool.map(k => [k, needDef ? (P.unitWeights[k] || 0) + 1 : P.unitWeights[k]]));
     const U = C.UNITS[unit];
@@ -363,6 +408,10 @@
       Object.keys(C.UNITS).forEach(k => { if (C.UNITS[k].role === 'def') send[k] = 0; }); // tylko jednostki ataku
     }
     const A = E.attackPower(send, E.upgradesOf(state, v.owner));
+    // Wariant na gracza/frakcję: tylko część obrońców (dają mało ataku, a osłabiają dom). Na wolne osady idzie pełny skład jak dawniej.
+    const sendH = Object.assign({}, send);
+    Object.keys(C.UNITS).forEach(k => { if (C.UNITS[k].role === 'def') sendH[k] = Math.floor(send[k] * C.AI.war.waveDefShare); });
+    const AH = E.attackPower(sendH, E.upgradesOf(state, v.owner));
     // armia zbiera się do sensownej wielkości (rośnie z rozbudową wioski) – zamiast wysyłać garstki co turę
     // Próg rośnie z czasem gry, więc wyprawy są coraz większe (a nie stałe garstki, które co chwilę giną lub wykrwawiają wroga).
     const hoursPlayed = Math.max(0, (t - state.created) / 3600000);
@@ -410,12 +459,15 @@
       if (grace && target.owner === null && playerAll.some(pv => E.dist(pv, target) < d)) continue;
       E.tickVillage(state, target, t);
       const wall = Math.max(0, target.buildings.wall - Math.floor(E.ramCount(send) / C.RAM.fightPerLevel));
-      const Dv = E.villageDefense(target, wall, E.upgradesOf(state, target.owner));
-      if (!(target.owner === null && !raid) && A < fullNeed * (vs ? C.AI.versus.powerMult : 1)) continue; // pełny próg: gracz, frakcje i grabież
-      if (A < Dv * P.attackRatio * (target.owner === 'player' ? D.aiCaution * (1 - press * (1 - C.AI.pressure.ratioFloor)) : vs ? C.AI.versus.ratioMult : 1)) continue;
+      const Dv0 = E.villageDefense(target, wall, E.upgradesOf(state, target.owner));
+      const Dv = playerDefenseWithHelp(state, target, Dv0, t);
+      const heavy = target.owner !== null && !raid;   // gracz i frakcje: wyprawa bez większości obrońców
+      const Ae = heavy ? AH : A;
+      if (!(target.owner === null && !raid) && Ae < fullNeed * (vs ? C.AI.versus.powerMult : 1)) continue; // pełny próg: gracz, frakcje i grabież
+      if (Ae < Dv * P.attackRatio * (target.owner === 'player' ? D.aiCaution * (1 - press * (1 - C.AI.pressure.ratioFloor)) : vs ? C.AI.versus.ratioMult : 1)) continue;
       let w = dw / (1 + d) * (vs ? C.AI.versus.weightMult : 1);
       w *= 1 + Math.min(2, (target.res.wood + target.res.clay + target.res.iron) / T().lootScale); // łup
-      w *= 1 + Math.min(1, A / Math.max(1, Dv) / 6);                                              // łatwy cel
+      w *= 1 + Math.min(1, Ae / Math.max(1, Dv) / 6);                                             // łatwy cel
       if (raid) w *= P.raids;
       else if (target.owner === null) w *= P.neutralBias * (1 + (100 - target.loyalty) / 25); // dobija rozpoczęty podbój
       else {
@@ -426,8 +478,9 @@
       if (!best || w > best.w) best = { target, w, raid };
     }
     if (!best) return;
-    if (best.target.owner !== null && P.nobles && v.units.noble > 0 && owned + noblesAway < cap) send.noble = 1;
-    const sent = E.sendAttack(state, v.id, best.target.id, send, t, 'attack', { raid: best.raid });
+    const wave = best.target.owner !== null && !best.raid ? sendH : send;
+    if (best.target.owner !== null && P.nobles && v.units.noble > 0 && owned + noblesAway < cap) wave.noble = 1;
+    const sent = E.sendAttack(state, v.id, best.target.id, wave, t, 'attack', { raid: best.raid });
     if ((best.target.owner === 'player' || isAIOwner(state, best.target.owner)) && !(sent && sent.ok === false)) {
       state.aiWar = state.aiWar || {};
       state.aiWar[v.owner + '>' + best.target.owner] = t;
@@ -491,7 +544,8 @@
       if (pool.length < 2) continue;
       E.tickVillage(state, target, t);
       const rams = pool.reduce((n, c) => n + E.ramCount(c.send), 0);
-      const Dv = E.villageDefense(target, Math.max(0, target.buildings.wall - Math.floor(rams / C.RAM.fightPerLevel)), E.upgradesOf(state, target.owner));
+      const Dv0 = E.villageDefense(target, Math.max(0, target.buildings.wall - Math.floor(rams / C.RAM.fightPerLevel)), E.upgradesOf(state, target.owner));
+      const Dv = playerDefenseWithHelp(state, target, Dv0, t);
       const need = Dv * M.ratio * (toPlayer ? D.aiCaution * (1 - press * (1 - C.AI.pressure.ratioFloor)) : C.AI.versus.ratioMult);
       // dokłada wioski od najbliższej, aż siła i liczebność wystarczą (z zapasem overkill), maks. maxVillages
       const use = []; let A = 0, n = 0;

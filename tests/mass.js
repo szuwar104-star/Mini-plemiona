@@ -25,7 +25,7 @@ function scene(owner, foeOwner) {
 // --- AI: kilka wiosek z armią uderza jedną falą w silnie bronioną wioskę gracza ---
 {
   const { s, base, att } = scene('ai', 'player');
-  const army = { axe: 2500, light: 300, spear: 1500, archer: 500, guard: 300, ram: 20 };
+  const army = { axe: 3500, light: 300, spear: 600, archer: 200, guard: 100, ram: 20 };
   const vs = [base, clone(s, base, 'a2', 3, 0, att), clone(s, base, 'a3', 0, 5, att), clone(s, base, 'a4', -6, 2, att)];
   vs.forEach(v => { v.buildings.hq = 15; v.buildings.wall = 3; v.buildings.farm = 20; v.buildings.barracks = 15; Object.assign(v.units, army); v.res = { wood: 0, clay: 0, iron: 0 }; });
   const tgt = clone(s, base, 'p1', 8, 3, 'player');

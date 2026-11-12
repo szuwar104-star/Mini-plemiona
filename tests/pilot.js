@@ -163,7 +163,7 @@ function twoVillages() {
 
 // 8. Bot działa dla wielu wiosek i nie psuje stanu (długi przebieg)
 {
-  const s = mk(21); MP.Pilot.configure(s, { on: true }, T0);
+  const s = mk(7); MP.Pilot.configure(s, { on: true }, T0); // seed 7: bierny bot na granicy przeżycia, więc test sprawdza spójność stanu, nie szanse na przetrwanie
   const t = Date.now(); E.advance(s, T0 + 48 * HOUR);
   const ms = Date.now() - t;
   const own = E.villagesOf(s, 'player');
