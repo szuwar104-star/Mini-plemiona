@@ -28,6 +28,63 @@
     return { wood: series(wood, factor, 5), clay: series(clay, factor, 5), iron: series(iron, factor, 5) };
   }
 
+
+  // Epoka II: drugie drzewko Technologii, odblokowane po ukończeniu CAŁEJ Epoki I (każde badanie na maksymalnym poziomie).
+  // Węzły działają jak w Epoce I i się z nią sumują; badania jednostek (effect.type 'unit2') są dodatkowym bonusem do ataku i obrony
+  // (TECH.unit2Bonus na poziom) i, tak jak w Epoce I, nie zależą od badań innych jednostek – tylko od korzenia swojej gałęzi.
+  // Koszty są kilka razy wyższe niż w Epoce I: to główny zlew nadwyżek surowców (monety kupuje się za surowce).
+  const e2 = n => Object.assign({ epoch: 2 }, n);
+  const EPOCH2_BRANCHES = [
+    { id: 'war2',   name: 'Epoka II: Wojsko – atak',    epoch: 2 },
+    { id: 'def2',   name: 'Epoka II: Wojsko – obrona',  epoch: 2 },
+    { id: 'eco2',   name: 'Epoka II: Gospodarka',       epoch: 2 },
+    { id: 'prod2',  name: 'Epoka II: Produkcja',        epoch: 2 },
+    { id: 'realm2', name: 'Epoka II: Królestwo i Cud świata', epoch: 2 }
+  ];
+  const EPOCH2_NODES = [
+    // --- Wojsko – atak ---
+    e2({ id: 'e2_drill', branch: 'war2', name: 'Musztra mistrzowska', desc: 'Jeszcze szybsze szkolenie wojska (sumuje się z Musztrą).', max: 5, base: 45, factor: 1.3, req: null, effect: { type: 'recruit', per: -0.04 } }),
+    e2({ id: 'u2_axe', branch: 'war2', name: 'Topornik II', desc: 'Dodatkowy atak i obrona Topornika (sumuje się z Epoką I).', max: 10, base: 40, factor: 1.27, req: { id: 'e2_drill', min: 1 }, effect: { type: 'unit2', unit: 'axe' } }),
+    e2({ id: 'u2_light', branch: 'war2', name: 'Lekka kawaleria II', desc: 'Dodatkowy atak i obrona Lekkiej kawalerii.', max: 10, base: 40, factor: 1.27, req: { id: 'e2_drill', min: 2 }, effect: { type: 'unit2', unit: 'light' } }),
+    e2({ id: 'u2_ram', branch: 'war2', name: 'Taran II', desc: 'Dodatkowy atak i obrona Tarana.', max: 10, base: 45, factor: 1.27, req: { id: 'e2_drill', min: 3 }, effect: { type: 'unit2', unit: 'ram' } }),
+    e2({ id: 'e2_plunder', branch: 'war2', name: 'Wielka grabież', desc: 'Jeszcze większy udźwig łupu atakujących jednostek.', max: 10, base: 50, factor: 1.27, req: { id: 'e2_drill', min: 4 }, effect: { type: 'carry', per: 0.05 } }),
+    e2({ id: 'e2_siege', branch: 'war2', name: 'Wielkie machiny', desc: 'Tarany jeszcze skuteczniej kruszą mur.', max: 5, base: 70, factor: 1.3, req: { id: 'u2_ram', min: 3 }, effect: { type: 'siege', per: 0.10 } }),
+    // --- Wojsko – obrona ---
+    e2({ id: 'e2_militia', branch: 'def2', name: 'Powszechny pobór', desc: 'Większa stała obrona każdej Twojej wioski (sumuje się z Pospolitym ruszeniem).', max: 5, base: 40, factor: 1.3, req: null, effect: { type: 'militia', per: 20 } }),
+    e2({ id: 'u2_spear', branch: 'def2', name: 'Pikinier II', desc: 'Dodatkowy atak i obrona Pikiniera.', max: 10, base: 40, factor: 1.27, req: { id: 'e2_militia', min: 1 }, effect: { type: 'unit2', unit: 'spear' } }),
+    e2({ id: 'u2_archer', branch: 'def2', name: 'Łucznik II', desc: 'Dodatkowy atak i obrona Łucznika.', max: 10, base: 40, factor: 1.27, req: { id: 'e2_militia', min: 1 }, effect: { type: 'unit2', unit: 'archer' } }),
+    e2({ id: 'u2_guard', branch: 'def2', name: 'Tarczownik II', desc: 'Dodatkowy atak i obrona Tarczownika.', max: 10, base: 40, factor: 1.27, req: { id: 'e2_militia', min: 2 }, effect: { type: 'unit2', unit: 'guard' } }),
+    e2({ id: 'u2_heavy', branch: 'def2', name: 'Ciężka kawaleria II', desc: 'Dodatkowy atak i obrona Ciężkiej kawalerii.', max: 10, base: 55, factor: 1.27, req: { id: 'e2_militia', min: 4 }, effect: { type: 'unit2', unit: 'heavy' } }),
+    e2({ id: 'e2_fort', branch: 'def2', name: 'Twierdze', desc: 'Jeszcze mocniejszy bonus muru w Twoich wioskach.', max: 10, base: 90, factor: 1.27, req: { id: 'e2_militia', min: 5 }, effect: { type: 'fort', per: 0.03 } }),
+    // --- Gospodarka ---
+    e2({ id: 'e2_trade', branch: 'eco2', name: 'Wielki handel', desc: 'Jeszcze lepszy kurs wymiany surowców (sumuje się z Kupiectwem).', max: 5, base: 40, factor: 1.3, req: null, effect: { type: 'exchange', per: 0.02 } }),
+    e2({ id: 'e2_store', branch: 'eco2', name: 'Spichlerze', desc: 'Jeszcze większa pojemność magazynów we wszystkich wioskach.', max: 10, base: 45, factor: 1.27, req: { id: 'e2_trade', min: 1 }, effect: { type: 'storage', per: 0.10 } }),
+    e2({ id: 'e2_agri', branch: 'eco2', name: 'Wielkie gospodarstwa', desc: 'Jeszcze więcej miejsca na farmach we wszystkich wioskach.', max: 10, base: 50, factor: 1.27, req: { id: 'e2_store', min: 2 }, effect: { type: 'pop', per: 0.05 } }),
+    e2({ id: 'e2_build', branch: 'eco2', name: 'Mistrzowie budowy', desc: 'Jeszcze krótszy czas budowy.', max: 5, base: 55, factor: 1.3, req: { id: 'e2_store', min: 3 }, effect: { type: 'build', per: -0.03 } }),
+    e2({ id: 'e2_mint', branch: 'eco2', name: 'Wielka Mennica', desc: 'Jeszcze większy limit zakupu monet w każdej wiosce.', max: 5, base: 55, factor: 1.3, req: { id: 'e2_trade', min: 2 }, effect: { type: 'mint', per: 3 } }),
+    // --- Produkcja ---
+    e2({ id: 'e2_tools', branch: 'prod2', name: 'Maszyny', desc: 'Jeszcze większa produkcja wszystkich surowców (sumuje się z Narzędziami).', max: 5, base: 45, factor: 1.3, req: null, effect: { type: 'prod', per: 0.03 } }),
+    e2({ id: 'e2_wood', branch: 'prod2', name: 'Gospodarka leśna', desc: 'Jeszcze większa produkcja drewna.', max: 10, base: 55, factor: 1.27, req: { id: 'e2_tools', min: 2 }, effect: { type: 'prodWood', per: 0.04 } }),
+    e2({ id: 'e2_clay', branch: 'prod2', name: 'Wielkie wypalanie', desc: 'Jeszcze większa produkcja gliny.', max: 10, base: 55, factor: 1.27, req: { id: 'e2_tools', min: 2 }, effect: { type: 'prodClay', per: 0.04 } }),
+    e2({ id: 'e2_iron', branch: 'prod2', name: 'Głębokie szyby', desc: 'Jeszcze większa produkcja żelaza.', max: 10, base: 55, factor: 1.27, req: { id: 'e2_tools', min: 2 }, effect: { type: 'prodIron', per: 0.04 } }),
+    // --- Królestwo i Cud świata ---
+    e2({ id: 'e2_admin', branch: 'realm2', name: 'Wielka administracja', desc: 'Kolejne miejsca w kolejkach budowy i rekrutacji.', max: 2, base: 400, factor: 2, req: null, effect: { type: 'queue', per: 1 } }),
+    e2({ id: 'e2_roads', branch: 'realm2', name: 'Gościńce', desc: 'Jeszcze szybszy marsz Twoich wojsk i osadników.', max: 10, base: 90, factor: 1.27, req: { id: 'e2_admin', min: 1 }, effect: { type: 'march', per: -0.02 } }),
+    e2({ id: 'w_time', branch: 'realm2', name: 'Cechy budowniczych', desc: 'Krótszy czas budowy poziomów Cudu świata.', max: 10, base: 70, factor: 1.27, req: { id: 'e2_admin', min: 1 }, effect: { type: 'wonderTime', per: -0.04 } }),
+    e2({ id: 'w_cost', branch: 'realm2', name: 'Kamieniołomy królewskie', desc: 'Tańsze poziomy Cudu świata (mniej surowców na poziom).', max: 10, base: 70, factor: 1.27, req: { id: 'e2_admin', min: 1 }, effect: { type: 'wonderCost', per: -0.03 } })
+  ];
+
+  // Cud świata: wielopoziomowy budynek (jeden na wioskę-właściciela), cel końcowy gry. Poziomy buduje się w kolejce budowy wioski
+  // (zajmuje jej miejsce) za surowce z TEJ wioski, więc trzeba je tam zwieźć. Zdobycie wioski przejmuje Cud razem z poziomami.
+  // Zwycięstwo: gracz (a w trybie Wyścig także AI) wygrywa, gdy Cud w jego wiosce osiągnie maxLevel.
+  // Koszt poziomu L (każdy surowiec) rośnie wykładniczo od costFrom do costTo; czas (s) od timeFrom do timeTo.
+  const WONDER_LEVELS = 50;
+  function wonderSeries(from, to, roundTo) {
+    const out = [0];
+    for (let l = 1; l <= WONDER_LEVELS; l++) out.push(Math.max(roundTo, Math.round(from * Math.pow(to / from, (l - 1) / (WONDER_LEVELS - 1)) / roundTo) * roundTo));
+    return out;
+  }
+
   MP.CONFIG = {
     SAVE_VERSION: 9,
 
@@ -197,6 +254,7 @@
     // caravan – mnożnik udźwigu kupca; tactics – część ujemnego szczęścia Twojego ataku, która znika (0,2 = −20% „pecha”)).
     TECH: {
       unitBonus: 0.05,
+      unit2Bonus: 0.05,                        // Epoka II: bonus na poziom badania jednostki (sumuje się z unitBonus)
       coinPrice: 1500,
       mint: { perLevelPerHour: 3, bucketHours: 6 },
       branches: [
@@ -205,7 +263,7 @@
         { id: 'eco', name: 'Gospodarka' },
         { id: 'prod', name: 'Produkcja' },
         { id: 'realm', name: 'Królestwo' }      // późna gra: drogie badania dla rozbudowanego plemienia
-      ],
+      ].concat(EPOCH2_BRANCHES),
       nodes: [
         // --- Wojsko – atak: korzeń Musztra; jednostki ataku niezależne od siebie ---
         { id: 'drill', branch: 'war', name: 'Musztra', desc: 'Szybsze szkolenie wojska (wszystkich jednostek).', max: 5, base: 10, factor: 1.3, req: null, effect: { type: 'recruit', per: -0.04 } },
@@ -241,7 +299,20 @@
         { id: 'medic', branch: 'realm', name: 'Lazaret', desc: 'Część poległych w Twoich atakach wraca ranna do domu zamiast ginąć.', max: 10, base: 25, factor: 1.27, req: { id: 'admin', min: 1 }, effect: { type: 'heal', per: 0.03 } },
         { id: 'command', branch: 'realm', name: 'Dowództwo', desc: 'Twoi Dowódcy podboju mocniej obniżają poparcie.', max: 5, base: 40, factor: 1.35, req: { id: 'roads', min: 3 }, effect: { type: 'command', per: 3 } },
         { id: 'faith', branch: 'realm', name: 'Wiara', desc: 'Wrodzy Dowódcy słabiej obniżają poparcie Twoich wiosek.', max: 5, base: 40, factor: 1.35, req: { id: 'medic', min: 3 }, effect: { type: 'faith', per: 0.08 } }
-      ]
+      ].concat(EPOCH2_NODES)
+    },
+
+    WONDER: {
+      name: 'Cud świata',
+      maxLevel: WONDER_LEVELS,
+      hq: 15,                                  // wymagany poziom Ratusza w wiosce Cudu
+      market: 5,                               // wymagany poziom Targowiska (kupcy do zwożenia surowców)
+      cost: wonderSeries(4000, 60000, 100),    // surowiec × 3 rodzaje na poziom (nie może przekroczyć magazynu wioski)
+      time: wonderSeries(600, 10800, 1),       // sekundy budowy poziomu (przed skróceniem Ratuszem i badaniami)
+      unit2Bonus: 0.05,
+      warnShare: 0.8,                          // przy tym ułamku maxLevel u AI gracz dostaje ostrzeżenie
+      // AI buduje Cud tylko w trybie Wyścig i tylko przy poziomie trudności z aiTech > 0.
+      ai: { startAfterMin: 180, reserve: 1.1, slow: 1.5 }
     },
 
     // Szablony „Buduj we wszystkich wioskach”: [budynek, docelowy poziom]. Zawsze celują w maksymalny poziom (LEVELS).
@@ -260,7 +331,7 @@
     },
     // Autopilot (pilot.js): bot rozwijający Twoje wioski. Czasy w sekundach/minutach CZASU GRY.
     PILOT: {
-      defaults: { on: false, build: true, recruit: 'defense', tech: true, defend: true, garrison: true, supply: true, defLevel: 40, convoy: false, hub: null, settle: false, settleMax: 0, attack: false, farm: false, split: false, splitRatio: 3, tickSec: 60 },
+      defaults: { on: false, build: true, recruit: 'defense', tech: true, defend: true, garrison: true, supply: true, defLevel: 40, convoy: false, hub: null, settle: false, settleMax: 0, attack: false, farm: false, split: false, splitRatio: 3, wonder: false, tickSec: 60 },
       tickSec: 60,               // domyślnie co ile sekund bot sprawdza wioski (gracz zmienia to suwakiem w ustawieniach)
       tickSteps: [15, 30, 60, 90, 120, 180], // dozwolone wartości suwaka „Częstotliwość pracy”
       alertDelaySec: 1,          // po wykryciu nowego ataku bot działa po tylu sekundach

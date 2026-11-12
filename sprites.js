@@ -213,6 +213,18 @@
       c.dot(17, 25.6, COL.gold, 1);
       [[5.8, 21.5], [22.2, 21.5]].forEach(p => { c.paint(S.rect(p[0], p[1], 4, 4.4), '#f2d675', 'd', { bev: 0.5 }); c.flat(S.rect(p[0] + 1.8, p[1], 0.5, 4.4), COL.dark); });
     },
+    wonder(c) {
+      c.shadow(16, 29.6, 14, 1.4);
+      c.paint(S.rect(2.5, 26, 27, 3.6), COL.stoneD, 'v');                // stopnie podstawy
+      c.paint(S.rect(5.5, 22.4, 21, 4), COL.stone, 'v');
+      c.paint(S.rect(8.5, 18.8, 15, 3.8), COL.cream, 'v');
+      c.paint(S.poly([[9.5, 18.8], [16, 4.2], [22.5, 18.8]]), COL.cream, 'h', { bev: 0.7 });   // piramida
+      c.flat(S.poly([[16, 4.2], [22.5, 18.8], [16, 18.8]]), 'rgba(0,0,0,0.12)');
+      c.paint(S.rrect(13.6, 21.6, 4.8, 4.8, 2.4), COL.woodD, 'h');
+      c.flat(S.poly([[14.6, 8], [16, 3.6], [17.4, 8]]), COL.gold);          // złoty wierzchołek
+      c.dot(16, 3.2, COL.gold, 1.3);
+      c.dot(11, 24.4, COL.gold, 0.9); c.dot(21, 24.4, COL.gold, 0.9);
+    },
     pick(c) {
       c.shadow(17, 30, 12, 1.2, 0.3);
       c.paint(S.line(7, 28, 22.5, 9.5, 3.4), COL.brown, 'h', { bev: 0.5 });
@@ -489,6 +501,6 @@
 
   MP.Sprites = {
     icon, village, terrain,
-    building: { hq: 'hq', wood: 'wood', clay: 'clay', iron: 'iron', farm: 'farm', barracks: 'barracks', market: 'market', wall: 'wall' }
+    building: { hq: 'hq', wood: 'wood', clay: 'clay', iron: 'iron', farm: 'farm', barracks: 'barracks', market: 'market', wall: 'wall', wonder: 'wonder' }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

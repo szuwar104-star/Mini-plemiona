@@ -212,6 +212,24 @@ Piąta gałąź drzewka. Fortyfikacje przeniesiono do gałęzi Wojsko – obrona
 
 Raport ataku pokazuje liczbę rannych uratowanych przez Lazaret. Test: `node tests/realm.js`.
 
+## Epoka II (drugie drzewko Technologii)
+
+Po ukończeniu **całej Epoki I** (każde z 29 badań na maksymalnym poziomie) odblokowuje się Epoka II: 25 droższych badań w pięciu gałęziach (Wojsko – atak, Wojsko – obrona, Gospodarka, Produkcja, Królestwo i Cud świata). Badania **sumują się** z Epoką I (to nie jest zastąpienie): Musztra mistrzowska, Powszechny pobór, Wielki handel, Spichlerze, Wielkie gospodarstwa, Mistrzowie budowy, Wielka Mennica, Maszyny, Gospodarka leśna, Wielkie wypalanie, Głębokie szyby, Wielka administracja, Gościńce, Wielka grabież, Wielkie machiny, Twierdze. Zasada układu zostaje: **badanie jednostki II (Topornik II, Lekka kawaleria II, Taran II, Pikinier II, Łucznik II, Tarczownik II, Ciężka kawaleria II) zależy tylko od korzenia swojej gałęzi**, nigdy od innej jednostki. Każdy poziom jednostki II daje dodatkowe +5% ataku i obrony (`TECH.unit2Bonus`), czyli razem z Epoką I do +100%. Dwa badania skracają i tanieją budowę Cudu świata (Cechy budowniczych: −4% czasu na poziom; Kamieniołomy królewskie: −3% kosztu na poziom). Całość kosztuje około 38 500 monet (≈58 mln surowców), więc to główny zlew nadwyżek. Ekran Technologia pokazuje nagłówek Epoki II z liczbą badań Epoki I do ukończenia, a gałęzie Epoki II są wyszarzone do odblokowania. Autopilot bada Epokę II po Epoce I (badania ataku tylko, gdy bot atakuje lub szkoli armię ataku). Konfiguracja: `EPOCH2_NODES` i `TECH.unit2Bonus` w `config.js`; test: `node tests/epoch2.js`.
+
+## Cud świata (cel końcowy)
+
+Drugi sposób na zwycięstwo obok liczby wiosek. Cud świata to wielopoziomowy budynek (**50 poziomów**, `WONDER` w `config.js`), który buduje się w jednej wiosce plemienia (jeden Cud na właściciela). Karta Cudu jest na dole ekranu wioski.
+
+- **Wymagania:** Ratusz 15 i Targowisko 5 w wiosce Cudu. Poziomy idą wspólną kolejką budowy wioski.
+- **Koszt:** każdy poziom kosztuje tyle samo drewna, gliny i żelaza, od 4 000 (poz. 1) do 60 000 (poz. 50) z każdego surowca (łącznie ≈3,1 mln surowców) i musi mieścić się w magazynie wioski. Surowce bierze się z TEJ wioski, więc trzeba je tam zwieźć kupcami (albo zrobić to Autopilotem).
+- **Czas:** od 10 minut (poz. 1) do 3 godzin (poz. 50), skracany przez Ratusz i badania (Budownictwo, Cechy budowniczych).
+- **Zwycięstwo:** gracz wygrywa przy poziomie 50 (zawsze, w obu trybach gry); w trybie **Wyścig** tak samo wygrywa AI, a Ty przegrywasz. Można grać dalej po zakończeniu.
+- **Zdobycie wioski przejmuje Cud razem z poziomami** (kolejka budowy znika, jak przy każdym przejęciu). To daje powód do ataku na wioskę z Cudem.
+- **AI** buduje Cud tylko w trybie Wyścig, po 180 minutach gry i tylko przy poziomie trudności z `aiTech` > 0, w swojej najlepszej wiosce, wolniej niż gracz (×1,5, a na łatwiejszych poziomach jeszcze wolniej). Gdy zacznie, dostajesz powiadomienie z koordynatami wioski; przy 80% poziomu pojawia się ostrzeżenie. Menu i Imperium pokazują postęp Twojego Cudu, a w Wyścigu także najdalszego Cudu AI.
+- **Autopilot:** opcja „Cud świata” (domyślnie wyłączona) wybiera wioskę (stolica, potem najwyższy Ratusz i magazyn), dokłada poziomy przed zwykłą budową i zwozi tam surowce funkcją Zasilania.
+
+Testy: `node tests/wonder.js`.
+
 ## Dyplomacja i zachowanie AI (wersja 3)
 
 Moduł `diplomacy.js` (parametry w `DIPLO` i `diplo` każdej osobowości w `config.js`). Menu → Dyplomacja, skrót w Przeglądzie i w panelu obcej wioski na mapie.

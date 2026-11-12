@@ -133,6 +133,29 @@
     return null;
   }
 
+  /* ---------- Cud świata (tylko tryb Wyścig) ---------- */
+  // Po czasie startAfterMin AI wybiera swoją najlepszą wioskę (najwyższy Ratusz, potem największy magazyn) i dokłada poziomy Cudu,
+  // gdy ta wioska ma zapas surowców (reserve × koszt). Pierwsza budowa jest ogłaszana graczowi z koordynatami, żeby mógł ją zdobyć.
+  function manageWonder(state, fid, vs, t) {
+    const W = C.WONDER, diff = E.diff(state);
+    if (!state.race || !(diff.aiTech > 0) || !vs.length) return;
+    if ((t - (state.created || 0)) / 60000 < W.ai.startAfterMin) return;
+    let v = E.wonderVillage(state, fid);
+    if (!v) {
+      const ok = vs.filter(h => h.buildings.hq >= W.hq && (h.buildings.market || 0) >= W.market);
+      if (!ok.length) return;
+      v = ok.sort((a, b) => b.buildings.hq - a.buildings.hq || E.storageCap(b) - E.storageCap(a))[0];
+    }
+    E.tickVillage(state, v, t);
+    const info = E.wonderInfo(state, v);
+    if (!info.cost) return;
+    if (!info.ok || E.RES.some(r => Math.floor(v.res[r]) < info.cost[r] * W.ai.reserve)) return;
+    const first = E.wonderLevel(v) + E.wonderQueued(v) === 0;
+    if (E.queueWonder(state, v, t).ok && first) {
+      E.notice(state, t, 'danger', state.factions[fid].name + ' zaczęła budować Cud świata w wiosce ' + v.name + ' (' + v.x + '|' + v.y + '). Możesz ją zdobyć, zanim skończy.');
+    }
+  }
+
   /* ---------- 1b. handel: wymiana nadwyżek na brakujący surowiec (opcja gry state.aiTrade) ---------- */
   // Wymienia tylko wtedy, gdy nadwyżki całkowicie pokrywają niedobór (czyli wymiana faktycznie odblokowuje budowę albo partię wojska).
   // Celem jest koszt budynku, na który wioska oszczędza (reserve), a gdy go nie ma – partia ulubionej jednostki frakcji.
@@ -437,6 +460,7 @@
       if (manageTrade(state, v, P, t, reserve) && reserve) reserve = manageBuild(state, v, P, t); // po wymianie budowa może już ruszyć
       for (let i = 0; i < 3; i++) if (!manageRecruit(state, v, P, t, reserve, vs.length)) break;
     }
+    manageWonder(state, fid, vs, t);
     sendReinforcements(state, fid, vs, P, t);
     gatherArmy(state, fid, vs, P, t);
     const playerAll = E.villagesOf(state, 'player');
