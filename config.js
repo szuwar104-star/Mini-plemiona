@@ -319,7 +319,7 @@
         farmReserve: 0.35,       // tyle farmy wioski zbiórki zostaje wolne na szkolenie obrońców (armia ataku nie zapycha jej do pełna)
         retryMin: 90             // po tylu minutach od przegranej fali bot zapomina o karze za ten cel
       },
-      // Farmienie (opcja „farm”): armia ataku grabi wolne osady i wioski frakcji wokół (bez Dowódców), po zwiadzie.
+      // Grabież (opcja „farm”): armia ataku grabi wolne osady i wioski frakcji wokół (bez Dowódców), po zwiadzie.
       farm: {
         range: 18,               // maks. odległość celu od wioski wysyłającej
         ratio: 1.3,              // wymagana siła ataku = szacowana obrona celu × ratio
@@ -327,7 +327,7 @@
         minPower: 300,           // poniżej tej siły ataku wioska nie farmi
         minUnits: 10,            // mniejszych fal nie wysyła
         minLoot: 250,            // cel z mniejszą ilością surowców (wg zwiadu) pomija
-        maxWaves: 60,            // maks. liczba fal farmienia naraz w drodze
+        maxWaves: 60,            // maks. liczba fal grabieży naraz w drodze
         perTurn: 15,             // maks. nowych fal w jednej turze
         cooldownMin: 20,         // przerwa przed ponownym grabieniem tego samego celu
         waveScouts: 1,           // zwiadowca w fali odświeża obraz celu po bitwie
