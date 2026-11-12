@@ -461,6 +461,39 @@ input:disabled { opacity: .4; }
 .mvlist.compact .mv > .ico { width: 22px; height: 22px; padding: 2px; }
 .loot .ico { margin-left: .3rem; }
 
+/* ---------- ekran ataków na gracza ---------- */
+.threat-head { display: grid; grid-template-columns: 1fr; gap: .8rem; }
+.threat-head h1 { margin: 0; }
+.threat-head.alarm { background: radial-gradient(520px 220px at 0% 0%, rgba(229, 83, 75, .22), transparent 70%), linear-gradient(180deg, var(--surface-2), var(--surface)); }
+.threat-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .5rem; }
+.kpi.danger b { color: #ff9a92; }
+.threat { border-left: 3px solid var(--red); }
+.th-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: .6rem; }
+.th-head h3 { margin: 0; display: flex; align-items: center; gap: .4rem; font-size: 1.1rem; }
+.th-head h3 small { color: var(--muted); font-weight: 600; }
+.th-clock { text-align: right; flex: none; }
+.th-clock .timer { display: block; font-size: 1.7rem; font-weight: 800; color: #ff9a92; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.th-clock small { color: var(--muted); font-size: .75rem; }
+.threat h4 { margin: .8rem 0 .35rem; font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.waves { list-style: none; margin: 0; padding: 0; display: grid; gap: .4rem; }
+.wave { display: grid; grid-template-columns: 28px 1fr auto; gap: .7rem; align-items: center; padding: .55rem .7rem; background: rgba(229, 83, 75, .09); border-radius: var(--r-sm); }
+.wno { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--red); color: #fff; font-weight: 800; font-size: .85rem; }
+.wbody { min-width: 0; font-size: .88rem; }
+.wbody .bar { display: block; margin-top: .4rem; height: 6px; }
+.wbody .bar i { background: linear-gradient(90deg, #b13a33, var(--red)); }
+.th-note { margin: .6rem 0 0; font-size: .8rem; }
+.threat .mvtime small.ok { color: #8fdca2; } .threat .mvtime small.bad { color: #ff9a92; }
+.threat .actions { margin-top: .9rem; }
+.threat-banner { display: flex; align-items: center; gap: .75rem; width: 100%; margin: 0 0 1rem; padding: .7rem .9rem; text-align: left; cursor: pointer; font: inherit; color: var(--text);
+  background: rgba(229, 83, 75, .14); border: 1px solid rgba(229, 83, 75, .55); border-radius: var(--r-sm); }
+.threat-banner:hover { background: rgba(229, 83, 75, .22); }
+.threat-banner > span { flex: 1; } .threat-banner b { display: block; color: #ff9a92; }
+.threat-banner small { color: var(--muted); } .threat-banner > i { font-style: normal; font-size: 1.6rem; color: #ff9a92; }
+@media (max-width: 720px) {
+  .threat-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .th-head { flex-direction: column; gap: .5rem; } .th-clock { text-align: left; }
+}
+
 /* ---------- raporty ---------- */
 .rlist { list-style: none; margin: 0; padding: 0; display: grid; gap: .35rem; }
 .ritem {
@@ -1036,3 +1069,4 @@ html, body { max-width: 100%; overflow-x: clip; }
 .wonder-card { grid-column: 1 / -1; border-left: 4px solid var(--gold, #d4a53a); }
 .wonder-card .goal { margin: 6px 0 8px; }
 .wonder-line { display: flex; align-items: center; gap: 6px; margin: 6px 0 0; }
+.threat-banner .ico { width: 34px; height: 34px; padding: 5px; flex: none; border-radius: 8px; background: rgba(229, 83, 75, .22); }

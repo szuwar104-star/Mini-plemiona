@@ -103,7 +103,7 @@
       b.setAttribute('aria-current', b.dataset.screen === UI.screen ? 'page' : 'false');
     });
     setBadge('reports', unread, '');
-    setBadge('army', incoming, 'danger');
+    setBadge('threats', incoming, 'danger');
   }
   function setBadge(screen, n, cls) {
     const b = document.querySelector('[data-screen="' + screen + '"] .badge');
@@ -116,8 +116,9 @@
   function incomingAttacks(s) {
     return s.movements.filter(m => m.type === 'attack' && m.owner !== 'player' && s.villages[m.to].owner === 'player');
   }
-  function playerMovements(s) {
-    return s.movements.filter(m => m.owner === 'player' || (m.type === 'attack' && s.villages[m.to].owner === 'player'))
+  // Ruchy gracza; wrogie ataki na gracza są osobno na ekranie Ataki, więc Wojsko woła to z withIncoming = false.
+  function playerMovements(s, withIncoming) {
+    return s.movements.filter(m => m.owner === 'player' || (withIncoming !== false && m.type === 'attack' && s.villages[m.to].owner === 'player'))
       .sort((a, b) => a.arrive - b.arrive);
   }
 
@@ -314,7 +315,7 @@
     return JSON.stringify([v.id, v.units, v.buildings.barracks, v.buildings.farm,
       v.recruitQueue.map(e => e.id + ':' + e.done),
       E.UNITS.map(u => { const i = E.recruitInfo(s, v, u); return i.code + i.max; }),
-      playerMovements(s).map(m => m.id), E.villagesOf(s, 'player').length, v.support, Object.values(s.villages).map(w => w.support && w.support[v.id] ? w.id + JSON.stringify(w.support[v.id]) : '').join()]);
+      playerMovements(s, false).map(m => m.id), incomingAttacks(s).length, E.villagesOf(s, 'player').length, v.support, Object.values(s.villages).map(w => w.support && w.support[v.id] ? w.id + JSON.stringify(w.support[v.id]) : '').join()]);
   }
 
   function renderArmy() {
@@ -340,6 +341,8 @@
       '<div class="kpi" title="Punkty za zniszczone jednostki wroga"><small>Pokonani wrogowie</small><b>' + fmt(Math.round(E.killsOf(s, 'player').total)) + '</b></div>' +
       '<div class="kpi wide"><small>Farma</small><b>' + fmt(used) + ' / ' + fmt(cap) + '</b><span class="meter"><i style="width:' + Math.min(100, used / cap * 100).toFixed(1) + '%"></i></span></div>' +
       '</div></section>';
+    const nInc = incomingAttacks(s).length;
+    if (nInc) html += '<button class="threat-banner" data-screen="threats">' + ico('axe') + '<span><b>Nadciągające ataki: ' + nInc + '</b><small>Zobacz szczegóły i wyślij obronę na zakładce Ataki</small></span><i>›</i></button>';
 
     // Statystyki jednostek z ulepszeniami i badaniami właściciela wioski (marsz i łup – tylko gracz).
     const pups = E.upgradesOf(s, v.owner), pfx = E.techEffects(v.owner === 'player' ? s.factions.player : null);
@@ -395,7 +398,7 @@
     }).join('') + '</ul>';
     html += '</section>';
 
-    const mv = playerMovements(s);
+    const mv = playerMovements(s, false);
     const others = E.villagesOf(s, 'player').filter(o => o.id !== v.id);
     if (others.length) {
       html += '<section class="panel"><h2>Wyślij wojsko do swojej wioski</h2><p class="muted">Domyślnie na stałe; w oknie możesz wybrać wsparcie (do odwołania).</p><div class="actions left">' +
@@ -406,6 +409,79 @@
       ? '<ul class="mvlist">' + mv.map(m => movementItem(s, m)).join('') + '</ul>'
       : '<p class="muted">Żadne wojska nie są w drodze. Wybierz cel na mapie, aby wysłać atak.</p>') + '</section>';
     el.innerHTML = html;
+  }
+
+  /* ---------- ekran: ATAKI (nadciągające i dotychczasowe ataki na gracza) ---------- */
+  const waveWord = n => n === 1 ? 'fala' : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20)) ? 'fale' : 'fal';
+  // Ataki wrogów pogrupowane po atakowanej wiosce; grupy od najbliższego uderzenia, fale w grupie od najwcześniejszej.
+  function threatGroups(s) {
+    const by = {};
+    incomingAttacks(s).forEach(m => { (by[m.to] = by[m.to] || []).push(m); });
+    return Object.keys(by).map(id => ({ v: s.villages[id], waves: by[id].sort((a, b) => a.arrive - b.arrive) }))
+      .sort((a, b) => a.waves[0].arrive - b.waves[0].arrive);
+  }
+  function threatCard(s, g, help) {
+    const v = g.v, first = g.waves[0], ups = E.upgradesOf(s, 'player');
+    const mine = help.filter(m => m.to === v.id);
+    const hosted = Object.values(v.support || {}).reduce((a, u) => a + E.sumUnits(u), 0);
+    const waves = g.waves.map((m, i) => {
+      const from = s.villages[m.from];
+      const gap = i ? ' <small class="muted">+' + dur(m.arrive - g.waves[i - 1].arrive) + ' po poprzedniej</small>' : '';
+      return '<li class="wave"><span class="wno">' + (i + 1) + '</span><div class="wbody"><b>' + flag(s, m.owner) + '</b> <span class="muted">z ' + esc(from.name) + ' ' + xy(from.x, from.y) +
+        ' · ' + E.dist(from, v).toFixed(1) + ' pola</span>' + gap +
+        '<span class="bar"><i data-ps="' + m.start + '" data-pe="' + m.arrive + '" style="width:' + pct(m.start, m.arrive) + '%"></i></span></div>' +
+        '<div class="mvtime"><span class="timer" data-end="' + m.arrive + '"></span><small>' + clock(m.arrive) + '</small></div></li>';
+    }).join('');
+    const helpHtml = mine.length ? '<h4>Twoja pomoc w drodze</h4><ul class="mvlist compact">' + mine.sort((a, b) => a.arrive - b.arrive).map(m => {
+      const ok = m.arrive <= first.arrive, from = s.villages[m.from];
+      return '<li class="mv sup">' + ico('spear') + '<div class="mvbody"><b>Z wioski ' + esc(from.name) + '</b><div>' + unitsLine(m.units) + '</div></div>' +
+        '<div class="mvtime"><span class="timer" data-end="' + m.arrive + '"></span><small class="' + (ok ? 'ok' : 'bad') + '">' + (ok ? 'zdąży przed 1. falą' : 'po 1. fali') + '</small></div></li>';
+    }).join('') + '</ul>' : '';
+    return '<section class="panel threat">' +
+      '<header class="th-head"><div><h3>' + ico('wall') + esc(v.name) + ' <small>' + xy(v.x, v.y) + '</small></h3>' +
+      '<p class="tags"><span class="warn">' + g.waves.length + ' ' + waveWord(g.waves.length) + '</span><span>Mur poz. ' + v.buildings.wall + '</span>' +
+      '<span title="Wojsko w wiosce, wsparcie i mur">Obrona ' + fmt(E.villageDefense(v, null, ups)) + '</span></p></div>' +
+      '<div class="th-clock"><span class="timer" data-end="' + first.arrive + '"></span><small>do uderzenia · ' + clock(first.arrive) + '</small></div></header>' +
+      '<ul class="waves">' + waves + '</ul>' +
+      '<h4>Obrońcy w wiosce' + (hosted ? ' <small class="muted">(w tym wsparcie: ' + fmt(hosted) + ')</small>' : '') + '</h4><p class="units-wrap">' + unitsLine(E.defenders(v)) + '</p>' +
+      '<p class="muted th-note">Siły wroga są nieznane – zwiadowcy lub raport z bitwy pokażą więcej.</p>' +
+      helpHtml +
+      '<div class="actions left"><button class="btn danger" data-act="threat-defend" data-id="' + v.id + '">' + ico('wall') + 'Wyślij obronę</button>' +
+      '<button class="btn ghost" data-act="goto" data-id="' + v.id + '">Zarządzaj wioską</button>' +
+      '<button class="btn ghost" data-act="show-on-map" data-x="' + v.x + '" data-y="' + v.y + '">Na mapie</button></div></section>';
+  }
+  function renderThreats() {
+    const s = st(), el = $('#screen-threats');
+    const groups = threatGroups(s), nWaves = groups.reduce((a, g) => a + g.waves.length, 0);
+    const help = s.movements.filter(m => m.owner === 'player' && m.type === 'support');
+    const reps = s.reports.filter(r => r.kind === 'defense').slice(0, 6);
+    const stat = E.statsOf(s, 'player');
+    const sig = JSON.stringify([groups.map(g => [g.v.id, g.waves.map(m => m.id), E.sumUnits(E.defenders(g.v)), g.v.buildings.wall]),
+      help.filter(m => groups.some(g => g.v.id === m.to)).map(m => m.id), reps.map(r => r.id + (r.read ? 1 : 0)), stat.defWon, stat.defLost,
+      Math.ceil(graceLeft(s) / 60000)]);
+    if (UI.sigs.threats === sig) return;
+    if (userScrolling()) return;
+    UI.sigs.threats = sig;
+    const keep = saveScroll(el);
+    const attackers = [...new Set(groups.reduce((a, g) => a.concat(g.waves.map(m => m.owner)), []))];
+    const next = groups.length ? groups[0].waves[0] : null;
+    let html = '<section class="panel threat-head' + (groups.length ? ' alarm' : '') + '"><div><h1>Ataki</h1><p class="tags">' +
+      (groups.length
+        ? '<span class="warn">' + nWaves + ' ' + waveWord(nWaves) + ' na ' + groups.length + ' ' + (groups.length === 1 ? 'wioskę' : 'wioski') + '</span>' + attackers.map(o => '<span>' + flag(s, o) + '</span>').join('')
+        : '<span class="ok">Spokojnie – żaden atak na Ciebie nie nadciąga</span>') + graceTag(s) + '</p></div>' +
+      '<div class="threat-kpis">' +
+      '<div class="kpi danger"><small>Najbliższe uderzenie</small><b>' + (next ? '<span class="timer" data-end="' + next.arrive + '"></span>' : '–') + '</b></div>' +
+      '<div class="kpi"><small>Zagrożone wioski</small><b>' + groups.length + '</b></div>' +
+      '<div class="kpi" title="Ataki na Ciebie odparte w całej grze"><small>Odparte</small><b>' + fmt(stat.defWon) + '</b></div>' +
+      '<div class="kpi" title="Ataki na Ciebie, w których obrona przegrała"><small>Przegrane</small><b>' + fmt(stat.defLost) + '</b></div></div></section>';
+    html += groups.map(g => threatCard(s, g, help)).join('');
+    html += '<section class="panel"><h2>Ostatnie ataki na Ciebie</h2>' + (reps.length
+      ? '<ul class="rlist">' + reps.map(r => '<li><button class="ritem ' + reportTone(r) + (r.conquered ? ' conq' : '') + (r.read ? '' : ' unread') + '" data-act="report" data-id="' + r.id + '">' +
+        ico('barracks') + '<span class="rtitle">' + reportTitle(s, r) + '</span><span class="rtime">' + dayClock(r.time) + '</span></button></li>').join('') + '</ul>' +
+        '<div class="actions left"><button class="btn ghost" data-act="threat-reports">Wszystkie raporty z obrony</button></div>'
+      : '<p class="muted">Nikt jeszcze Cię nie zaatakował. Gdy to nastąpi, raport z bitwy pojawi się tutaj.</p>') + '</section>';
+    el.innerHTML = html;
+    restoreScroll(el, keep);
   }
 
   /* ---------- ekran: PRZEGLĄD WIOSEK ---------- */
@@ -454,7 +530,7 @@
     }).join('');
     el.innerHTML = '<section class="ov-head panel"><div><h1>Przegląd wiosek</h1><p class="tags"><span>' + allOwn.length + ' z ' + E.winVillages(s) + ' wiosek</span>' +
       (roles ? '<span class="rtag off">' + ico('axe') + nOff + ' ofensywnych</span><span class="rtag def">' + ico('wall') + nDef + ' defensywnych</span>' : '') +
-      (inc.length ? '<span class="warn">Nadciągające ataki: ' + inc.length + '</span>' : '') +
+      (inc.length ? '<span class="warn"><button class="link" data-screen="threats">Nadciągające ataki: ' + inc.length + '</button></span>' : '') +
       (diploOffers(s) ? '<span class="warn">Oferty paktów: ' + diploOffers(s) + '</span>' : '') + '</p>' +
       (roles ? '<div class="actions left rolefilter"><span class="muted">Pokaż wioski:</span>' +
         [['all', 'Wszystkie'], ['off', 'Ofensywne'], ['def', 'Defensywne']].map(f => '<button class="btn' + (rf === f[0] ? '' : ' ghost') + '" data-act="ov-role" data-role="' + f[0] + '">' + f[1] + '</button>').join('') + '</div>' : '') +
@@ -1985,6 +2061,7 @@
     document.querySelectorAll('.screen').forEach(el => { el.hidden = el.id !== 'screen-' + UI.screen; });
     if (UI.screen === 'village') renderVillage();
     else if (UI.screen === 'army') renderArmy();
+    else if (UI.screen === 'threats') renderThreats();
     else if (UI.screen === 'reports') renderReports();
     else if (UI.screen === 'tech') renderTech();
     else if (UI.screen === 'overview' && !(document.activeElement && document.activeElement.closest && document.activeElement.closest('#screen-overview'))) renderOverview();
@@ -2365,6 +2442,8 @@
         break;
       }
       case 'troops-open': UI.troops = troopsDefaults(UI.vid || (cur() && cur().id)); openModal('troops'); break;
+      case 'threat-defend': UI.troops = defenseDefaults(b.dataset.id); UI.troops.stay = false; openModal('troops'); break;
+      case 'threat-reports': UI.filter = 'defense'; show('reports'); break;
       case 'defense-open': UI.troops = defenseDefaults(UI.vid || (cur() && cur().id)); openModal('troops'); break;
       case 'troops-support': {
         /* tylko obrona + wsparcie (do odwołania) + domyślnie 90% zostaje w wiosce wysyłającej; od razu wysyła */
