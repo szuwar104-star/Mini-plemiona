@@ -439,9 +439,12 @@
       '<button class="btn" data-act="pilot-open">' + ico('wall') + 'Autopilot' + (s.pilot && s.pilot.on ? ' <small>(wł.)</small>' : '') + '</button>' +
       '<button class="btn" data-act="diplo-open">' + ico('scroll') + 'Dyplomacja' + (diploOffers(s) ? ' <small>(' + diploOffers(s) + ')</small>' : '') + '</button></div></div>' +
       '<div class="army-kpis ov-kpis">' + E.RES.map(r => '<div class="kpi"><small>' + C.RESOURCES[r].name + ' razem</small><b>' + fmt(total[r]) + '</b><small>+' + Math.round(prod[r]) + ' / min</small></div>').join('') +
-      '<div class="kpi" title="' + E.UNITS.filter(k => all[k] > 0).map(k => C.UNITS[k].name + ': ' + fmt(all[k])).join(', ') + '"><small>Jednostki łącznie</small><b>' + fmt(allTotal) + '</b>' +
+      '<div class="kpi"><small>Jednostki łącznie</small><b>' + fmt(allTotal) + '</b>' +
         '<small>w wioskach ' + fmt(army) + (allTotal > army ? ' + poza ' + fmt(allTotal - army) : '') + '</small></div>' +
-      '<div class="kpi"><small>Moc konta</small><b>' + fmt(pw.total) + '</b><small>bud. ' + fmt(pw.buildings) + ' + woj. ' + fmt(pw.army) + '</small></div></div></section>' +
+      '<div class="kpi"><small>Moc konta</small><b>' + fmt(pw.total) + '</b><small>bud. ' + fmt(pw.buildings) + ' + woj. ' + fmt(pw.army) + '</small></div>' +
+      '<div class="kpi ov-units"><small>Wszystkie jednostki wg rodzaju (wioski, wsparcie, marsz)</small><div class="ov-units-list">' +
+        (allTotal ? E.UNITS.filter(k => all[k] > 0).map(k => '<span class="uchip">' + ico(k) + C.UNITS[k].name + ' <b>' + fmt(all[k]) + '</b></span>').join('') : '<span class="muted">brak</span>') +
+      '</div></div></div></section>' +
       '<section class="panel"><div class="tablewrap"><table class="units ov">' +
       '<thead><tr><th>Wioska</th><th>' + ico('wood') + 'Drewno</th><th>' + ico('clay') + 'Glina</th><th>' + ico('iron') + 'Żelazo</th><th>' + ico('pop') + 'Farma</th><th>Budowa</th><th>Rekrutacja</th><th>Wojsko</th><th>Ataki</th></tr></thead>' +
       '<tbody>' + rows + '</tbody></table></div></section>';

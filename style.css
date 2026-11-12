@@ -237,6 +237,10 @@ main { padding: 1.25rem; min-width: 0; }
 .ov-head h1 { margin: 0; }
 .ov-kpis { grid-template-columns: repeat(4, minmax(110px, 1fr)) !important; }
 .ov-kpis .kpi small:last-child { color: var(--green); }
+.ov-kpis .ov-units { grid-column: 1 / -1; }
+.ov-kpis .ov-units small { color: var(--muted); }
+.ov-units-list { display: flex; flex-wrap: wrap; gap: .35rem .9rem; margin-top: .25rem; }
+.ov-units-list .uchip b { font-size: .95rem; }
 table.ov td { vertical-align: middle; }
 table.ov th .ico { width: 18px; height: 18px; }
 table.ov .vname { position: sticky; left: 0; background: var(--surface); z-index: 1; }
