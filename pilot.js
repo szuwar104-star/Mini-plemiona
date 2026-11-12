@@ -559,6 +559,8 @@
   const isAtt = k => { const U = C.UNITS[k]; return !U.role && !U.conquer && !U.settler && !U.scout; };
   const attUnits = v => { const u = E.emptyUnits(); Object.keys(C.UNITS).forEach(k => { if (isAtt(k)) u[k] = v.units[k] || 0; }); return u; };
   const attPower = (state, v) => E.attackPower(attUnits(v), E.upgradesOf(state, 'player'));
+  // Szacowana obrona celu wg zwiadu: z ulepszeniami i badaniami wroga oraz zapasem na wojsko, które doszkolił od zwiadu.
+  const estDef = (state, o, intel, wall, t, cfg) => E.defenseFrom(intel.units, wall, E.upgradesOf(state, o.owner)) * (1 + cfg.growthPerHour * Math.max(0, t - intel.time) / 3600000);
   const foeBlocked = (state, o, t) => !!(MP.Diplomacy && MP.Diplomacy.blocked(state, 'player', o.owner, t));
 
   function noblesTotal(state, vs) {
@@ -733,7 +735,7 @@
         if (loy <= 0) return;
         const wall = intel.buildings ? intel.buildings.wall : W.wallGuess;
         const wallEff = Math.max(0, wall - Math.floor(E.ramCount(send) / C.RAM.fightPerLevel));
-        const need = E.defenseFrom(intel.units, wallEff, null) * W.ratio * (1 + W.failPenalty * ((p.fail[o.id] || { n: 0 }).n));
+        const need = estDef(state, o, intel, wallEff, t, W) * W.ratio * (1 + W.failPenalty * ((p.fail[o.id] || { n: 0 }).n));
         if (src.A < need) { dg.weak++; if (src.A / need > dg.ratio) { dg.ratio = src.A / need; dg.A = src.A; dg.need = need; } return; }
         // dobijanie rozpoczętego podboju najpierw, potem blisko i z dużą przewagą; wolne osady (tanie) trochę chętniej
         const w = (1 + (C.LOYALTY.max - loy) / 25) / (1 + d) * (1 + Math.min(1, src.A / need / 4)) * (neutral ? 1.3 : 1);
@@ -759,7 +761,7 @@
       if (usedSrc.has(c.src.v.id) || usedTgt.has(c.o.id)) continue;
       const v = c.src.v, o = c.o;
       // tylu żołnierzy, ile trzeba (reszta zostaje na grabież/obronę); Tarany idą wszystkie, żeby mur liczył się jak w szacunku
-      const f = Math.min(1, Math.max(0.3, c.need * 1.1 / c.src.A)), send = E.emptyUnits(), full = attUnits(v);
+      const f = Math.min(1, Math.max(0.3, c.need * W.sendMargin / c.src.A)), send = E.emptyUnits(), full = attUnits(v);
       Object.keys(full).forEach(k => { send[k] = C.UNITS[k].wallPower ? full[k] : Math.min(full[k], Math.ceil(full[k] * f)); });
       if (!c.neutral) send.noble = 1;
       send.scout = Math.max(0, Math.min(W.waveScouts, (v.units.scout || 0) - 1));
@@ -838,13 +840,13 @@
       }
       if (intel.res && intel.res.wood + intel.res.clay + intel.res.iron < F.minLoot) { dg.poor++; continue; }
       const wall = intel.buildings ? intel.buildings.wall : F.wallGuess;
-      const need = E.defenseFrom(intel.units, wall, null) * F.ratio * (1 + P().war.failPenalty * ((p.farmFail[o.id] || { n: 0 }).n));
+      const need = estDef(state, o, intel, wall, t, F) * F.ratio * (1 + P().war.failPenalty * ((p.farmFail[o.id] || { n: 0 }).n));
       const src = hosts.filter(h => E.dist(h.v, o) <= F.range && h.A >= need).sort((a, b) => E.dist(a.v, o) - E.dist(b.v, o))[0];
       if (!src) { dg.weak++; continue; }
       // tyle jednostek, by pokonać obronę ORAZ unieść cały łup (zwiad pokazuje surowce celu)
       const loot = intel.res ? intel.res.wood + intel.res.clay + intel.res.iron : 0;
       const carry = Object.keys(src.u).reduce((a, k) => a + src.u[k] * (C.UNITS[k].carry || 0), 0);
-      const f = Math.min(1, Math.max(need * 1.15 / src.A, carry > 0 ? loot / carry : 0)), send = E.emptyUnits();
+      const f = Math.min(1, Math.max(need * F.sendMargin / src.A, carry > 0 ? loot / carry : 0)), send = E.emptyUnits();
       Object.keys(src.u).forEach(k => { send[k] = Math.min(src.u[k], Math.ceil(src.u[k] * f)); });
       if (E.sumUnits(send) < F.minUnits) continue;
       send.scout = Math.max(0, Math.min(F.waveScouts, (src.v.units.scout || 0) - 1));

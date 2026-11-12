@@ -370,10 +370,12 @@
       settleDefMin: 0.5,         // osadników szkoli tylko wioska z obroną co najmniej tej części celu
       settleFoeDist: 2.5,        // nie zakłada osad bliżej niż tyle pól od wioski innej frakcji (wolne osady bez właściciela nie liczą się)
       // Ataki i podbój wiosek frakcji (opcja „attack”): bot zwiadem sprawdza obronę celu, zbiera armię w najsilniejszej wiosce
-      // i wysyła kolejne fale z Dowódcą podboju, aż poparcie spadnie do 0. Bot nie widzi ulepszeń ani posiłków wroga – stąd zapas (ratio).
+      // i wysyła kolejne fale z Dowódcą podboju, aż poparcie spadnie do 0. Zwiad nie pokazuje przyszłych posiłków wroga – stąd zapas (ratio, growthPerHour); ulepszenia wroga bot uwzględnia.
       war: {
         range: 18,               // maks. odległość celu od wioski, z której wyrusza fala
         ratio: 1.5,              // wymagana siła ataku = szacowana obrona celu × ratio
+        sendMargin: 1.8,         // fala niesie tyle razy więcej siły niż wymagane minimum (zwycięzca traci (obrona/atak)^1,5 – im większa przewaga, tym mniejsze straty)
+        growthPerHour: 0.25,     // zapas na wojsko, które cel doszkolił od zwiadu (część obrony na godzinę wieku zwiadu)
         failPenalty: 0.5,        // każda przegrana fala na ten cel podnosi wymagane ratio o tę część
         minPower: 1500,          // poniżej tej siły ataku bot nie zwiadowuje ani nie atakuje
         nobles: 2,               // minimalna liczba Dowódców, których bot utrzymuje (w wioskach, w szkoleniu i w drodze)
@@ -403,6 +405,8 @@
       farm: {
         range: 18,               // maks. odległość celu od wioski wysyłającej
         ratio: 1.3,              // wymagana siła ataku = szacowana obrona celu × ratio
+        sendMargin: 1.6,         // fala niesie tyle razy więcej siły niż wymagane minimum (większa przewaga = mniejsze straty)
+        growthPerHour: 0.25,     // zapas na wojsko, które cel doszkolił od zwiadu
         failPenalty: 0.5,        // każda przegrana fala na cel podnosi wymagane ratio o tę część
         minPower: 300,           // poniżej tej siły ataku wioska nie farmi
         minUnits: 10,            // mniejszych fal nie wysyła
