@@ -611,7 +611,13 @@
       // co najmniej minUnits żołnierzy i przewagi ratio nad obroną celu; po drodze dokłada wioski, aż siła wyniesie overkill × wymagane minimum (i minUnits),
       // maks. maxVillages wiosek. defShare – jaka część jednostek obronnych każdej wioski idzie (reszta zostaje w domu; bez Dowódcy z tej wioski).
       // versusShare – ile uderzeń wolno mierzyć we frakcje AI zamiast w gracza (reszta tylko w gracza; wojny AI z AI nadal rzadkie dzięki versus).
-      mass: { everyMin: 8, chance: 0.5, minUnits: 10000, range: 18, ratio: 1.2, overkill: 3, maxVillages: 14, defShare: 0.7, versusShare: 0.1, spreadSec: 20 },
+      mass: { everyMin: 5, chance: 0.7, minUnits: 10000, range: 22, ratio: 1.2, overkill: 3, maxVillages: 16, defShare: 0.15, versusShare: 0.1, spreadSec: 20 },
+      // Siła fal (ai.js): offShare (osobowość) – docelowy udział jednostek ofensywnych w armii wioski (liczony w populacji); pod presją rośnie o
+      // offPressure. Poniżej tego udziału wioska rekrutuje tylko jednostki ataku; udział rośnie liniowo przez rampHours godzin gry od startu. waveDefShare – jaka część obrońców wolnej od keepHome idzie w
+      // zwykłą wyprawę na gracza/frakcję (obrońcy dają mało ataku, a osłabiają dom; na wolne osady idą jak dawniej). reinforce – przy
+      // ataku na gracza AI doliczy do obrony celu część obrońców jego wiosek w promieniu range (posiłki, Autopilot) – share to ich część,
+      // capMult – maks. dodatek jako wielokrotność obrony samego celu.
+      war: { rampHours: 24, offPressure: 0.15, offMax: 0.8, waveDefShare: 0.25, reinforce: { range: 6, share: 0.4, capMult: 3 } },
       // Handel AI (opcja gry state.aiTrade, ai.js): frakcja wymienia w Targowisku nadwyżki na surowiec, którego brakuje do budowy
       // albo do partii ulubionej jednostki – tylko wtedy, gdy wymiana całkiem pokrywa niedobór. Kurs i udźwig kupców bazowe (bez badań gracza).
       // cooldownMin: przerwa między wymianami w jednej wiosce; keepShare: część magazynu, której AI nie oddaje; batch: wielkość partii jednostek.
@@ -671,7 +677,7 @@
           recruitShare: 0.9, attackChance: 0.6, attackRatio: 1.3, keepHome: 0.2,
           minPower: 250, range: 8, targets: 'any', anyAfterMin: 0,
           neutralBias: 1, playerBias: 1.6, nobles: true, maxVillages: 12, settle: false, spyChance: 0.15,
-          homeDef: 28, waves: 2, gatherChance: 0.15, raids: 1.2
+          homeDef: 28, waves: 2, gatherChance: 0.15, raids: 1.2, offShare: 0.65
         },
         economic: {
           label: 'gospodarcza',
@@ -685,7 +691,7 @@
           recruitShare: 0.65, attackChance: 0.25, attackRatio: 2.0, keepHome: 0.5,
           minPower: 300, range: 6, targets: 'neutral', anyAfterMin: 30,
           neutralBias: 2, playerBias: 0.8, nobles: true, maxVillages: 8, settleMax: 12, settle: true, spyChance: 0.05,
-          homeDef: 30, waves: 1, gatherChance: 0.1, raids: 1
+          homeDef: 30, waves: 1, gatherChance: 0.1, raids: 1, offShare: 0.5
         },
         defensive: {
           label: 'obronna',
@@ -699,7 +705,7 @@
           recruitShare: 0.75, attackChance: 0.2, attackRatio: 2.5, keepHome: 0.8,
           minPower: 300, range: 5, targets: 'neutral', anyAfterMin: 45,
           neutralBias: 2, playerBias: 0.6, nobles: false, maxVillages: 6, settleMax: 7, settle: true, spyChance: 0.05,
-          homeDef: 45, waves: 1, gatherChance: 0, raids: 0.5
+          homeDef: 45, waves: 1, gatherChance: 0, raids: 0.5, offShare: 0.35
         },
         expansionist: {
           label: 'ekspansywna',
@@ -713,7 +719,7 @@
           recruitShare: 0.85, attackChance: 0.5, attackRatio: 1.5, keepHome: 0.3,
           minPower: 200, range: 9, targets: 'any', anyAfterMin: 0,
           neutralBias: 2.5, playerBias: 1, nobles: true, maxVillages: 13, settleMax: 17, settle: true, spyChance: 0.1,
-          homeDef: 25, waves: 2, gatherChance: 0.12, raids: 0.8
+          homeDef: 25, waves: 2, gatherChance: 0.12, raids: 0.8, offShare: 0.6
         }
       }
     },
