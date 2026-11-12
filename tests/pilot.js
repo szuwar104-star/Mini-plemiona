@@ -322,10 +322,12 @@ function twoVillages() {
   const w = setup({ axe: 20, noble: 1, scout: 5 });
   E.advance(w.s, w.s.now + 2 * HOUR);
   ok(!w.s.reports.some(r => r.kind === 'attack') && !w.s.movements.some(m => m.type === 'attack'), 'za słaba armia – bot czeka');
+  ok(w.s.pilot.warWhy && w.s.pilot.warWhy.text && w.s.pilot.log.some(l => /^Brak ataku:/.test(l.text)), 'bot podaje powód braku ataku: ' + (w.s.pilot.warWhy && w.s.pilot.warWhy.text));
   // bez Dowódcy: tylko zwiad, bez ataku
   const nn = setup({ axe: 500, ram: 12, scout: 5 });
   E.advance(nn.s, nn.s.now + 2 * HOUR);
   ok(!nn.s.reports.some(r => r.kind === 'attack'), 'bez Dowódcy bot nie atakuje');
+  ok(nn.s.pilot.warWhy && /Dowódc/.test(nn.s.pilot.warWhy.text), 'powód: brak Dowódcy (' + (nn.s.pilot.warWhy && nn.s.pilot.warWhy.text) + ')');
   // opcja wyłączona
   const off = setup(army, { attack: false });
   E.advance(off.s, off.s.now + 2 * HOUR);
@@ -334,6 +336,7 @@ function twoVillages() {
   const st = setup(army); st.foe.units.guard = 400; st.foe.units.spear = 400;
   E.advance(st.s, st.s.now + 2 * HOUR);
   ok(!st.s.reports.some(r => r.kind === 'attack'), 'mocno bronionego celu bot nie atakuje (zwiad pokazał obronę)');
+  ok(st.s.pilot.warWhy && st.s.pilot.warWhy.key === 'weak', 'powód: za słaba fala (' + (st.s.pilot.warWhy && st.s.pilot.warWhy.text) + ')');
   // pakt o nieagresji chroni cel
   const pk = setup(army);
   pk.s.diplomacy = pk.s.diplomacy || {};
@@ -341,6 +344,7 @@ function twoVillages() {
   E.advance(pk.s, pk.s.now + 2 * HOUR);
   MP.Diplomacy.blocked = bl;
   ok(!pk.s.reports.some(r => r.kind === 'attack') && pk.foe.owner !== 'player', 'cel z paktem nie jest atakowany');
+  ok(pk.s.pilot.warWhy && pk.s.pilot.warWhy.key === 'foes', 'powód: pakt o nieagresji (' + (pk.s.pilot.warWhy && pk.s.pilot.warWhy.text) + ')');
 }
 // 15. Zbiórka armii: zaplecze przenosi atak i Dowódcę do najsilniejszej wioski
 {

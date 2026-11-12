@@ -627,3 +627,8 @@ input[type=checkbox], input[type=radio] { accent-color: var(--gold); width: 1.05
   #modal .dialog.atk table.units input[type=number] { min-height: 30px; }
   #modal .dialog.atk > p.muted { display: none; }
 }
+
+/* Przegląd: kafelki jednostek w stylu planszy (spójne z .chip) */
+.uov { border-radius: 4px; background: rgba(0, 0, 0, .28); box-shadow: inset 0 0 0 1px var(--line-2); }
+.uov .ico { border-radius: 3px; background: rgba(0, 0, 0, .35); box-shadow: inset 0 0 0 1px var(--line); }
+.uov-txt b { color: var(--gold-2); font-family: var(--serif, inherit); }
