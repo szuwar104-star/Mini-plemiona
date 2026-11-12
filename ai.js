@@ -108,22 +108,22 @@
 
   /* ---------- 2. wojsko ---------- */
   function manageRecruit(state, v, P, t, reserve, owned) {
-    if (v.recruitQueue.length >= T().recruitQueue) return;
+    if (v.recruitQueue.length >= T().recruitQueue) return false;
     const full = storeRatio(v) > T().storeSpend;
 
     // dowódca podboju
     if (P.nobles && v.buildings.barracks >= C.UNITS.noble.barracks && noblesOf(state, v) === 0 && owned < villageCap(state, P, t) &&
         E.villageDefense(v, null, E.upgradesOf(state, v.owner)) >= homeDefTarget(v, P) * 0.6) {
       const ri = E.recruitInfo(state, v, 'noble');
-      if (ri.ok && ri.max >= 1) { E.queueRecruit(state, v, 'noble', 1, t); return; }
-      if (ri.code === 'resources' && !full && E.rand(state) < 0.5) return; // odkłada surowce na dowódcę
+      if (ri.ok && ri.max >= 1) { E.queueRecruit(state, v, 'noble', 1, t); return true; }
+      if (ri.code === 'resources' && !full && E.rand(state) < 0.5) return false; // odkłada surowce na dowódcę
     }
     // osadnik: rozrost na wolne ziemie
     if (P.settle && v.buildings.hq >= C.UNITS.settler.hq && owned < villageCap(state, P, t, true) && settlersOf(state, v) === 0 &&
         !state.movements.some(m => m.type === 'settle' && m.owner === v.owner) && E.rand(state) < T().settleChance) {
       const si = E.recruitInfo(state, v, 'settler');
-      if (si.ok && si.max >= 1) { E.queueRecruit(state, v, 'settler', 1, t); return; }
-      if (si.code === 'resources' && !full) return; // odkłada surowce na osadnika
+      if (si.ok && si.max >= 1) { E.queueRecruit(state, v, 'settler', 1, t); return true; }
+      if (si.code === 'resources' && !full) return false; // odkłada surowce na osadnika
     }
 
     const def = E.villageDefense(v, null, E.upgradesOf(state, v.owner));
@@ -136,16 +136,17 @@
       if (U.wallPower && E.ramCount(v.units) >= T().siegeCap) return false;
       return needDef ? U.role === 'def' : (P.unitWeights[u] || 0) > 0;
     });
-    if (!pool.length) return;
+    if (!pool.length) return false;
     const unit = pickWeighted(state, pool.map(k => [k, needDef ? (P.unitWeights[k] || 0) + 1 : P.unitWeights[k]]));
     const U = C.UNITS[unit];
     const ri = E.recruitInfo(state, v, unit);
-    if (!ri.ok) return;
+    if (!ri.ok) return false;
     // budżet: nadwyżka ponad rezerwę na budynek; przy pełnym magazynie albo zagrożeniu – wszystko
     const share = full || threatened ? 1 : P.recruitShare;
     const byBudget = Math.min.apply(null, E.RES.map(r => Math.floor(Math.max(0, v.res[r] - (reserve && !full && !threatened ? reserve[r] : 0)) * share / Math.max(1, U.cost[r]))));
     const n = Math.min(ri.max, byBudget, unit === 'scout' ? 3 : U.wallPower ? 5 : C.AI.maxOrder);
-    if (n >= 1) E.queueRecruit(state, v, unit, n, t);
+    if (n < 1) return false;
+    return E.queueRecruit(state, v, unit, n, t).ok !== false;
   }
 
   /* ---------- 3. obrona: posiłki dla zagrożonej wioski ---------- */
@@ -331,7 +332,7 @@
     for (const v of vs) {
       E.tickVillage(state, v, t);
       const reserve = manageBuild(state, v, P, t);
-      manageRecruit(state, v, P, t, reserve, vs.length);
+      for (let i = 0; i < 3; i++) if (!manageRecruit(state, v, P, t, reserve, vs.length)) break;
     }
     sendReinforcements(state, fid, vs, P, t);
     gatherArmy(state, fid, vs, P, t);
