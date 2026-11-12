@@ -276,6 +276,7 @@
       coinFrom: 0.85, coinTo: 0.6, // zakup monet: gdy magazyn > coinFrom, schodzi do coinTo
       logMax: 30,
       settleRanges: [5, 8],      // w jakim promieniu od wioski macierzystej bot szuka miejsca na osadę (najpierw bliżej)
+      settleFarMax: 14,          // gdy wioska nie ma wolnego pola w zasięgu, osadnik może iść na pole przy innej własnej wiosce, maks. tyle pól
       settleDefMin: 0.5,         // osadników szkoli tylko wioska z obroną co najmniej tej części celu
       settleFoeDist: 2.5,        // nie zakłada osad bliżej niż tyle pól od wioski innej frakcji (wolne osady bez właściciela nie liczą się)
       buildWeights: { hq: 1, wood: 1.1, clay: 1.1, iron: 1.1, farm: 1, barracks: 0.8, market: 0.5, wall: 0.7 },
