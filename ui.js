@@ -1102,7 +1102,7 @@
   /* wspólne zatwierdzenie okna: planuje i od razu wysyła (jak przycisk „Wyślij wojsko”) */
   function troopsSendNow() {
     const g = UI.troops;
-    const r = G.action(s => E.sendTroops(s, E.planTroops(s, g.target, troopsArgs(g), s.now), s.now));
+    const r = MP.Game.action(s => E.sendTroops(s, E.planTroops(s, g.target, troopsArgs(g), s.now), s.now));
     if (r.ok) { UI.troops = null; closeModal(); invalidate(); render(); }
     else toast('bad', r.reason);
   }
