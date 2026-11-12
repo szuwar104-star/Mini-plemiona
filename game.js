@@ -56,9 +56,9 @@
         await new Promise(r => setTimeout(r, 30)); // pozwól wyświetlić ekran ładowania
         this.state = state;
         const away = state.paused ? 0 : this.clock() - state.now;
-        const unreadBefore = state.reports.filter(r => !r.read).length;
+        const unreadBefore = state.reports.filter(r => !r.read && r.kind !== 'news').length;
         this.tick(true);
-        const fresh = state.reports.filter(r => !r.read).length - unreadBefore;
+        const fresh = state.reports.filter(r => !r.read && r.kind !== 'news').length - unreadBefore;
         UI().drainNotices(true);
         if (state.paused) {
           UI().toast('info', 'Gra jest wstrzymana – czas nie płynie. Wznów ją przyciskiem u góry.');
