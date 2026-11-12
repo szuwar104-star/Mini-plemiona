@@ -609,6 +609,8 @@
     if (type === 'attack' && to.owner === 'player' && from.owner !== 'player') {
       state.lastHit = state.lastHit || {};
       state.lastHit[to.id] = t;
+      state.lastHitBy = state.lastHitBy || {};
+      state.lastHitBy[from.owner] = t; // kiedy dana frakcja ostatnio uderzyła w gracza (presja AI liczona osobno dla frakcji)
       notice(state, t, 'danger', 'Nadciąga atak na ' + to.name + ' (' + to.x + ':' + to.y + ')!');
       if (state.pilot && state.pilot.on && C.PILOT) state.pilot.next = Math.min(state.pilot.next || Infinity, t + C.PILOT.alertDelaySec * 1000); // Autopilot reaguje od razu
     }

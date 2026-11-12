@@ -83,15 +83,15 @@
     return Math.floor(z * Math.max(0, 1 - hours / fade));
   }
 
-  // Presja na gracza (poziom Trudny): im dłużej AI nie uderzyło w żadną wioskę gracza, tym śmielej do tego dąży – niższe wymagane
+  // Presja na gracza (poziom Trudny): im dłużej dana frakcja nie uderzyła w żadną wioskę gracza, tym śmielej do tego dąży – niższe wymagane
   // przewagi i próg siły wyprawy, częstsze próby i większa waga gracza jako celu. Po udanym uderzeniu presja spada do zera.
   // Zwraca 0..1 (pomnożone przez DIFFICULTY.aiPressure; 0 = wyłączona na Łatwym i Normalnym).
-  function pressureOf(state, t) {
+  function pressureOf(state, t, fid) {
     const D = E.diff(state), k = D.aiPressure || 0, cfg = C.AI.pressure;
     if (!k || !cfg) return 0;
     let last = state.created + D.graceMinutes * 60000;
-    const hits = state.lastHit || {};
-    for (const id in hits) if (hits[id] > last) last = hits[id];
+    const mine = state.lastHitBy && state.lastHitBy[fid];
+    if (mine > last) last = mine; // presja liczona osobno dla każdej frakcji: cudze ataki jej nie zerują
     return Math.max(0, Math.min(1, ((t - last) / 60000 - cfg.startMin) / cfg.rampMin)) * k;
   }
 
@@ -294,7 +294,9 @@
       if (target.owner === null && zone && playerAll.some(pv => E.dist(pv, target) <= zone)) continue;
       if (target.owner === 'player' && (grace || (state.lastHit && t - (state.lastHit[target.id] || -1e15) < cooldown))) continue;
       const d = E.dist(v, target);
-      if (d > P.range * (target.owner === 'player' ? 1 + press * C.AI.pressure.rangeBoost : 1)) continue; // pod presją sięga dalej po gracza
+      // pod presją sięga dalej po gracza: do x(1+rangeBoost) zasięgu, a na dużych mapach co najmniej rangeMapShare boku mapy
+      const reach = target.owner === 'player' ? P.range + press * Math.max(P.range * C.AI.pressure.rangeBoost, state.map.size * C.AI.pressure.rangeMapShare - P.range) : P.range;
+      if (d > reach) continue;
       // okres ochronny: osady bliższe graczowi zostają dla niego
       if (grace && target.owner === null && playerAll.some(pv => E.dist(pv, target) < d)) continue;
       E.tickVillage(state, target, t);
@@ -349,7 +351,7 @@
     sendReinforcements(state, fid, vs, P, t);
     gatherArmy(state, fid, vs, P, t);
     const playerAll = E.villagesOf(state, 'player');
-    const press = pressureOf(state, t);
+    const press = pressureOf(state, t, fid);
     for (const v of vs) {
       if (P.settle) trySettle(state, v, t);
       trySpy(state, v, P, t);
