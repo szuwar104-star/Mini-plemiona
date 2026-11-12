@@ -422,17 +422,18 @@
   // Dla każdego piksela liczy się właściciel najbliższej osady w zasięgu. Zamiast sprawdzać wszystkie osady,
   // każde pole (tile) ma własną krótką listę osad, które mogą go dosięgnąć (w tej samej kolejności, więc wynik
   // jest identyczny). Ramka obramowania liczona bez domknięć, na tablicy z marginesem (poza mapą = inny właściciel).
-  function territory(state, cv) {
+  // Zmiana właściciela kilku osad (podbój, utrata) nie przelicza całej mapy: stan (own, uni) zostaje przy płótnie,
+  // a przeliczamy i przemalowujemy tylko pola w zasięgu zmienionych osad plus sąsiednie (obramowanie sięga 10 px).
+  const terrState = new WeakMap();   // płótno -> { N, own, uni }
+  function territory(state, cv, changed) {
     const N = state.map.size, W = N * AP;
     const ctx = cv.getContext('2d');
-    const img = ctx.createImageData(W, W), d = img.data;
     const owners = Object.values(state.villages).filter(v => v.owner !== null);
     const keys = Object.keys(state.factions);
     const colors = keys.map(k => rgb(state.factions[k].color));
     const R = 2.35 * AP, R2 = R * R;
     const cs = owners.map(v => ({ x: (v.x + 0.5) * AP, y: (v.y + 0.5) * AP, o: keys.indexOf(v.owner) }));
     const M = 10, PW = W + 2 * M;            // margines = największy skok wykrywania krawędzi
-    const own = new Int16Array(PW * PW).fill(-2);
     const near = new Array(N * N);
     for (let i = 0; i < near.length; i++) near[i] = [];
     cs.forEach(c => {
@@ -440,27 +441,43 @@
       const y0 = Math.max(0, Math.floor((c.y - R) / AP)), y1 = Math.min(N - 1, Math.floor((c.y + R) / AP));
       for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) near[ty * N + tx].push(c);
     });
-    const uni = new Int16Array(N * N);       // właściciel całego pola, jeśli jest jeden (-1 = nikt), inaczej -3
-    for (let ty = 0; ty < N; ty++) {
-      for (let tx = 0; tx < N; tx++) {
-        const list = near[ty * N + tx], n = list.length;
-        let lo = 32767, hi = -32768;
-        for (let y = ty * AP, ye = y + AP; y < ye; y++) {
-          const row = (y + M) * PW + M;
-          for (let x = tx * AP, xe = x + AP; x < xe; x++) {
-            let best = R2, o = -1;
-            for (let i = 0; i < n; i++) {
-              const c = list[i], dx = x - c.x, dy = y - c.y, dd = dx * dx + dy * dy;
-              if (dd < best) { best = dd; o = c.o; }
-            }
-            own[row + x] = o;
-            if (o < lo) lo = o;
-            if (o > hi) hi = o;
-          }
-        }
-        uni[ty * N + tx] = lo === hi ? lo : -3;
-      }
+
+    let st = terrState.get(cv);
+    const inc = !!(changed && changed.length && changed.length <= 40 && st && st.N === N);
+    if (!inc) {
+      st = { N, own: new Int16Array(PW * PW).fill(-2), uni: new Int16Array(N * N) };   // uni: właściciel całego pola, jeśli jest jeden (-1 = nikt), inaczej -3
+      terrState.set(cv, st);
     }
+    const own = st.own, uni = st.uni;
+
+    // prostokąty pól do przeliczenia: cała mapa albo zasięg każdej zmienionej osady
+    const rects = inc ? changed.map(v => {
+      const cx = (v.x + 0.5) * AP, cy = (v.y + 0.5) * AP;
+      return { tx0: Math.max(0, Math.floor((cx - R) / AP)), tx1: Math.min(N - 1, Math.floor((cx + R) / AP)),
+               ty0: Math.max(0, Math.floor((cy - R) / AP)), ty1: Math.min(N - 1, Math.floor((cy + R) / AP)) };
+    }) : [{ tx0: 0, tx1: N - 1, ty0: 0, ty1: N - 1 }];
+    rects.forEach(r => {
+      for (let ty = r.ty0; ty <= r.ty1; ty++) {
+        for (let tx = r.tx0; tx <= r.tx1; tx++) {
+          const list = near[ty * N + tx], n = list.length;
+          let lo = 32767, hi = -32768;
+          for (let y = ty * AP, ye = y + AP; y < ye; y++) {
+            const row = (y + M) * PW + M;
+            for (let x = tx * AP, xe = x + AP; x < xe; x++) {
+              let best = R2, o = -1;
+              for (let i = 0; i < n; i++) {
+                const c = list[i], dx = x - c.x, dy = y - c.y, dd = dx * dx + dy * dy;
+                if (dd < best) { best = dd; o = c.o; }
+              }
+              own[row + x] = o;
+              if (o < lo) lo = o;
+              if (o > hi) hi = o;
+            }
+          }
+          uni[ty * N + tx] = lo === hi ? lo : -3;
+        }
+      }
+    });
     // Pole, którego wszystkie 8 sąsiadów ma tego samego właściciela, nie ma w zasięgu 10 px żadnej krawędzi
     // (pole ma 28 px), więc dostaje samo wypełnienie bez sprawdzania sąsiadów piksel po pikselu.
     const inner = (tx, ty) => {
@@ -470,37 +487,72 @@
       return true;
     };
     const diff = (j, o, k) => own[j - k] !== o || own[j + k] !== o || own[j - k * PW] !== o || own[j + k * PW] !== o;
-    for (let ty = 0; ty < N; ty++) for (let tx = 0; tx < N; tx++) {
-      if (uni[ty * N + tx] === -1) continue;   // pole poza terytoriami
-      const fast = inner(tx, ty), cf = fast ? colors[uni[ty * N + tx]] : null;
-      for (let y = ty * AP, ye = y + AP; y < ye; y++) {
-      for (let x = tx * AP, xe = x + AP; x < xe; x++) {
-        const j = (y + M) * PW + M + x, o = own[j];
-        if (o < 0) continue;
-        const i = (y * W + x) * 4, c = colors[o];
-        if (fast) { d[i] = cf[0]; d[i + 1] = cf[1]; d[i + 2] = cf[2]; d[i + 3] = 85; continue; }
-        const edge = diff(j, o, 1) || diff(j, o, 2);
-        // granica: gruba, pełna linia w ciemniejszym kolorze frakcji, od środka pas "poświaty", wnętrze wyraźnie podbarwione
-        if (edge) { d[i] = c[0] * .6; d[i + 1] = c[1] * .6; d[i + 2] = c[2] * .6; d[i + 3] = 255; }
-        else {
-          const glow = diff(j, o, 6), band = !glow && diff(j, o, 10);
-          d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = glow ? 170 : band ? 120 : 85;
+    // Maluje pola tx0..tx1 × ty0..ty1 do bufora (ox, oy = piksel mapy odpowiadający lewemu górnemu rogowi bufora, w = jego szerokość).
+    const paint = (d, w, ox, oy, tx0, ty0, tx1, ty1) => {
+      for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) {
+        if (uni[ty * N + tx] === -1) continue;   // pole poza terytoriami
+        const fast = inner(tx, ty), cf = fast ? colors[uni[ty * N + tx]] : null;
+        for (let y = ty * AP, ye = y + AP; y < ye; y++) {
+          for (let x = tx * AP, xe = x + AP; x < xe; x++) {
+            const j = (y + M) * PW + M + x, o = own[j];
+            if (o < 0) continue;
+            const i = ((y - oy) * w + (x - ox)) * 4, c = colors[o];
+            if (fast) { d[i] = cf[0]; d[i + 1] = cf[1]; d[i + 2] = cf[2]; d[i + 3] = 85; continue; }
+            const edge = diff(j, o, 1) || diff(j, o, 2);
+            // granica: gruba, pełna linia w ciemniejszym kolorze frakcji, od środka pas "poświaty", wnętrze wyraźnie podbarwione
+            if (edge) { d[i] = c[0] * .6; d[i + 1] = c[1] * .6; d[i + 2] = c[2] * .6; d[i + 3] = 255; }
+            else {
+              const glow = diff(j, o, 6), band = !glow && diff(j, o, 10);
+              d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = glow ? 170 : band ? 120 : 85;
+            }
+          }
         }
       }
-      }
+    };
+    if (!inc) {
+      const img = ctx.createImageData(W, W);
+      paint(img.data, W, 0, 0, 0, 0, N - 1, N - 1);
+      ctx.clearRect(0, 0, W, W);
+      ctx.putImageData(img, 0, 0);
+      return;
     }
-    ctx.clearRect(0, 0, W, W);
-    ctx.putImageData(img, 0, 0);
+    rects.forEach(r => {
+      const tx0 = Math.max(0, r.tx0 - 1), ty0 = Math.max(0, r.ty0 - 1), tx1 = Math.min(N - 1, r.tx1 + 1), ty1 = Math.min(N - 1, r.ty1 + 1);
+      const w = (tx1 - tx0 + 1) * AP, h = (ty1 - ty0 + 1) * AP;
+      const img = ctx.createImageData(w, h);
+      paint(img.data, w, tx0 * AP, ty0 * AP, tx0, ty0, tx1, ty1);
+      ctx.putImageData(img, tx0 * AP, ty0 * AP);   // putImageData nadpisuje też przezroczyste piksele, więc stare wypełnienie znika
+    });
   }
 
   /* ---------- MAPA: osady ---------- */
-  function villages(state, cv) {
+  // Pełne przerysowanie albo – gdy znamy zmienione osady – tylko prostokąty wokół nich: czyścimy prostokąt i rysujemy
+  // w nim wszystkie osady, które go dotykają, w tej samej kolejności co przy pełnym rysowaniu (wynik identyczny).
+  function villages(state, cv, changed) {
     const ctx = cv.getContext('2d'), p = pen(ctx);
-    ctx.clearRect(0, 0, cv.width, cv.height);
-    Object.values(state.villages).sort((a, b) => a.y - b.y || a.x - b.x).forEach(v => {
+    const sorted = Object.values(state.villages).sort((a, b) => a.y - b.y || a.x - b.x);
+    const draw = v => {
       const neutral = v.owner === null;
       const roof = neutral ? '#8a6b4d' : state.factions[v.owner].color;
       drawVillage(p, v, roof, neutral);
+    };
+    if (!changed || changed.length > 40) {
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      sorted.forEach(draw);
+      return;
+    }
+    // zasięg szkicu osady wokół jej środka (piksele grafiki)
+    const L = 20, T = 32, B = 24;
+    const boxes = changed.map(v => ({ x0: Math.round((v.x + 0.5) * AP) - L, x1: Math.round((v.x + 0.5) * AP) + L, y0: Math.round((v.y + 0.5) * AP) - T, y1: Math.round((v.y + 0.5) * AP) + B }));
+    boxes.forEach(r => {
+      ctx.save();
+      ctx.beginPath(); ctx.rect(r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0); ctx.clip();
+      ctx.clearRect(r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0);
+      sorted.forEach(v => {
+        const cx = Math.round((v.x + 0.5) * AP), cy = Math.round((v.y + 0.5) * AP);
+        if (cx + L > r.x0 && cx - L < r.x1 && cy + B > r.y0 && cy - T < r.y1) draw(v);
+      });
+      ctx.restore();
     });
   }
 

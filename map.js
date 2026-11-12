@@ -1,7 +1,8 @@
 /* =========================================================================
    Mini Plemiona – MAPA ŚWIATA
    Warstwy: teren (canvas) → terytoria (canvas) → osady (canvas)
-   → pola interaktywne (DOM, każde z danymi) → trasy wojsk (SVG).
+   → pola interaktywne (DOM, każde z danymi); trasy wojsk to osobna warstwa <canvas>
+   nad widokiem (patrz „trasy wojsk”), rysowana tylko dla tego, co widać na ekranie.
    Obsługa: przeciąganie, kółko myszy, szczypanie, przyciski, minimapa.
    ========================================================================= */
 (function (root) {
@@ -30,6 +31,7 @@
     if (!world) return;
     world.style.transform = 'translate(' + view.x + 'px,' + view.y + 'px) scale(' + view.s + ')';
     world.classList.toggle('far', view.s < 0.85);
+    fx.viewDirty = true; fx.lastView = root.performance.now(); fxKick();
     scheduleMini();
   }
   // Minimapa max. raz na klatkę – przy przeciąganiu i szczypaniu apply() leci po kilka razy na klatkę.
@@ -95,8 +97,7 @@
     html += '</div><div class="ruler corner"></div>' +
       '<div class="board" style="left:' + HEAD + 'px;top:' + HEAD + 'px;width:' + S + 'px;height:' + S + 'px">' +
       '<div class="layer-slot terrain"></div><div class="layer-slot territory"></div><div class="layer-slot villages"></div>' +
-      '<div class="tiles" style="grid-template-columns:repeat(' + N + ',' + TILE + 'px);grid-template-rows:repeat(' + N + ',' + TILE + 'px)"></div>' +
-      '<svg class="moves" viewBox="0 0 ' + S + ' ' + S + '" width="' + S + '" height="' + S + '" aria-hidden="true"></svg></div>';
+      '<div class="tiles" style="grid-template-columns:repeat(' + N + ',' + TILE + 'px);grid-template-rows:repeat(' + N + ',' + TILE + 'px)"></div></div>';
     world.innerHTML = html;
     world.style.width = worldSize() + 'px';
     world.style.height = worldSize() + 'px';
@@ -108,7 +109,7 @@
     world.querySelector('.territory').appendChild(territoryCv);
     world.querySelector('.villages').appendChild(villagesCv);
     layers = { terrain: terrainCv, territory: territoryCv, villages: villagesCv,
-      tiles: world.querySelector('.tiles'), moves: world.querySelector('.moves'), nv };
+      tiles: world.querySelector('.tiles'), nv };
     return true;
   }
 
@@ -152,14 +153,19 @@
     const tierKey = vs.map(v => v.id + ':' + v.owner + ':' + A.villageTier(E.points(v))).join('|');
     let miniDirty = !!layers.terrainDirty;
     layers.terrainDirty = false;
+    // Zmienione osady (inny właściciel / poziom wyglądu) przerysowują tylko swoje okolice – patrz Art.territory / Art.villages.
     if (rebuilt || layers.ownerKey !== ownerKey) {
       layers.ownerKey = ownerKey;
-      A.territory(state, layers.territory);   // najdroższa warstwa (piksel po pikselu)
+      const d = trackChanges(vs, rebuilt ? null : layers.ownerMap, v => v.owner);
+      layers.ownerMap = d.map;
+      A.territory(state, layers.territory, d.changed);
       miniDirty = true;
     }
     if (rebuilt || layers.tierKey !== tierKey) {
       layers.tierKey = tierKey;
-      A.villages(state, layers.villages);
+      const d = trackChanges(vs, rebuilt ? null : layers.tierMap, v => v.owner + ':' + A.villageTier(E.points(v)));
+      layers.tierMap = d.map;
+      A.villages(state, layers.villages, d.changed);
       miniDirty = true;
     }
     if (rebuilt) {
@@ -174,6 +180,12 @@
     }
     if (miniDirty || !miniBase) miniBase = A.minimap(state, layers.terrain, layers.territory, MINI * 2);
     drawMini();
+  }
+  // Porównuje osady z poprzednim stanem (id -> wartość); changed = null oznacza „brak podstaw, rysuj wszystko”.
+  function trackChanges(vs, prev, f) {
+    const map = new Map(), changed = prev ? [] : null;
+    vs.forEach(v => { const k = f(v); map.set(v.id, k); if (changed && prev.get(v.id) !== k) changed.push(v); });
+    return { map, changed: changed && prev.size <= map.size ? changed : null };
   }
   function villageSig(state, v) { return v.owner + '|' + E.points(v) + '|' + v.name + '|' + (pilotRole(state, v) || ''); }
   function syncVillageTiles(state, ctx) {
@@ -211,60 +223,219 @@
     }
   }
 
-  /* ---------- trasy wojsk ---------- */
-  // Marsze na tym samym odcinku (ten sam kierunek i rodzaj) dzielą jedną linię; każdy marsz ma tylko swój znacznik.
-  // Elementy SVG są trwałe (klucz = odcinek / id marszu), co tick przesuwamy znaczniki – animacja linii się nie
-  // restartuje (to było miganie), a dodanie lub zakończenie marszu nie przebudowuje reszty.
-  // Przy tłoku (>MANY_ROUTES odcinków) linie są cienkie i półprzezroczyste, bez obwódek i okręgów celu.
-  const SVG_NS = 'http://www.w3.org/2000/svg';
-  const MANY_ROUTES = 14;
+  /* ---------- trasy wojsk: jedna warstwa <canvas> ---------- */
+  // Setki marszów jako elementy SVG/DOM zamulały mapę (każdy znacznik = węzeł DOM, każda linia = animacja CSS,
+  // a wszystko siedziało w warstwie skalowanej razem ze światem). Teraz:
+  //  • dane marszów to zwykłe tablice (zero DOM), budowane raz na tick gry,
+  //  • rysuje je jedno płótno wielkości widoku (nie świata), ostre przy każdym zbliżeniu i ekranie Retina,
+  //  • linie i znaczniki są rysowane zbiorczo: jedna ścieżka na rodzaj marszu, a elementy poza ekranem pomijane,
+  //  • pozycje znaczników liczone z zegara gry w każdej klatce – marsz płynie, a nie skacze co sekundę,
+  //  • pętla rysująca śpi, gdy mapa jest ukryta, i rysuje rzadziej, gdy nic się nie przesuwa (tylko animacja kresek).
+  // Wygląd odpowiada motywowi „medieval” (grubsze trasy, znacznik jak żeton) i jest taki sam przy 3 i przy 3000 marszów.
+  const KINDS = ['sup', 'settle', 'trade', 'spy', 'ret', 'out', 'inc'];   // kolejność rysowania: wrogie ataki na wierzchu
+  const KIND_STYLE = {
+    out:    { line: '#8fb6ff', fill: '--blue',   fb: '#4f78b8', w: 4 },
+    ret:    { line: '#9fe0ae', fill: '--green',  fb: '#6f9a4a', w: 4 },
+    inc:    { line: '#ff9a92', fill: '--red',    fb: '#c2463c', w: 5 },
+    spy:    { line: '#d6c0ff', fill: '--violet', fb: '#a77bf3', w: 4 },
+    trade:  { line: '#ffe08a', fill: null,       fb: '#b88a26', w: 4 },
+    settle: { line: '#ffffff', fill: null,       fb: '#8a6b4d', w: 4 },
+    sup:    { line: '#8fe6d6', fill: '--teal',   fb: '#2fb5a2', w: 4 }
+  };
+  const MARK_R = 10, DEST_R = 22, DASH = [10, 8], MARCH = 18;   // MARCH = długość okresu kreskowania (px świata na sekundę)
+  const ANIM_MAX = 30;                                           // do tylu widocznych tras kreski „maszerują”; przy większym tłoku są nieruchome (i z pamięci podręcznej)
+  const IDLE_MS = 50;                                            // tyle (≈20 kl./s) wystarcza dla kresek i powolnego ruchu znaczników
+  const fx = { cv: null, ctx: null, dpr: 1, cw: 0, ch: 0, state: null, segs: [], marks: [], byKind: null, raf: 0, last: 0, viewDirty: true, colors: null,
+    ver: 0, sig: '', lastView: 0, animLines: true, cache: null };
+  const visSegs = KINDS.map(() => []);
+
+  function fxColors() {
+    const cs = root.getComputedStyle ? root.getComputedStyle(root.document.documentElement) : null;
+    const out = {};
+    KINDS.forEach(k => {
+      const st = KIND_STYLE[k], v = cs && st.fill ? cs.getPropertyValue(st.fill).trim() : '';
+      out[k] = v || st.fb;
+    });
+    return out;
+  }
+  function fxMount(vp, wd) {
+    fx.cv = root.document.createElement('canvas');
+    fx.cv.className = 'moves-cv';
+    fx.cv.setAttribute('aria-hidden', 'true');
+    vp.insertBefore(fx.cv, wd.nextSibling);
+    fx.ctx = fx.cv.getContext('2d');
+    fx.colors = fxColors();
+  }
+  function fxKick() {
+    if (!fx.raf && fx.cv && root.requestAnimationFrame) fx.raf = root.requestAnimationFrame(fxFrame);
+  }
+  function fxFrame(t) {
+    fx.raf = 0;
+    if (!viewport || !viewport.clientWidth) return;      // mapa ukryta (inny ekran) – pętla śpi do następnego renderu
+    const animating = fx.marks.length > 0;
+    if (fx.viewDirty || (animating && t - fx.last >= (fx.animLines ? IDLE_MS : IDLE_MS * 2))) {
+      fx.viewDirty = false; fx.last = t;
+      fxDraw(t);
+    }
+    if (animating || fx.viewDirty) fxKick();
+  }
+  function fxClock() {
+    const s = fx.state;
+    return s ? E.gameClock(s, Date.now()) : 0;
+  }
+
+  // Dane marszów: unikalne odcinki (marsze na tym samym odcinku dzielą linię) + lista znaczników.
   function renderMoves(state, list) {
-    if (!layers) return;
-    if (!layers.routes) layers.routes = new Map();
-    const routes = layers.routes;
-    const now = state.now;
+    if (!layers || !fx.cv) return;
+    const segMap = new Map(), segs = [], marks = [];
     const c = v => ({ x: (v.x + 0.5) * TILE, y: (v.y + 0.5) * TILE });
-    const seen = new Set();
     list.forEach(m => {
       const from = state.villages[m.from], to = m.to ? state.villages[m.to] : { x: m.x, y: m.y };
+      if (!from || !to) return;
       let a = c(from), b = c(to), kind;
       if (m.type === 'return' || m.type === 'trade-return') { kind = m.type === 'return' ? 'ret' : 'trade'; const t = a; a = b; b = t; }
       else if (m.owner !== 'player') kind = 'inc';
       else kind = { attack: 'out', spy: 'spy', transport: 'trade', settle: 'settle', support: 'sup' }[m.type] || 'out';
-      const prog = Math.max(0, Math.min(1, (now - m.start) / Math.max(1, m.arrive - m.start)));
-      const px = a.x + (b.x - a.x) * prog, py = a.y + (b.y - a.y) * prog;
-      const ang = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
-      const tf = 'translate(' + px.toFixed(1) + ' ' + py.toFixed(1) + ') rotate(' + ang.toFixed(1) + ')';
-      const id = m.id || (m.type + ':' + m.from + ':' + m.to + ':' + m.start);
-      const seg = kind + '|' + a.x + ',' + a.y + '|' + b.x + ',' + b.y;
-      let r = routes.get(seg);
-      if (!r) {
-        const g = document.createElementNS(SVG_NS, 'g');
-        g.setAttribute('class', 'route ' + kind);
-        g.innerHTML = '<line class="trail" x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '"/>' +
-          '<line class="path" x1="' + a.x + '" y1="' + a.y + '" x2="' + b.x + '" y2="' + b.y + '"/>' +
-          '<circle class="dest" cx="' + b.x + '" cy="' + b.y + '" r="22"/>';
-        layers.moves.appendChild(g);
-        r = { g, marks: new Map() };
-        routes.set(seg, r);
+      const key = kind + '|' + a.x + ',' + a.y + '|' + b.x + ',' + b.y;
+      let seg = segMap.get(key);
+      if (!seg) {
+        const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
+        seg = { key, k: KINDS.indexOf(kind), ax: a.x, ay: a.y, bx: b.x, by: b.y, dx, dy, cos: dx / len, sin: dy / len,
+          x0: Math.min(a.x, b.x) - DEST_R, x1: Math.max(a.x, b.x) + DEST_R, y0: Math.min(a.y, b.y) - DEST_R, y1: Math.max(a.y, b.y) + DEST_R };
+        segMap.set(key, seg); segs.push(seg);
       }
-      let mk = r.marks.get(id);
-      if (!mk) {
-        const el = document.createElementNS(SVG_NS, 'g');
-        el.setAttribute('class', 'mk');
-        el.innerHTML = '<circle class="marker" r="9"/><path class="arrow" d="M-4,-4 L5,0 L-4,4 Z"/>';
-        r.g.appendChild(el);
-        mk = { el, tf: null };
-        r.marks.set(id, mk);
+      marks.push({ seg, start: m.start, span: Math.max(1, m.arrive - m.start) });
+    });
+    fx.state = state; fx.segs = segs; fx.marks = marks;
+    fx.byKind = KINDS.map((_, k) => marks.filter(mk => mk.seg.k === k));
+    // wersja zestawu odcinków rośnie tylko, gdy naprawdę coś doszło lub zniknęło (przy tym samym zestawie bitmapa linii zostaje)
+    let sig = ''; for (let i = 0; i < segs.length; i++) sig += segs[i].key + ';';
+    if (sig !== fx.sig) { fx.sig = sig; fx.ver++; }
+    fx.viewDirty = true; fxKick();
+  }
+
+  // Linie (cienie, kreski, okręgi celu) jednego przebiegu rysowania.
+  function drawLines(ctx, groups, off) {
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 9;
+    ctx.beginPath();
+    for (let q = 0; q < KINDS.length; q++) { const a = groups[q]; for (let i = 0; i < a.length; i++) { ctx.moveTo(a[i].ax, a[i].ay); ctx.lineTo(a[i].bx, a[i].by); } }
+    ctx.stroke();
+    for (let q = 0; q < KINDS.length; q++) {
+      const a = groups[q]; if (!a.length) continue;
+      ctx.strokeStyle = KIND_STYLE[KINDS[q]].line;
+      ctx.setLineDash(DASH); ctx.lineDashOffset = off; ctx.lineWidth = KIND_STYLE[KINDS[q]].w;
+      ctx.beginPath();
+      for (let i = 0; i < a.length; i++) { ctx.moveTo(a[i].ax, a[i].ay); ctx.lineTo(a[i].bx, a[i].by); }
+      ctx.stroke();
+      ctx.setLineDash([5, 5]); ctx.lineDashOffset = 0; ctx.lineWidth = 3;
+      ctx.beginPath();
+      for (let i = 0; i < a.length; i++) { ctx.moveTo(a[i].bx + DEST_R, a[i].by); ctx.arc(a[i].bx, a[i].by, DEST_R, 0, 6.2832); }
+      ctx.stroke();
+    }
+    ctx.setLineDash([]); ctx.lineDashOffset = 0;
+  }
+  // Odcinki przecinające prostokąt (współrzędne planszy), pogrupowane wg rodzaju. Zwraca ich liczbę.
+  function cullSegs(x0, y0, x1, y1, out) {
+    out.forEach(a => { a.length = 0; });
+    let n = 0;
+    for (let i = 0; i < fx.segs.length; i++) {
+      const g = fx.segs[i];
+      if (g.x1 >= x0 && g.x0 <= x1 && g.y1 >= y0 && g.y0 <= y1) { out[g.k].push(g); n++; }
+    }
+    return n;
+  }
+  const cacheSegs = KINDS.map(() => []);
+  // Tłok: linie rysowane raz do bitmapy większej od widoku (zapas M px z każdej strony). Przesuwanie mapy to wtedy
+  // samo przesunięcie bitmapy (bez ponownego rysowania kresek – to było najdroższe), a zmiana zbliżenia na chwilę skaluje
+  // starą bitmapę i dopiero po uspokojeniu rysuje ją od nowa w ostrości.
+  function fxCacheDraw(ctx, dpr, cw, ch, s, calm) {
+    let c = fx.cache;
+    let M = Math.round(Math.max(cw, ch) * 0.25);
+    while ((cw + 2 * M) * (ch + 2 * M) * dpr * dpr > 16e6 && M > 60) M -= 20;   // bitmapa ≤ ~16 Mpx (≈64 MB), także na dużych monitorach
+    const fresh = c && c.ver === fx.ver && c.dpr === dpr && c.cw === cw && c.ch === ch && c.M === M;
+    const sameScale = c && c.s === s;
+    const dx = c ? view.x - c.x : 0, dy = c ? view.y - c.y : 0;
+    const inside = sameScale && Math.abs(dx) <= M && Math.abs(dy) <= M;
+    if (!(fresh && ((sameScale && inside) || !calm))) {
+      if (!c) c = fx.cache = { cv: root.document.createElement('canvas') };
+      const W = Math.round((cw + 2 * M) * dpr), H = Math.round((ch + 2 * M) * dpr);
+      if (c.cv.width !== W || c.cv.height !== H) { c.cv.width = W; c.cv.height = H; }
+      const g = c.cv.getContext('2d');
+      g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, W, H);
+      g.setTransform(dpr * s, 0, 0, dpr * s, dpr * (view.x + HEAD * s + M), dpr * (view.y + HEAD * s + M));
+      cullSegs(-(view.x + M) / s - HEAD - 6, -(view.y + M) / s - HEAD - 6, (cw + M - view.x) / s - HEAD + 6, (ch + M - view.y) / s - HEAD + 6, cacheSegs);
+      drawLines(g, cacheSegs, 0);
+      Object.assign(c, { ver: fx.ver, dpr, cw, ch, M, s, x: view.x, y: view.y });
+    }
+    // przeniesienie bitmapy na ekran: przy tym samym zbliżeniu czyste przesunięcie, inaczej skalowanie tymczasowe
+    const r = s / c.s;
+    const ex = view.x + HEAD * s - r * (c.x + HEAD * c.s), ey = view.y + HEAD * s - r * (c.y + HEAD * c.s);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (r === 1) ctx.drawImage(c.cv, Math.round((ex - M) * dpr), Math.round((ey - M) * dpr));
+    else ctx.drawImage(c.cv, (ex - M * r) * dpr, (ey - M * r) * dpr, c.cv.width * r, c.cv.height * r);
+    return r === 1;   // false = obraz tymczasowo rozmyty, trzeba wrócić po uspokojeniu widoku
+  }
+
+  function fxDraw(t) {
+    const cv = fx.cv, ctx = fx.ctx;
+    const dpr = Math.min(2, root.devicePixelRatio || 1);
+    const cw = viewport.clientWidth, ch = viewport.clientHeight;
+    if (cv.width !== Math.round(cw * dpr) || cv.height !== Math.round(ch * dpr)) {
+      cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
+    }
+    fx.dpr = dpr; fx.cw = cw; fx.ch = ch;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    if (!fx.marks.length) return;
+
+    const s = view.s, k = dpr * s;
+    const m = 6;   // zapas przy przycinaniu do widoku
+    const vx0 = -view.x / s - HEAD - m, vy0 = -view.y / s - HEAD - m;
+    const vx1 = (cw - view.x) / s - HEAD + m, vy1 = (ch - view.y) / s - HEAD + m;
+    const n = cullSegs(vx0, vy0, vx1, vy1, visSegs);
+    fx.animLines = n <= ANIM_MAX;
+    const now = root.performance.now();
+    if (fx.animLines) {
+      // mało tras: pełne rysowanie co klatkę, kreski maszerują
+      ctx.setTransform(k, 0, 0, k, dpr * (view.x + HEAD * s), dpr * (view.y + HEAD * s));
+      drawLines(ctx, visSegs, -((t / 1000) * MARCH) % MARCH);
+    } else {
+      // dużo tras: linie z bitmapy; po zmianie zbliżenia wróć do ostrego obrazu, gdy widok się uspokoi
+      const sharp = fxCacheDraw(ctx, dpr, cw, ch, s, now - fx.lastView > 140);
+      if (!sharp) fx.viewDirty = true;
+    }
+
+    // znaczniki: pozycja z zegara gry (płynnie między tickami), tylko te w widoku
+    ctx.setTransform(k, 0, 0, k, dpr * (view.x + HEAD * s), dpr * (view.y + HEAD * s));
+    const gt = fxClock(), rr = MARK_R + 2;
+    const ox = [];
+    for (let q = 0; q < KINDS.length; q++) {
+      const list = fx.byKind[q]; if (!list.length) continue;
+      ox.length = 0;
+      ctx.beginPath();
+      for (let i = 0; i < list.length; i++) {
+        const mk = list[i], g = mk.seg;
+        let p = (gt - mk.start) / mk.span; p = p < 0 ? 0 : p > 1 ? 1 : p;
+        const x = g.ax + g.dx * p, y = g.ay + g.dy * p;
+        if (x < vx0 - rr || x > vx1 + rr || y < vy0 - rr || y > vy1 + rr) continue;
+        ctx.moveTo(x + MARK_R, y); ctx.arc(x, y, MARK_R, 0, 6.2832);
+        ox.push(x, y, g.cos, g.sin);
       }
-      if (mk.tf !== tf) { mk.tf = tf; mk.el.setAttribute('transform', tf); }
-      seen.add(seg + '#' + id);
-    });
-    routes.forEach((r, seg) => {
-      r.marks.forEach((mk, id) => { if (!seen.has(seg + '#' + id)) { mk.el.remove(); r.marks.delete(id); } });
-      if (!r.marks.size) { r.g.remove(); routes.delete(seg); }
-    });
-    layers.moves.classList.toggle('many', routes.size > MANY_ROUTES);
+      if (!ox.length) continue;
+      ctx.fillStyle = fx.colors[KINDS[q]]; ctx.strokeStyle = '#2b1d10'; ctx.lineWidth = 3;
+      ctx.fill(); ctx.stroke();
+      ctx.beginPath();
+      for (let i = 0; i < ox.length; i += 4) {   // strzałka: trójkąt (-4,-4) (5,0) (-4,4) obrócony o kąt odcinka
+        const x = ox[i], y = ox[i + 1], c = ox[i + 2], sn = ox[i + 3];
+        ctx.moveTo(x - 4 * c + 4 * sn, y - 4 * sn - 4 * c);
+        ctx.lineTo(x + 5 * c, y + 5 * sn);
+        ctx.lineTo(x - 4 * c - 4 * sn, y - 4 * sn + 4 * c);
+        ctx.closePath();
+      }
+      ctx.fillStyle = '#fff'; ctx.fill();
+    }
   }
 
   /* ---------- minimapa ---------- */
@@ -362,6 +533,7 @@
 
   function mount(vp, wd, miniCanvas, selectCb, activateCb) {
     viewport = vp; world = wd; onSelect = selectCb; onActivate = activateCb; mini = miniCanvas;
+    fxMount(vp, wd);
     vp.addEventListener('pointerdown', onDown);
     vp.addEventListener('pointermove', onMove);
     vp.addEventListener('pointerup', onUp);
@@ -390,7 +562,7 @@
     }
   }
 
-  function reset() { builtFor = null; view.fitted = false; }
+  function reset() { builtFor = null; view.fitted = false; fx.segs = []; fx.marks = []; fx.byKind = null; fx.viewDirty = true; fxKick(); }
   // Na telefonie: jeśli panel szczegółów zasłania wybrane pole, przesuń mapę tak, by pole było nad panelem.
   function revealAbove(x, y, coveredFromBottom) {
     bottomInset = coveredFromBottom;

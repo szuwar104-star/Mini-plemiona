@@ -361,13 +361,6 @@ table.units.rep td.uname .ico { width: 22px; height: 22px; margin: 0 .35rem 0 0;
 .tile.under-attack::after { background: linear-gradient(180deg, #e0574b, #8e2a20); }
 .tile.targeted::after { background: linear-gradient(180deg, #6f97d6, #2f548f); }
 
-/* Trasy przemarszu: grubsze, z ciemnym obrysem, znacznik jak żeton */
-.route .trail { stroke-width: 9; stroke-opacity: .5; }
-.route .path { stroke-width: 4; }
-.route .marker { r: 10; stroke: #2b1d10; stroke-width: 3; }
-.route .dest { stroke-width: 3; }
-.route.inc .path { stroke-width: 5; }
-
 /* Narzędzia mapy: skrzynka z okuciami, mniejsza, przy krawędzi */
 .map-tools { right: 10px; top: 10px; gap: 4px; padding: 4px; border-radius: 4px; background: linear-gradient(180deg, #2b2219, #1a140f); border: 1px solid #0b0806; box-shadow: inset 0 0 0 1px var(--line-2), 0 4px 12px rgba(0, 0, 0, .5); }
 .mbtn { width: 36px; height: 36px; border-radius: 3px; background: rgba(0, 0, 0, .25); box-shadow: inset 0 0 0 1px var(--line); color: var(--gold-2); font-family: var(--serif); }
