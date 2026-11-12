@@ -289,27 +289,32 @@
     if (settlersTotal(state, vs) > 0) return null;
     const U = C.UNITS.settler, ups = E.upgradesOf(state, 'player');
     let best = null, eligible = 0;
+    const why = {};                                           // powód odrzucenia -> liczba wiosek (do statusu w oknie Autopilota)
+    const no = (k) => { why[k] = (why[k] || 0) + 1; };
     vs.forEach(v => {
-      if (threatened[v.id] || v.buildings.hq < U.hq || v.buildings.barracks < U.barracks) return;
-      if (E.villageDefense(v, null, ups) < E.points(v) * p.defLevel * P().settleDefMin) return;
-      if (v.recruitQueue.length >= E.queueMax(v, 'recruit')) return;
-      if (E.RES.some(r => U.cost[r] > E.storageCap(v))) return;
+      if (threatened[v.id]) return no('atakowane');
+      if (v.buildings.hq < U.hq) return no('Ratusz poniżej ' + U.hq);
+      if (v.buildings.barracks < U.barracks) return no('brak Koszar');
+      if (E.villageDefense(v, null, ups) < E.points(v) * p.defLevel * P().settleDefMin) return no('za słaba obrona');
+      if (v.recruitQueue.length >= E.queueMax(v, 'recruit')) return no('pełna kolejka wojska');
+      if (E.RES.some(r => U.cost[r] > E.storageCap(v))) return no('za mały magazyn');
       eligible++;
       if (!findSpotFor(state, v, vs, spotOf)) return;      // wolne pole musi być osiągalne z TEJ wioski (a nie tylko z najbogatszej)
       const ready = Math.min.apply(null, E.RES.map(r => v.res[r] / U.cost[r]));
       if (!best || ready > best.ready) best = { v, ready };
     });
     if (!best) {
-      settleWhy(state, p, t, eligible ? 'brak wolnego pola na równinie w zasięgu wiosek (poza polami zbyt blisko cudzych wiosek)' : 'żadna wioska nie spełnia warunków (Ratusz 4, Koszary 1, obrona, magazyn, brak ataku)');
+      settleWhy(state, p, t, eligible ? 'brak wolnego pola na równinie w zasięgu wiosek (poza polami zbyt blisko cudzych wiosek)'
+        : 'żadna wioska nie spełnia warunków: ' + Object.keys(why).map(k => k + ' ×' + why[k]).join(', '));
       return null;
     }
     const ri = E.recruitInfo(state, best.v, 'settler');
     if (ri.ok && ri.max >= 1 && E.queueRecruit(state, best.v, 'settler', 1, t).ok !== false) {
-      p.settleInfo = '';
+      p.settleInfo = 'szkolenie osadnika';
       note(state, p, t, 'Szkolenie osadnika w ' + best.v.name);
       return null;
     }
-    settleWhy(state, p, t, 'odkłada surowce na osadnika w ' + best.v.name);
+    settleWhy(state, p, t, 'odkłada surowce na osadnika w ' + best.v.name + (ri.code === 'pop' ? ' (brak miejsca na farmie)' : ''));
     return { id: best.v.id, cost: U.cost };       // jeszcze nie stać – ta wioska odkłada surowce
   }
 

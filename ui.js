@@ -1256,7 +1256,7 @@
       '<label class="field">Sprawdzaj co <select data-aevery>' + C.AUTO.everyMin.map(m => '<option value="' + m + '"' + (m === Number(g.everyMin) ? ' selected' : '') + '>' + m + ' min</option>').join('') + '</select></label>' +
       '<label class="chk"><input type="checkbox" data-acoins' + (g.coins ? ' checked' : '') + '>Kupuj monety w wiosce centralnej (maks. limitu, najobfitszym surowcem)</label>' +
       (hub && !((hub.buildings.market || 0) > 0) && g.coins ? '<p class="why">Wioska centralna nie ma Targowiska – monet nie kupi. Wysyłające wioski też potrzebują Targowiska (kupcy).</p>' : '') +
-      '<div class="summary"><div><span>Stan</span><b>' + (a && a.on ? 'włączone' : 'wyłączone') + '</b></div>' +
+      '<div class="summary">' + (g.settle && p && p.settleInfo ? '<div class="wide"><span>Osadnicy – status</span><b>' + esc(p.settleInfo) + '</b></div>' : '') + '<div><span>Stan</span><b>' + (a && a.on ? 'włączone' : 'wyłączone') + '</b></div>' +
       (a && a.on && a.next ? '<div><span>Następny przegląd</span><b>' + clock(a.next) + '</b></div>' : '') +
       (ago !== null ? '<div class="wide"><span>Ostatnio (' + ago + ' min temu)</span><b>' + (a.last.sent ? a.last.sent + ' konwojów, ' + fmt(a.last.total) + ' surowców' : 'nic do wysłania') +
         (a.last.coins ? ', ' + a.last.coins + ' monet' : '') + '</b></div>' : '') + '</div>' +
@@ -1289,7 +1289,7 @@
       '<label class="chk"><input type="checkbox" data-pdefend' + (g.defend ? ' checked' : '') + '>Wysyłaj obronę z innych wiosek do atakowanych (po ataku wraca)</label>' +
       '<label class="chk"><input type="checkbox" data-ptech' + (g.tech ? ' checked' : '') + '>Kupuj monety z nadwyżek surowców i badaj Technologię (wymaga Targowiska)</label>' +
       '<label class="chk"><input type="checkbox" data-pset' + (g.settle ? ' checked' : '') + '>Szkol osadników i zakładaj nowe wioski w pobliżu (jeden osadnik naraz)</label>' +
-      '<label class="field">Maks. liczba wiosek (puste = bez limitu)<input type="number" inputmode="numeric" min="1" max="200" placeholder="' + E.winVillages(s) + '" data-psmax value="' + nz(g.settleMax) + '"></label>' +
+      '<label class="field">Maks. liczba wiosek (puste = bez limitu)<input type="number" inputmode="numeric" min="1" max="200" placeholder="bez limitu" data-psmax value="' + nz(g.settleMax) + '"></label>' +
       '<label class="chk"><input type="checkbox" data-pconv' + (g.convoy ? ' checked' : '') + '>Wysyłaj nadwyżki surowców do stolicy (Konwoje co 15 min)</label>' +
       '<label class="field">Stolica (wioska centralna) <select data-phub>' + E.villagesOf(s, 'player').sort((x, y) => x.name.localeCompare(y.name, 'pl')).map(v =>
         '<option value="' + v.id + '"' + (v.id === g.hub ? ' selected' : '') + '>' + esc(v.name) + ' ' + xy(v.x, v.y) + ((v.buildings.market || 0) > 0 ? '' : ' – bez Targowiska') + '</option>').join('') + '</select></label>' +
