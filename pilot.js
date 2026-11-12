@@ -16,7 +16,7 @@
       zwykła armia). Uderzenie = pierwsza fala + kolejne z innych wiosek tuż po niej, by poparcie spadło do 0 za jednym razem.
    6. Grabież (opcja „farm”) – grabież wiosek wokoło, bez Dowódców.
    7. Podział wiosek (opcja „split”) – wioski dzielą się na OFENSYWNE (tylko wojska ataku, z nich wychodzą wszystkie ataki
-      i grabieże) i DEFENSYWNE (tylko obrona; stąd idą posiłki i garnizony, w tym dla wiosek ofensywnych). Na jedną
+      i grabieże) i DEFENSYWNE (tylko obrona, szkolona aż do zapełnienia farmy w 90%; stąd idą posiłki i garnizony, w tym dla wiosek ofensywnych). Na jedną
       ofensywną przypada splitRatio defensywnych. Armia ataku z wiosek defensywnych przechodzi na stałe do ofensywnych.
    Bot nie podgląda sił wroga bez zwiadu (tak jak Ty: „siła nieznana”). Wszystkie liczby: C.PILOT.
    ========================================================================= */
@@ -267,8 +267,10 @@
     if (v.recruitQueue.length >= Math.min(P().recruitDepth, E.queueMax(v, 'recruit'))) return;
     const ups = E.upgradesOf(state, 'player');
     const full = storeRatio(v) > P().storeSpend;
+    // wioska defensywna szkoli obrońców, dopóki farma nie jest zapełniona w split.defPopFill (liczy też kolejkę) – zanim surowce trafią na monety
+    const fillDef = roleOf(p, v) === 'def' && popRatio(state, v) < P().split.defPopFill;
     const free = threatened || full;          // bez rezerwy na budynek
-    const share = free ? 1 : P().recruitShare;
+    const share = free || fillDef ? 1 : P().recruitShare;
     const spend = {};
     E.RES.forEach(r => { spend[r] = Math.max(0, v.res[r] - (reserve && !free ? reserve[r] : 0)) * share; });
     const afford = (U, cap) => Math.min.apply(null, E.RES.map(r => U.cost[r] > 0 ? Math.floor(spend[r] / U.cost[r]) : Infinity).concat([cap]));
@@ -291,7 +293,7 @@
     let role;
     if (split === 'off') role = 'att';                       // wioska ofensywna: tylko jednostki ataku (obronę dostarczają defensywne)
     else if (needDef) role = 'def';
-    else if (split === 'def') { if (full) role = 'def'; else return; }   // defensywna: nigdy jednostek ataku
+    else if (split === 'def') { if (full || fillDef) role = 'def'; else return; }   // defensywna: nigdy jednostek ataku
     else if (p.recruit === 'balanced' || p.attack || p.farm) role = 'att';
     else if (full) role = 'def';            // pełny magazyn: nadwyżka idzie na dodatkową obronę, nic się nie marnuje
     else return;

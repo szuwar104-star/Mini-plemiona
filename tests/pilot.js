@@ -565,5 +565,29 @@ function twoVillages() {
   ok(defHave > 0 && offNew === 0, 'wioska z samą ofensywą szkoli obrońców, nie kolejną ofensywę (' + defHave + ' obrońców, +' + offNew + ' ofensywy)');
 }
 
+// 18. Wioska defensywna szkoli obrońców aż do zapełnienia farmy w 90%, także gdy cel obrony jest spełniony, a magazyn niepełny
+{
+  const s = E.newGame(T0, 31, 'normal', 'small');
+  Object.values(s.factions).forEach(f => { if (f.ai) f.nextThink = 1e15; });
+  const A = E.villagesOf(s, 'player')[0];
+  A.buildings.farm = 20; A.buildings.barracks = 5; A.buildings.storage = 20; A.buildings.hq = 15;
+  Object.keys(s.villages).forEach(id => { if (s.villages[id].owner !== 'player') delete s.villages[id]; });
+  const vs = [A];
+  for (let i = 1; i < 4; i++) {
+    const v = JSON.parse(JSON.stringify(A));
+    Object.assign(v, { id: 'vf' + i, name: 'F' + i, x: A.x + i, y: A.y + 1, buildQueue: [], recruitQueue: [], support: {}, lastTick: s.now });
+    s.villages[v.id] = v; vs.push(v);
+  }
+  vs.forEach(v => { v.units = Object.assign(E.emptyUnits(), { scout: 3 }); v.res = { wood: 30000, clay: 30000, iron: 30000 }; });
+  vs[0].units.axe = 400;
+  MP.Pilot.configure(s, { on: true, build: false, tech: false, recruit: 'balanced', split: true, splitRatio: 3, garrison: false, defLevel: 1 }, s.now);
+  E.advance(s, s.now + 6 * HOUR);
+  const roles = s.pilot.roles || {};
+  const defV = vs.filter(v => roles[v.id] === 'def');
+  ok(defV.length === 3, 'trzy wioski defensywne (' + defV.length + ')');
+  ok(defV.every(v => E.villageDefenseDef(v, null, null) > E.points(v) * 1), 'cel obrony (defLevel 1) jest spełniony, więc samo to nie wymusza szkolenia');
+  ok(defV.every(v => E.popUsed(s, v) / E.popCap(v) >= C.PILOT.split.defPopFill - 0.02 || v.res.wood < 200 || v.res.clay < 200 || v.res.iron < 200), 'wioski defensywne zapełniają farmę do 90% (' + defV.map(v => (E.popUsed(s, v) / E.popCap(v)).toFixed(2)).join(', ') + ')');
+}
+
 if (fails) { console.error('\nBłędy: ' + fails); process.exit(1); }
 console.log('\nWszystkie testy Autopilota przeszły.');

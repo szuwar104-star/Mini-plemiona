@@ -273,6 +273,7 @@
       // Podział wiosek (opcja „split”): wioski ofensywne szkolą tylko jednostki ataku i stąd wychodzą ataki/grabieże,
       // wioski defensywne tylko obronę (posiłki i garnizony, także dla ofensywnych). Wymaga działań ofensywnych (podbój, grabież albo tryb zbalansowany).
       split: {
+        defPopFill: 0.9,         // wioska defensywna szkoli obrońców, dopóki farma (z kolejką) nie jest zapełniona w tym stopniu
         ratio: 3,                // domyślnie: na 1 wioskę ofensywną przypada tyle defensywnych
         offGarrison: 0.5         // cel garnizonu przygranicznej wioski ofensywnej = zwykły cel garnizonu × ta wartość (obrona idzie z defensywnych)
       },
