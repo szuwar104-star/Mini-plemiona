@@ -1026,3 +1026,13 @@ html, body { max-width: 100%; overflow-x: clip; }
 .tags .rtag { margin-left: 0; }
 .rtag .ico { width: 1em; height: 1em; }
 .rolefilter { align-items: center; gap: .4rem; }
+
+/* Epoka II i Cud świata */
+.epoch-head { border-left: 4px solid var(--blue); }
+.epoch-head h2 { margin-top: 0; }
+.tech-branch.epoch-locked { opacity: .62; }
+.tech-branch.epoch-locked .tech-tree { filter: grayscale(.6); }
+.epoch-note { display: flex; align-items: center; gap: 6px; margin: 4px 0 8px; }
+.wonder-card { grid-column: 1 / -1; border-left: 4px solid var(--gold, #d4a53a); }
+.wonder-card .goal { margin: 6px 0 8px; }
+.wonder-line { display: flex; align-items: center; gap: 6px; margin: 6px 0 0; }

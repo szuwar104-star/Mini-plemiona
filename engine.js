@@ -27,7 +27,7 @@
   function cleanUnits(u) { const o = emptyUnits(); UNITS.forEach(k => { o[k] = Math.max(0, Math.floor(Number(u && u[k]) || 0)); }); return o; }
   function sumUnits(u) { return UNITS.reduce((s, k) => s + (u[k] || 0), 0); }
   // Ulepszenia z Kuźni: `ups` = { jednostka: poziom } właściciela (albo null). Każdy poziom daje +bonusPerLevel do ataku i obrony.
-  function upgradeMult(ups, k) { return 1 + C.TECH.unitBonus * ((ups && ups[k]) || 0); }
+  function upgradeMult(ups, k) { return 1 + C.TECH.unitBonus * ((ups && ups[k]) || 0) + ((ups && ups['__u2_' + k]) || 0); }
   function attackPower(u, ups) { return UNITS.reduce((s, k) => s + (u[k] || 0) * C.UNITS[k].att * upgradeMult(ups, k), 0); }
   // Ile "taranów" liczą jednostki przy burzeniu muru (Taran i Taran z bali mają wallPower w config.js).
   // Machiny oblężnicze (badanie gracza): tarany gracza liczą się za więcej przy burzeniu muru.
@@ -57,8 +57,13 @@
     const f = state.factions[owner];
     if (!f) return null;
     const lv = id => (f.tech && f.tech[id]) ? f.tech[id] * techNode(id).effect.per : 0;
-    const fort = lv('fort'), militia = lv('militia');
-    return fort || militia ? Object.assign({}, f.upgrades, { __fort: fort, __militia: militia }) : (f.upgrades || null);
+    const fort = lv('fort') + lv('e2_fort'), militia = lv('militia') + lv('e2_militia');
+    // Epoka II: dodatkowy bonus jednostek (badania 'unit2') idzie do osobnych kluczy __u2_<jednostka>.
+    let extra = null;
+    if (f.tech) C.TECH.nodes.forEach(n => {
+      if (n.effect.type === 'unit2' && f.tech[n.id]) { extra = extra || {}; extra['__u2_' + n.effect.unit] = f.tech[n.id] * C.TECH.unit2Bonus; }
+    });
+    return fort || militia || extra ? Object.assign({}, f.upgrades, extra, { __fort: fort, __militia: militia }) : (f.upgrades || null);
   }
   function newId(state, prefix) { return prefix + (state.nextId++); }
   function tileAt(state, x, y) { return state.map.tiles[y * state.map.size + x]; }
@@ -265,7 +270,7 @@
   let D = C.DIFFICULTY[C.DEFAULT_DIFFICULTY];
   // Efekty badań gracza (AI nie ma technologii) liczone przy każdym tiku świata – tak samo jak poziom trudności (D).
   let FX = { storage: 1, exchange: C.MARKET.exchangeRate, build: 1, recruit: 1, mint: 0, prod: 1, prodWood: 1, prodClay: 1, prodIron: 1, carry: 1, hide: 0, pop: 1,
-    queue: 0, march: 1, heal: 0, fort: 0, command: 0, faith: 0, militia: 0, siege: 1, caravan: 1, tactics: 0 };
+    queue: 0, march: 1, heal: 0, fort: 0, command: 0, faith: 0, militia: 0, siege: 1, caravan: 1, tactics: 0, wonderTime: 1, wonderCost: 1 };
   function techNode(id) { return C.TECH.nodes.find(n => n.id === id) || null; }
   function techLevel(f, node) {
     if (!f) return 0;
@@ -275,14 +280,17 @@
     const base = kind === 'build' ? C.BUILD_QUEUE_MAX : C.RECRUIT_QUEUE_MAX;
     return base + (v && v.owner === 'player' ? FX.queue : 0);
   }
+  // Epoka II odblokowuje się po ukończeniu całej Epoki I (każde badanie epoki niższej na maksymalnym poziomie).
+  function epochDone(f, epoch) { return C.TECH.nodes.every(n => (n.epoch || 1) >= epoch || techLevel(f, n) >= n.max); }
   function techCost(node, level) { return Math.max(1, Math.round(node.base * Math.pow(node.factor, level - 1))); }
   function techEffects(f) {
     const fx = { storage: 1, exchange: C.MARKET.exchangeRate, build: 1, recruit: 1, mint: 0, prod: 1, prodWood: 1, prodClay: 1, prodIron: 1, carry: 1, hide: 0, pop: 1,
-      queue: 0, march: 1, heal: 0, fort: 0, command: 0, faith: 0, militia: 0, siege: 1, caravan: 1, tactics: 0 };
+      queue: 0, march: 1, heal: 0, fort: 0, command: 0, faith: 0, militia: 0, siege: 1, caravan: 1, tactics: 0, wonderTime: 1, wonderCost: 1 };
     C.TECH.nodes.forEach(n => {
       const lvl = techLevel(f, n);
-      if (lvl && n.effect.type !== 'unit') fx[n.effect.type] += n.effect.per * lvl;
+      if (lvl && n.effect.type !== 'unit' && n.effect.type !== 'unit2') fx[n.effect.type] += n.effect.per * lvl;
     });
+    fx.wonderTime = Math.max(0.3, fx.wonderTime); fx.wonderCost = Math.max(0.5, fx.wonderCost);
     fx.build = Math.max(0.3, fx.build); fx.recruit = Math.max(0.3, fx.recruit);
     fx.march = Math.max(0.5, fx.march); fx.heal = Math.min(0.3, fx.heal); fx.faith = Math.min(0.4, fx.faith); fx.tactics = Math.min(0.8, fx.tactics);
     return fx;
@@ -445,6 +453,71 @@
     return info;
   }
 
+  /* ---------- Cud świata ---------- */
+  // Poziomy Cudu stoją w v.buildings.wonder, a budowa idzie wspólną kolejką budowy wioski (wpis building: 'wonder').
+  // Zdobycie wioski przenosi Cud wraz z poziomami (kolejka budowy jest wtedy czyszczona jak zawsze).
+  function wonderLevel(v) { return (v && v.buildings && v.buildings.wonder) || 0; }
+  function wonderQueued(v) { return v.buildQueue.filter(e => e.building === 'wonder').length; }
+  // Wioska właściciela z Cudem (najwyższy poziom, liczony razem z kolejką); null, gdy nie ma.
+  function wonderVillage(state, owner) {
+    let best = null;
+    villagesOf(state, owner).forEach(v => {
+      const n = wonderLevel(v) + wonderQueued(v);
+      if (n > 0 && (!best || n > best.n)) best = { v, n };
+    });
+    return best && best.v;
+  }
+  function wonderTime(v, level) {
+    const W = C.WONDER, mine = v.owner === 'player';
+    const aiSlow = mine ? 1 : C.WONDER.ai.slow / Math.max(0.3, (D && D.aiTech) || 1);   // AI buduje wolniej (zwłaszcza na łatwiejszych poziomach)
+    return Math.round(W.time[level] * C.BUILDINGS.hq.buildSpeed[v.buildings.hq] * (mine ? FX.build * FX.wonderTime : aiSlow) * 1000);
+  }
+  function wonderCost(v, level) {
+    const m = v.owner === 'player' ? FX.wonderCost : 1, c = Math.ceil(C.WONDER.cost[level] * m);
+    return { wood: c, clay: c, iron: c };
+  }
+  function wonderInfo(state, v) {
+    const W = C.WONDER, cur = wonderLevel(v), target = cur + wonderQueued(v) + 1;
+    const info = { key: 'wonder', target, cost: null, time: 0, ok: false, code: '', reason: '' };
+    if (target > W.maxLevel) { info.code = 'max'; info.reason = 'Maksymalny poziom'; return info; }
+    info.cost = wonderCost(v, target);
+    info.time = wonderTime(v, target);
+    if (v.buildings.hq < W.hq) { info.code = 'hq'; info.reason = 'Wymaga Ratusza poz. ' + W.hq; return info; }
+    if ((v.buildings.market || 0) < W.market) { info.code = 'market'; info.reason = 'Wymaga Targowiska poz. ' + W.market; return info; }
+    if (cur + wonderQueued(v) === 0) {
+      const other = wonderVillage(state, v.owner);
+      if (other && other.id !== v.id) { info.code = 'one'; info.reason = 'Cud świata już rośnie w wiosce ' + other.name; return info; }
+    }
+    if (v.buildQueue.length >= queueMax(v, 'build')) { info.code = 'queue'; info.reason = 'Kolejka jest pełna'; return info; }
+    if (RES.some(r => info.cost[r] > storageCap(v))) { info.code = 'storage'; info.reason = 'Za mały magazyn – rozbuduj Ratusz'; return info; }
+    if (!canAfford(v, info.cost)) { info.code = 'resources'; info.reason = 'Brak surowców'; return info; }
+    info.ok = true;
+    return info;
+  }
+  function queueWonder(state, v, t) {
+    tickVillage(state, v, t);
+    const info = wonderInfo(state, v);
+    if (!info.ok) return info;
+    pay(v, info.cost);
+    const last = v.buildQueue[v.buildQueue.length - 1];
+    const start = last ? Math.max(t, last.end) : t;
+    v.buildQueue.push({ id: newId(state, 'b'), building: 'wonder', level: info.target, start, end: start + info.time });
+    return info;
+  }
+  // Po ukończeniu poziomu Cudu: gracz wygrywa przy maxLevel; w trybie Wyścig tak samo AI (porażka gracza), z ostrzeżeniem przy warnShare.
+  function checkWonder(state, v, t) {
+    const W = C.WONDER, owner = v.owner, lvl = wonderLevel(v);
+    if (state.ended || owner === null) return;
+    if (owner === 'player') { if (lvl >= W.maxLevel) state.ended = { type: 'victory', wonder: true, time: t, seen: false }; return; }
+    if (!state.race) return;
+    if (lvl >= W.maxLevel) { state.ended = { type: 'defeat', by: owner, wonder: true, villages: villagesOf(state, owner).length, time: t, seen: false }; return; }
+    state.wonderWarn = state.wonderWarn || {};
+    if (lvl >= Math.ceil(W.maxLevel * W.warnShare) && !state.wonderWarn[owner]) {
+      state.wonderWarn[owner] = true;
+      notice(state, t, 'danger', ownerName(state, owner) + ' ma Cud świata na poziomie ' + lvl + ' z ' + W.maxLevel + ' w wiosce ' + v.name + ' (' + v.x + '|' + v.y + ') – zdobądź ją!');
+    }
+  }
+
   /* ---------- rekrutacja ---------- */
   function recruitPer(v, unit) {
     return Math.round(C.UNITS[unit].time * C.BUILDINGS.barracks.recruitSpeed[v.buildings.barracks] * (v.owner === 'player' ? FX.recruit : 1) * 1000);
@@ -590,6 +663,7 @@
     info.target = info.level + 1;
     if (info.level >= node.max) { info.code = 'max'; info.reason = 'Maksymalny poziom'; return info; }
     info.cost = techCost(node, info.target);
+    if ((node.epoch || 1) > 1 && !epochDone(f, node.epoch)) { info.code = 'epoch'; info.reason = 'Najpierw ukończ całą Epokę I'; return info; }
     if (node.req) {
       const parent = techNode(node.req.id);
       info.req = { id: parent.id, name: parent.name, min: node.req.min, have: techLevel(f, parent) };
@@ -1386,6 +1460,7 @@
           attacker: newOwner, defender: prevOwner, toName: v.name, toX: v.x, toY: v.y, to: v.id });
       }
     }
+    if (newOwner !== null && wonderLevel(v)) checkWonder(state, v, t);
     checkWin(state, newOwner, t);
   }
 
@@ -1437,7 +1512,10 @@
       tickVillage(state, v, t);   // produkcja do chwili zmiany poziomu liczona po starej stawce
       const e = v.buildQueue.shift();
       v.buildings[e.building] = e.level;
-      if (v.owner === 'player') notice(state, t, 'info', C.BUILDINGS[e.building].name + ' w ' + v.name + ' – poziom ' + e.level);
+      if (e.building === 'wonder') {
+        if (v.owner === 'player') notice(state, t, 'info', 'Cud świata w ' + v.name + ' – poziom ' + e.level + ' z ' + C.WONDER.maxLevel);
+        checkWonder(state, v, t);
+      } else if (v.owner === 'player') notice(state, t, 'info', C.BUILDINGS[e.building].name + ' w ' + v.name + ' – poziom ' + e.level);
     } else if (ev.kind === 'move') {
       const i = state.movements.findIndex(m => m.id === ev.ref);
       const m = state.movements.splice(i, 1)[0];
@@ -1504,8 +1582,8 @@
     exchange, aiExchange, aiExchangeRate, aiExchangeMax, exchangeMax, merchantCap, ramEff, exchangeGet, exchangeRate, exchangeQuick, coinQuick, buyCoinsAll, mintLimit, mintTokens, buyCoins, techInfo, researchTech, techNode, techLevel, techCost, techEffects,
     tileAt, villagesOf, points, unitPoints, armyOf, accountPower, addKills, killsOf, statsOf, ranking, ownerName, ownerColor,
     newGame, worldOf, winVillages, productionPerMin, storageCap, popCap, popMult, popUsed, tickVillage,
-    notice, checkWin,
-    buildInfo, queueBuild, recruitInfo, queueRecruit, recruitPer,
+    notice, checkWin, changeOwner,
+    buildInfo, queueBuild, wonderLevel, wonderQueued, wonderVillage, wonderInfo, queueWonder, checkWonder, epochDone, recruitInfo, queueRecruit, recruitPer,
     travelTime, slowest, sendAttack, sendSpy, advance, nextEvent, gameClock, pauseGame, resumeGame,
     unitsPop, supportRoom, sendSupport, withdrawSupport, defenders, defenseFrom, villageDefense, villageDefenseDef,
     merchantsTotal, merchantsBusy, merchantsFree, merchantTime, sendTransport, planGather, sendGather, planTroops, sendTroops, planRecruitAll, recruitAll, incomingRes, settleCheck, sendSettler

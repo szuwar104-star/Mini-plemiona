@@ -124,6 +124,7 @@
   /* ---------- ekran: WIOSKA ---------- */
   // Bonusy z technologii: efekt końcowy (z badaniami i trudnością) + mała etykieta z procentem bonusu.
   const pctOf = x => Math.round(x * 100);
+  const buildName = k => k === 'wonder' ? C.WONDER.name : C.BUILDINGS[k].name;
   const bonusTag = (pct, why) => pct ? ' <span class="tb" title="Bonus: ' + (why || 'technologia') + '">' + (pct > 0 ? '+' : '−') + Math.abs(pct) + '%</span>' : '';
   function effectText(v, key, next) {
     const B = C.BUILDINGS[key], L = v.buildings[key], s = st();
@@ -194,7 +195,7 @@
     html += '<section class="panel"><h2>Kolejka budowy <small>' + v.buildQueue.length + '/' + E.queueMax(v, 'build') + '</small></h2>';
     if (!v.buildQueue.length) html += '<p class="muted">Nic się nie buduje. Wybierz budynek poniżej.</p>';
     else html += '<ul class="queue">' + v.buildQueue.map(e =>
-      '<li>' + ico(S.building[e.building]) + '<span class="qname">' + C.BUILDINGS[e.building].name + ' – poziom ' + e.level + '</span>' +
+      '<li>' + ico(S.building[e.building]) + '<span class="qname">' + buildName(e.building) + ' – poziom ' + e.level + '</span>' +
       '<span class="bar"><i data-ps="' + e.start + '" data-pe="' + e.end + '" style="width:' + pct(e.start, e.end) + '%"></i></span>' +
       '<span class="timer" data-end="' + e.end + '"></span></li>').join('') + '</ul>';
     html += '</section><div class="bgrid">';
@@ -221,7 +222,28 @@
       if (k === 'market' && lv > 0) html += '<button class="btn ghost" data-act="exchange-open">' + ico('merchant') + 'Wymiana i monety</button>';
       html += '</div></article>';
     });
+    html += wonderCard(s, v);
     el.innerHTML = html + '</div>';
+  }
+
+  // Karta Cudu świata (cel końcowy): poziomy buduje się w tej wiosce za jej surowce, w kolejce budowy.
+  function wonderCard(s, v) {
+    const W = C.WONDER, lv = E.wonderLevel(v), info = E.wonderInfo(s, v), here = lv + E.wonderQueued(v) > 0;
+    const next = info.code === 'max' ? null : info.target, total = lv + E.wonderQueued(v);
+    const other = E.wonderVillage(s, 'player');
+    let html = '<article class="bcard panel wonder-card" id="b-wonder">' +
+      '<div class="bicon">' + S.icon('wonder') + '</div>' +
+      '<div class="bbody"><h3>' + W.name + ' <span class="lvl">' + lv + '<small>/' + W.maxLevel + '</small></span></h3>' +
+      '<div class="goal"><i style="width:' + Math.min(100, lv / W.maxLevel * 100) + '%"></i></div>' +
+      '<p class="effect">' + (here || !other ? 'Cel końcowy: dobuduj Cud do poziomu ' + W.maxLevel + ', by wygrać. Jeden Cud na plemię; wróg, który zdobędzie wioskę, przejmuje jego poziomy. Wymaga Ratusza ' + W.hq + ' i Targowiska ' + W.market + '.'
+        : 'Twój Cud świata rośnie w wiosce ' + esc(other.name) + ' (poz. ' + E.wonderLevel(other) + ').') + '</p>';
+    if (next && (here || !other || other.id === v.id)) {
+      html += costChips(v, info.cost) +
+        '<button class="btn" data-act="build-wonder"' + (info.ok ? '' : ' disabled') + '>' +
+        (total ? 'Rozbuduj do poz. ' + next : 'Rozpocznij budowę Cudu') + ' <small>' + dur(info.time) + '</small></button>';
+      if (!info.ok) html += '<p class="why">' + info.reason + '</p>';
+    } else if (!next) html += '<p class="done">Cud ukończony</p>';
+    return html + '</div></article>';
   }
 
   function noVillages() {
@@ -424,7 +446,7 @@
         '<td class="vname"><button class="link" data-act="goto" data-id="' + v.id + '">' + esc(v.name) + '</button>' + roleTag(roles && roles[v.id]) + '<small>' + xy(v.x, v.y) + ', ' + E.points(v) + ' pkt</small></td>' +
         E.RES.map(resCell).join('') +
         '<td class="num farm"><b>' + fmt(used) + '</b><small> / ' + fmt(pc) + '</small></td>' +
-        '<td>' + (bq ? ico(S.building[bq.building]) + C.BUILDINGS[bq.building].name + ' ' + bq.level + ' <span class="timer" data-end="' + bq.end + '"></span>' +
+        '<td>' + (bq ? ico(S.building[bq.building]) + buildName(bq.building) + ' ' + bq.level + ' <span class="timer" data-end="' + bq.end + '"></span>' +
           (v.buildQueue.length > 1 ? ' <small class="muted">+' + (v.buildQueue.length - 1) + '</small>' : '') : '<span class="idle">wolne</span>') + '</td>' +
         '<td>' + (rq ? ico(rq.unit) + (rq.count - rq.done) + ' <span class="timer" data-end="' + (rq.start + rq.count * rq.per) + '"></span>' : '<span class="idle">wolne</span>') + '</td>' +
         '<td class="units-cell"><span class="units-wrap">' + unitsLine(v.units) + '</span></td>' +
@@ -580,7 +602,9 @@
 
   /* ---------- ekran: TECHNOLOGIA ---------- */
   const TECH_ICON = { drill: 'barracks', trade: 'market', store: 'hq', agri: 'farm', mint: 'coin', build: 'pick', tools: 'pick', p_wood: 'wood', p_clay: 'clay', p_iron: 'iron', plunder: 'merchant', hide: 'wall',
-    admin: 'hq', roads: 'map', medic: 'pop', fort: 'wall', command: 'noble', faith: 'village', militia: 'village', siege: 'ram', tactics: 'map', caravan: 'merchant' };
+    admin: 'hq', roads: 'map', medic: 'pop', fort: 'wall', command: 'noble', faith: 'village', militia: 'village', siege: 'ram', tactics: 'map', caravan: 'merchant',
+    e2_drill: 'barracks', e2_plunder: 'merchant', e2_siege: 'ram', e2_militia: 'village', e2_fort: 'wall', e2_trade: 'market', e2_store: 'hq', e2_agri: 'farm',
+    e2_build: 'pick', e2_mint: 'coin', e2_tools: 'pick', e2_wood: 'wood', e2_clay: 'clay', e2_iron: 'iron', e2_admin: 'hq', e2_roads: 'map', w_time: 'wonder', w_cost: 'wonder' };
   function techEffectText(n, lvl, next) {
     const e = n.effect, pc = x => Math.round(x * 1000) / 10;
     const cur = lvl, nxt = next;
@@ -606,11 +630,14 @@
       case 'siege': return 'Skuteczność taranów ' + line(l => '+' + pc(e.per * l) + '%');
       case 'caravan': return 'Udźwig kupca ' + line(l => fmt(Math.floor(C.MERCHANT.capacity * (1 + e.per * l))));
       case 'tactics': return 'Złagodzenie pecha w ataku ' + line(l => pc(Math.min(0.8, e.per * l)) + '%');
+      case 'unit2': return 'Dodatkowy atak i obrona ' + line(l => '+' + pc(l * C.TECH.unit2Bonus) + '%');
+      case 'wonderTime': return 'Czas budowy Cudu świata ' + line(l => '−' + pc(Math.min(0.7, -e.per * l)) + '%');
+      case 'wonderCost': return 'Koszt poziomu Cudu świata ' + line(l => '−' + pc(Math.min(0.5, -e.per * l)) + '%');
       case 'faith': return 'Spadek poparcia Twoich wiosek ' + line(l => '−' + pc(Math.min(0.4, e.per * l)) + '%');
     }
     return '';
   }
-  const techIcon = n => n.effect.type === 'unit' ? n.effect.unit : (TECH_ICON[n.id] || 'scroll');
+  const techIcon = n => (n.effect.type === 'unit' || n.effect.type === 'unit2') ? n.effect.unit : (TECH_ICON[n.id] || 'scroll');
   function techPips(n, level) {
     let pips = '';
     for (let i = 1; i <= n.max; i++) pips += '<i class="' + (i <= level ? 'on' : '') + '"></i>';
@@ -657,7 +684,9 @@
     const cols = new Array(L.depths).fill('minmax(168px,1fr)').join(' 30px ');
     const infos = {}; nodes.forEach(n => { infos[n.id] = E.techInfo(s, n.id); });
     const done = nodes.reduce((a, n) => a + infos[n.id].level, 0), all = nodes.reduce((a, n) => a + n.max, 0);
-    return '<section class="panel tech-branch tb-' + branch.id + '"><h2>' + branch.name + '<small>' + done + '/' + all + ' poziomów</small></h2>' +
+    const locked = (branch.epoch || 1) > 1 && !E.epochDone(s.factions.player, branch.epoch);
+    return '<section class="panel tech-branch tb-' + branch.id + (locked ? ' epoch-locked' : '') + '"><h2>' + branch.name + '<small>' + done + '/' + all + ' poziomów</small></h2>' +
+      (locked ? '<p class="muted epoch-note">' + ico('scroll') + 'Zablokowane: najpierw ukończ całą Epokę I (wszystkie badania na maksymalnym poziomie).</p>' : '') +
       '<div class="tech-scroll"><div class="tech-tree" style="grid-template-columns:' + cols + ';grid-template-rows:repeat(' + L.rows + ',1fr)">' +
       nodes.filter(n => n.req).map(n => techLink(n, L.pos, infos[n.id])).join('') +
       nodes.map(n => techTile(n, L.pos[n.id], infos[n.id], coins, UI.techSel === n.id)).join('') + '</div></div></section>';
@@ -684,6 +713,13 @@
       (kids.length ? '<p class="muted td-kids">Odblokowuje: ' + kids.map(k => k.name + ' (od poz. ' + k.req.min + ')').join(', ') + '</p>' : '') +
       act + (state !== 'max' ? '<p class="muted td-total">Do maksimum: ' + ico('coin') + fmt(toMax) + ' monet</p>' : '') + '</section>';
   }
+  // Nagłówek Epoki II: ile badań Epoki I zostało do odblokowania.
+  function epochHead(s, f) {
+    const e1 = C.TECH.nodes.filter(n => !n.epoch), left = e1.filter(n => E.techLevel(f, n) < n.max).length, open = E.epochDone(f, 2);
+    return '<section class="panel epoch-head"><h2>Epoka II</h2><p class="muted">' + (open
+      ? 'Odblokowana! Drugie drzewko jest znacznie droższe i sumuje się z Epoką I; część badań skraca też budowę Cudu świata.'
+      : 'Odblokuje się po ukończeniu całej Epoki I. Zostało badań do maksimum: <b>' + left + '</b> z ' + e1.length + '.') + '</p></section>';
+  }
   function renderTech() {
     const s = st(), el = $('#screen-tech'), f = s.factions.player, coins = f.coins || 0;
     if (UI.techSel && !E.techNode(UI.techSel)) UI.techSel = null; // szczegóły tylko po kliknięciu węzła – bez domyślnego wyboru
@@ -695,7 +731,10 @@
       '<div class="tech-coins"><span class="chip big">' + ico('coin') + fmt(coins) + '</span></div></section>' +
       '<div class="tech-top">' + (UI.techSel ? techDetailHtml(s, coins) : '') +
       '<section class="panel quick"><h2>Szybki zakup monet<small>aktywna wioska</small></h2><div data-quick="coins"></div></section></div>' +
-      C.TECH.branches.map(b => techBranchHtml(b, s, coins)).join('');
+      C.TECH.branches.map((b, i, all) => {
+        const first = b.epoch === 2 && !(all[i - 1] && all[i - 1].epoch === 2);
+        return (first ? epochHead(s, f) : '') + techBranchHtml(b, s, coins);
+      }).join('');
   }
 
   /* ---------- ekran: RAPORTY ---------- */
@@ -1304,7 +1343,7 @@
     const s = st(), p = s.pilot || {}, D = C.PILOT.defaults;
     return { on: p.on !== undefined ? p.on : true, build: p.build !== undefined ? p.build : D.build, recruit: p.recruit || D.recruit,
       tech: p.tech !== undefined ? p.tech : D.tech, defend: p.defend !== undefined ? p.defend : D.defend, garrison: p.garrison !== undefined ? p.garrison : D.garrison, supply: p.supply !== undefined ? p.supply : D.supply, defLevel: p.defLevel || D.defLevel,
-      tickSec: p.tickSec || C.PILOT.tickSec, settle: !!p.settle, settleMax: p.settleMax || 0, split: !!p.split, splitRatio: p.splitRatio || D.splitRatio, attack: !!p.attack, farm: !!p.farm, convoy: !!p.convoy, hub: p.hub || (s.auto && s.auto.hub) || (autoDefaults().hub) };
+      tickSec: p.tickSec || C.PILOT.tickSec, settle: !!p.settle, settleMax: p.settleMax || 0, split: !!p.split, splitRatio: p.splitRatio || D.splitRatio, attack: !!p.attack, farm: !!p.farm, wonder: !!p.wonder, convoy: !!p.convoy, hub: p.hub || (s.auto && s.auto.hub) || (autoDefaults().hub) };
   }
   function pilotModal() {
     const s = st(), g = UI.pilot, p = s.pilot;
@@ -1344,6 +1383,7 @@
       row('data-pbuild', g.build, 'hq', 'Rozbudowa budynków', 'We wszystkich wioskach') +
       row('data-psup', g.supply, 'market', 'Zasilanie wiosek surowcami', 'Bogatsze wioski dopełniają magazyny wiosek, którym brakuje na budowę, do 80% (wymaga Targowiska)') +
       row('data-ptech', g.tech, 'scroll', 'Technologia', 'Kupuje monety z nadwyżek i bada drzewko (wymaga Targowiska)') +
+      row('data-pwonder', g.wonder, 'wonder', 'Cud świata', 'Dokłada poziomy Cudu w jednej wiosce (wymaga Ratusza ' + C.WONDER.hq + ' i Targowiska ' + C.WONDER.market + ') i zwozi tam surowce z innych wiosek; pochłania ogromne ilości surowców') +
       row('data-pconv', g.convoy, 'merchant', 'Nadwyżki do stolicy', 'Konwoje co 15 min. Wioski z magazynem pełnym w ponad 80% oddają nadwyżkę (zostaje im 40%); wysyłające wioski i stolica potrzebują Targowiska') +
       fld('hq', 'Stolica', 'Wioska centralna dla konwojów', '<select data-phub>' + hubs + '</select>'));
 
@@ -1582,6 +1622,18 @@
     return html;
   }
 
+  // Drugi sposób na zwycięstwo: Cud świata do maksymalnego poziomu (gracz zawsze; AI tylko w trybie Wyścig).
+  function wonderGoal(s) {
+    const W = C.WONDER, mine = E.wonderVillage(s, 'player');
+    let html = '<p class="muted seg-note">Albo ukończ <b>Cud świata</b> (poz. ' + W.maxLevel + '): ' + (mine
+      ? 'rośnie w wiosce ' + esc(mine.name) + ' (poz. ' + E.wonderLevel(mine) + ').' : 'zacznij go w wiosce z Ratuszem ' + W.hq + ' i Targowiskiem ' + W.market + '.') + '</p>';
+    if (s.race) {
+      const top = Object.values(s.factions).filter(f => f.ai && f.alive).map(f => ({ f, v: E.wonderVillage(s, f.id) })).filter(o => o.v)
+        .sort((a, b) => E.wonderLevel(b.v) - E.wonderLevel(a.v))[0];
+      if (top) html += '<p class="muted seg-note">Cud ' + flag(s, top.f.id) + ': poz. ' + E.wonderLevel(top.v) + ' z ' + W.maxLevel + ' w wiosce ' + esc(top.v.name) + ' (' + xy(top.v.x, top.v.y) + ').</p>';
+    }
+    return html;
+  }
   // W trybie Wyścig: najsilniejsza frakcja AI i jej postęp do celu.
   function raceLeader(s) {
     if (!s.race) return '';
@@ -1664,7 +1716,7 @@
     const own = E.villagesOf(s, 'player').length;
     return '<h2>Menu</h2>' +
       '<section><h3>Cel gry</h3><p>Zdobądź ' + E.winVillages(s) + ' wiosek. Masz ' + own + '.</p>' +
-      '<div class="goal"><i style="width:' + Math.min(100, own / E.winVillages(s) * 100) + '%"></i></div>' + raceLeader(s) + '</section>' +
+      '<div class="goal"><i style="width:' + Math.min(100, own / E.winVillages(s) * 100) + '%"></i></div>' + raceLeader(s) + wonderGoal(s) + '</section>' +
       '<section><h3>Technologia</h3><p class="muted">Drzewko badań płatne monetami: ulepszenia wojska, magazyny, kurs wymiany.</p>' +
       '<div class="actions left"><button class="btn" data-act="tech-open">' + ico('scroll') + 'Otwórz Technologię</button></div></section>' +
       '<section><h3>Autopilot' + (s.pilot && s.pilot.on ? ' <span class="pil-state on sm"><i></i>działa</span>' : '') + '</h3><p class="muted">Bot buduje, szkoli wojsko, bada technologie i wysyła obronę do atakowanych wiosek, gdy Cię nie ma.</p>' +
@@ -1694,7 +1746,8 @@
       '<li>Wolną osadę przejmujesz, wygrywając bitwę. Wioskę frakcji – Dowódcą podboju (Koszary 5).</li>' +
       '<li>Zwiadowcy odkrywają siłę obrony celu. Targowisko pozwala przewozić surowce, a Osadnik zakłada wioski na pustych równinach.</li>' +
       '<li>Mur obronny zwiększa obronę wioski, a tarany go burzą. Wsparcie broni innej Twojej wioski i możesz je odwołać na ekranie Wojsko.</li>' +
-      '<li>Technologia (Menu lub Przegląd): badania kupujesz monetami. Monety kupisz w Targowisku za nadmiar surowca.</li>' +
+      '<li>Technologia (Menu lub Przegląd): badania kupujesz monetami. Monety kupisz w Targowisku za nadmiar surowca. Po ukończeniu całej Epoki I odblokowuje się droższa Epoka II.</li>' +
+      '<li>Cud świata (ekran wioski, karta na dole): wielopoziomowy cel końcowy – ukończ go do poziomu ' + C.WONDER.maxLevel + ', by wygrać. Budujesz go surowcami z jednej wioski, więc zwoź je kupcami.</li>' +
       '<li>Dyplomacja (Menu lub Przegląd): pakt o nieagresji chroni Cię przed frakcją na kilka godzin. Frakcje pamiętają ataki, dary poprawiają ich nastawienie.</li>' +
       '<li>Ekran Przegląd pokazuje wszystkie wioski naraz: surowce, kolejki, wojsko i nadciągające ataki.</li>' +
       '<li>Przez pierwsze ' + E.diff(s).graceMinutes + ' minut frakcje AI Cię nie atakują. ' + Math.round(E.diff(s).lootProtect * 100) + '% pojemności magazynu jest ukryte przed łupieżcami.</li></ul></section>' +
@@ -1740,11 +1793,17 @@
       '<div class="actions"><button class="btn ghost" data-act="close">Anuluj</button><button class="btn danger" data-act="new-game-now">Zacznij nową grę</button></div>';
   }
 
+  function wonderAside(s) {
+    const v = E.wonderVillage(s, 'player');
+    return v ? '<p class="muted wonder-line">' + ico('wonder') + 'Cud świata: poz. ' + E.wonderLevel(v) + ' z ' + C.WONDER.maxLevel + ' (' + esc(v.name) + ')</p>' : '';
+  }
   function endModal() {
     const s = st(), win = s.ended.type === 'victory', by = s.ended.by;
     const title = win ? 'Zwycięstwo!' : by ? 'Przegrałeś wyścig' : 'Twoje plemię upadło';
-    const text = win ? 'Zdobyłeś ' + E.winVillages(s) + ' wiosek i zdominowałeś mapę. Możesz grać dalej albo zacząć nową kampanię.'
-      : by ? flag(s, by) + ' jako pierwsza zdobyła ' + E.winVillages(s) + ' wiosek. Możesz grać dalej albo zacząć nową kampanię.'
+    const text = win ? (s.ended.wonder ? 'Ukończyłeś Cud świata (poz. ' + C.WONDER.maxLevel + ') i Twoje plemię przeszło do legendy. Możesz grać dalej albo zacząć nową kampanię.'
+        : 'Zdobyłeś ' + E.winVillages(s) + ' wiosek i zdominowałeś mapę. Możesz grać dalej albo zacząć nową kampanię.')
+      : by ? (s.ended.wonder ? flag(s, by) + ' jako pierwsza ukończyła Cud świata (poz. ' + C.WONDER.maxLevel + '). Możesz grać dalej albo zacząć nową kampanię.'
+        : flag(s, by) + ' jako pierwsza zdobyła ' + E.winVillages(s) + ' wiosek. Możesz grać dalej albo zacząć nową kampanię.')
       : 'Straciłeś ostatnią wioskę. Spróbuj ponownie – tym razem z mocniejszą obroną.';
     return '<div class="endgame ' + (win ? 'win' : 'loss') + '">' + S.icon(win ? 'noble' : 'sword') +
       '<h2>' + title + '</h2><p>' + text + '</p>' +
@@ -1822,11 +1881,11 @@
     const own = E.villagesOf(s, 'player');
     const mv = playerMovements(s);
     const pw = E.accountPower(s, 'player');
-    const sig = JSON.stringify([own.map(v => v.id + E.points(v)), pw.total, mv.map(m => m.id), Object.values(s.factions).map(f => E.villagesOf(s, f.id).length), Math.round(E.killsOf(s, 'player').total)]);
+    const sig = JSON.stringify([own.map(v => v.id + E.points(v) + ':' + E.wonderLevel(v)), pw.total, mv.map(m => m.id), Object.values(s.factions).map(f => E.villagesOf(s, f.id).length), Math.round(E.killsOf(s, 'player').total)]);
     if (UI.sigs.aside === sig) return;
     UI.sigs.aside = sig;
     let html = '<section class="panel"><h2>Imperium</h2><p>' + own.length + ' z ' + E.winVillages(s) + ' wiosek</p>' +
-      '<div class="goal"><i style="width:' + Math.min(100, own.length / E.winVillages(s) * 100) + '%"></i></div>' +
+      '<div class="goal"><i style="width:' + Math.min(100, own.length / E.winVillages(s) * 100) + '%"></i></div>' + wonderAside(s) +
       '<p class="tags"><span>Moc: ' + fmt(pw.total) + ' pkt</span><span>Atak ' + fmt(pw.attack) + '</span><span>Obrona ' + fmt(pw.defense) + '</span><span>Pokonani ' + fmt(Math.round(E.killsOf(s, 'player').total)) + '</span></p>' +
       '<ul class="vlist">' + own.map(v => '<li><button class="link" data-act="goto" data-id="' + v.id + '">' + esc(v.name) + '</button> <span class="muted">' + xy(v.x, v.y) + ', ' + E.points(v) + ' pkt</span></li>').join('') + '</ul></section>';
     html += '<section class="panel"><h2>Ruchy wojsk</h2>' + (mv.length ? '<ul class="mvlist compact">' + mv.slice(0, 8).map(m => movementItem(s, m)).join('') + '</ul>'
@@ -1973,6 +2032,11 @@
     switch (act) {
       case 'build': {
         const r = G.action(s => E.queueBuild(s, cur(), b.dataset.k, s.now));
+        if (!r.ok) toast('bad', r.reason);
+        break;
+      }
+      case 'build-wonder': {
+        const r = G.action(s => E.queueWonder(s, cur(), s.now));
         if (!r.ok) toast('bad', r.reason);
         break;
       }
@@ -2461,6 +2525,7 @@
     else if (t.hasAttribute && t.hasAttribute('data-pconv')) { UI.pilot.convoy = t.checked; }
     else if (t.hasAttribute && t.hasAttribute('data-phub')) { UI.pilot.hub = t.value; }
     else if (t.hasAttribute && t.hasAttribute('data-ptech')) { UI.pilot.tech = t.checked; }
+    else if (t.hasAttribute && t.hasAttribute('data-pwonder')) { UI.pilot.wonder = t.checked; }
     else if (t.hasAttribute && t.hasAttribute('data-mmax')) { UI.mass.max = t.checked; renderModal(); }
     else if (t.dataset && t.dataset.msrc) { if (t.checked) delete UI.mass.off[t.dataset.msrc]; else UI.mass.off[t.dataset.msrc] = true; updateMassPlan(); }
     else if (t.hasAttribute && t.hasAttribute('data-ttarget')) { UI.troops.target = t.value; UI.troops.off = {}; renderModal(); }

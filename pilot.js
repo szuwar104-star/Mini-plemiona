@@ -208,6 +208,33 @@
     return saving;
   }
 
+  /* ---------- 2c. Cud świata (opcja Autopilota) ---------- */
+  // Wybiera wioskę Cudu (istniejącą albo najlepszą: stolica, potem najwyższy Ratusz i magazyn), dokłada poziomy, gdy starcza surowców,
+  // a gdy brakuje – zwraca koszt jako rezerwę, żeby Zasilanie dowiozło tam surowce z innych wiosek. Kończy po maksymalnym poziomie.
+  function wonderStep(state, p, vs, t, threatened, acts) {
+    const W = C.WONDER;
+    let v = E.wonderVillage(state, 'player');
+    if (!v) {
+      const ok = vs.filter(h => !threatened[h.id] && h.buildings.hq >= W.hq && (h.buildings.market || 0) >= W.market && E.storageCap(h) >= W.cost[1]);
+      if (!ok.length) return null;
+      v = ok.sort((a, b) => (b.id === p.hub) - (a.id === p.hub) || b.buildings.hq - a.buildings.hq || E.storageCap(b) - E.storageCap(a))[0];
+    }
+    if (threatened[v.id] || E.wonderLevel(v) >= W.maxLevel) return null;
+    let cost = null;
+    for (let guard = 0; guard < 4; guard++) {
+      E.tickVillage(state, v, t);
+      const info = E.wonderInfo(state, v);
+      if (info.ok) {
+        E.queueWonder(state, v, t); acts.built++;
+        note(state, p, t, 'Cud świata w ' + v.name + ': poziom ' + info.target + ' w budowie');
+        continue;
+      }
+      if (info.code === 'resources') cost = info.cost;
+      break;
+    }
+    return cost ? { v, cost } : null;
+  }
+
   /* ---------- 2b. zasilanie wiosek z brakiem surowców na budowę ---------- */
   // Wioska, która czeka na surowce na następny budynek (kolejka pusta albo niepełna), dostaje surowce
   // od wiosek, które mają je ponad własną rezerwę – nie tylko brakujące na budynek, ale tyle, by magazyn wioski miał
@@ -365,8 +392,8 @@
 
   /* ---------- 4. technologia ---------- */
   function techAllowed(node, p) {
-    if (node.branch !== 'war') return true;
-    return node.id === 'drill' || p.recruit === 'balanced' || !!p.attack || !!p.farm || splitOn(p);
+    if (node.branch !== 'war' && node.branch !== 'war2') return true;
+    return node.id === 'drill' || node.id === 'e2_drill' || p.recruit === 'balanced' || !!p.attack || !!p.farm || splitOn(p);
   }
   function techOrder(p) {
     const out = P().techPriority.slice();
@@ -852,10 +879,15 @@
     defend(state, p, vs, t, acts, threatened);
     garrison(state, p, vs, t, acts, threatened);
     const reserves = {};
+    const wv = p.wonder ? wonderStep(state, p, vs, t, threatened, acts) : null;       // Cud bierze miejsce w kolejce przed zwykłą budową
     vs.forEach(v => {
       if (p.build && !threatened[v.id]) reserves[v.id] = buildVillage(state, v, p, t, acts);
     });
-    if (p.build) supply(state, p, vs, t, reserves, threatened, acts);
+    if (wv) {
+      const cur = reserves[wv.v.id] || { wood: 0, clay: 0, iron: 0 };
+      reserves[wv.v.id] = { wood: Math.max(cur.wood, wv.cost.wood), clay: Math.max(cur.clay, wv.cost.clay), iron: Math.max(cur.iron, wv.cost.iron) };
+    }
+    if (p.build || wv) supply(state, p, vs, t, reserves, threatened, acts);
     if (p.settle) {
       const sv = settleStep(state, p, vs, t, threatened, acts);
       if (sv) {
@@ -896,6 +928,7 @@
     if (cfg.settle !== undefined) o.settle = !!cfg.settle;
     if (cfg.attack !== undefined) o.attack = !!cfg.attack;
     if (cfg.farm !== undefined) o.farm = !!cfg.farm;
+    if (cfg.wonder !== undefined) o.wonder = !!cfg.wonder;
     if (cfg.split !== undefined) o.split = !!cfg.split;
     if (cfg.splitRatio !== undefined) { const n = Math.floor(Number(cfg.splitRatio)); if (n >= 1 && n <= 10) o.splitRatio = n; }
     if (cfg.settleMax !== undefined) { const n = Math.floor(Number(cfg.settleMax)); o.settleMax = n >= 1 && n <= 200 ? n : 0; }

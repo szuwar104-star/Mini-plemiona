@@ -652,3 +652,12 @@ input[type=checkbox], input[type=radio] { accent-color: var(--gold); width: 1.05
 
 .tile.role-off .vlabel { box-shadow: 0 0 0 1px #3a2a17, 0 0 0 2.5px var(--fc), 0 0 0 4px #b3342a, 0 2px 4px rgba(0, 0, 0, .5); }
 .tile.role-def .vlabel { box-shadow: 0 0 0 1px #3a2a17, 0 0 0 2.5px var(--fc), 0 0 0 4px #2f548f, 0 2px 4px rgba(0, 0, 0, .5); }
+
+/* Epoka II i Cud świata */
+.tech-branch.tb-war2  { --bc: #a8443a; }
+.tech-branch.tb-def2  { --bc: #4a7fb0; }
+.tech-branch.tb-eco2  { --bc: #c9a043; }
+.tech-branch.tb-prod2 { --bc: #6f9a4a; }
+.tech-branch.tb-realm2 { --bc: #8a5ea8; }
+.epoch-head { border-top: 3px solid #8a5ea8; }
+.wonder-card { border-top: 3px solid #c9a043; }
