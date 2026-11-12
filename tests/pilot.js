@@ -159,6 +159,31 @@ function twoVillages() {
   ok(!s.auto.on, 'wyłączenie konwojów w bocie wyłącza Konwoje');
 }
 
+// 9b. Zasilanie: wioska z pustą kolejką budowy dostaje brakujące surowce od bogatszej
+{
+  const { s, A, B } = twoVillages();
+  [A, B].forEach(v => { Object.keys(C.PILOT.buildWeights).forEach(k => { v.buildings[k] = 10; }); v.buildings.storage = 12; });   // drogie następne budynki
+  const cap = E.storageCap(B);
+  B.res = { wood: cap, clay: cap, iron: cap }; A.res = { wood: 0, clay: 0, iron: 0 };
+  B.buildQueue.push({ building: 'wood', start: s.now, end: s.now + HOUR, level: B.buildings.wood + 1 });   // B ma zajętą kolejkę
+  MP.Pilot.configure(s, { on: true, recruit: 'off', tech: false, convoy: false }, s.now);
+  const t0 = s.now; s.pilot.next = t0 + 1000;
+  E.advance(s, t0 + 3 * MIN);
+  ok((s.pilot.stats.supplied || 0) > 0, 'bot zasilił wioskę z pustą kolejką (' + (s.pilot.stats.supplied || 0) + ' surowców)');
+  ok(A.buildQueue.length > 0 || s.movements.some(m => m.type === 'transport' && m.to === A.id), 'A dostała surowce / ruszyła budowa');
+  ok(B.res.wood < cap && B.res.wood >= cap * C.PILOT.supplyKeep - 1, 'dawca zachował rezerwę magazynu');
+  const sent = s.pilot.stats.supplied;
+  E.advance(s, t0 + 4 * MIN);
+  ok(s.pilot.stats.supplied - sent < sent, 'surowce w drodze nie są wysyłane drugi raz');
+  // wyłączone = brak zasilania
+  const t = twoVillages(); [t.A, t.B].forEach(v => { Object.keys(C.PILOT.buildWeights).forEach(k => { v.buildings[k] = 10; }); v.buildings.storage = 12; });
+  t.B.res = { wood: cap, clay: cap, iron: cap }; t.A.res = { wood: 0, clay: 0, iron: 0 };
+  t.B.buildQueue.push({ building: 'wood', start: t.s.now, end: t.s.now + HOUR, level: t.B.buildings.wood + 1 });
+  MP.Pilot.configure(t.s, { on: true, recruit: 'off', tech: false, supply: false }, t.s.now);
+  t.s.pilot.next = t.s.now + 1000; E.advance(t.s, t.s.now + 3 * MIN);
+  ok(!(t.s.pilot.stats.supplied > 0), 'z wyłączoną opcją bot nie zasila wiosek');
+}
+
 // 10. Osadnicy: bot zakłada nowe wioski w pobliżu
 {
   const s = mk(9);
