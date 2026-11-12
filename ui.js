@@ -122,24 +122,33 @@
   }
 
   /* ---------- ekran: WIOSKA ---------- */
+  // Bonusy z technologii: efekt końcowy (z badaniami i trudnością) + mała etykieta z procentem bonusu.
+  const pctOf = x => Math.round(x * 100);
+  const bonusTag = (pct, why) => pct ? ' <span class="tb" title="Bonus: ' + (why || 'technologia') + '">' + (pct > 0 ? '+' : '−') + Math.abs(pct) + '%</span>' : '';
   function effectText(v, key, next) {
-    const B = C.BUILDINGS[key], L = v.buildings[key];
+    const B = C.BUILDINGS[key], L = v.buildings[key], s = st();
+    const me = v.owner === 'player', fx = me ? E.techEffects(s.factions.player) : E.techEffects(null);
+    const ups = me ? E.upgradesOf(s, 'player') : null;
+    const arrow = (f) => f(L) + (next ? ' → ' + f(next) : '');
     switch (key) {
-      case 'hq': return 'Magazyn ' + fmt(B.storage[L]) + (next ? ' → ' + fmt(B.storage[next]) : '') +
-        ', czas budowy ' + Math.round(B.buildSpeed[L] * 100) + '%' + (next ? ' → ' + Math.round(B.buildSpeed[next] * 100) + '%' : '');
+      case 'hq': return 'Magazyn ' + arrow(l => fmt(Math.floor(B.storage[l] * fx.storage))) + bonusTag(pctOf(fx.storage - 1), 'badanie Magazyny') +
+        ', czas budowy ' + arrow(l => Math.round(B.buildSpeed[l] * fx.build * 100) + '%') + bonusTag(-pctOf(1 - fx.build), 'badanie Budownictwo');
       case 'wood': case 'clay': case 'iron': {
-        return B.prod[L] + (next ? ' → ' + B.prod[next] : '') + ' ' +
-          { wood: 'drewna', clay: 'gliny', iron: 'żelaza' }[key] + ' na minutę';
+        const mult = me ? E.diff(s).playerProd * fx.prod * fx[{ wood: 'prodWood', clay: 'prodClay', iron: 'prodIron' }[key]] : 1;
+        return arrow(l => Math.round(B.prod[l] * mult)) + ' ' +
+          { wood: 'drewna', clay: 'gliny', iron: 'żelaza' }[key] + ' na minutę' + bonusTag(pctOf(mult - 1), 'badania i poziom trudności');
       }
       case 'farm': {
-        const m = v.owner === 'player' ? E.popMult() : 1;
-        return 'Miejsca dla wojska: ' + fmt(Math.floor(B.pop[L] * m)) + (next ? ' → ' + fmt(Math.floor(B.pop[next] * m)) : '');
+        return 'Miejsca dla wojska: ' + arrow(l => fmt(Math.floor(B.pop[l] * fx.pop))) + bonusTag(pctOf(fx.pop - 1), 'badanie Rolnictwo');
       }
-      case 'wall': return 'Obrona +' + Math.round(B.bonus[L] * 100) + '%' + (next ? ' → +' + Math.round(B.bonus[next] * 100) + '%' : '') +
-        ', mur sam broni siłą ' + B.flat[L] + (next ? ' → ' + B.flat[next] : '');
+      case 'wall': {
+        const fort = (ups && ups.__fort) || 0;
+        return 'Obrona ' + arrow(l => '+' + Math.round(B.bonus[l] * (1 + fort) * 100) + '%') + bonusTag(pctOf(fort), 'badanie Fortyfikacje') +
+          ', mur sam broni siłą ' + arrow(l => B.flat[l]);
+      }
       case 'market': return 'Wymiana surowców (kurs ' + Math.round(E.exchangeRate() * 100) + '%) i zakup monet. Kupcy: ' + B.merchants[L] + (next ? ' → ' + B.merchants[next] : '') + ', każdy wiezie do ' + fmt(E.merchantCap()) + ' surowców';
       case 'barracks': {
-        let t = 'Czas szkolenia ' + Math.round(B.recruitSpeed[L] * 100) + '%' + (next ? ' → ' + Math.round(B.recruitSpeed[next] * 100) + '%' : '');
+        let t = 'Czas szkolenia ' + arrow(l => Math.round(B.recruitSpeed[l] * fx.recruit * 100) + '%') + bonusTag(-pctOf(1 - fx.recruit), 'badanie Musztra');
         const unlock = next ? E.UNITS.filter(u => C.UNITS[u].barracks === next).map(u => C.UNITS[u].name) : [];
         if (unlock.length) t += '. Odblokowuje: ' + unlock.join(', ');
         return t;
@@ -309,16 +318,20 @@
       '<div class="kpi wide"><small>Farma</small><b>' + fmt(used) + ' / ' + fmt(cap) + '</b><span class="meter"><i style="width:' + Math.min(100, used / cap * 100).toFixed(1) + '%"></i></span></div>' +
       '</div></section>';
 
+    // Statystyki jednostek z ulepszeniami i badaniami właściciela wioski (marsz i łup – tylko gracz).
+    const pups = E.upgradesOf(s, v.owner), pfx = E.techEffects(v.owner === 'player' ? s.factions.player : null);
+    const r1 = x => Math.round(x * 10) / 10;
     html += '<div class="ugrid">';
     E.UNITS.forEach(k => {
       const U = C.UNITS[k], info = E.recruitInfo(s, v, k);
+      const um = E.upgradeMult(pups, k), upPct = pctOf(um - 1);
       const locked = info.code === 'locked';
       html += '<article class="ucard' + (locked ? ' locked' : '') + '">' +
         '<header><span class="u-ico">' + S.icon(k) + '</span><div class="u-name"><h3>' + U.name + '</h3><p>' + U.desc + '</p></div>' +
         '<div class="u-count"><b>' + fmt(v.units[k]) + '</b><small>w wiosce</small>' + (away[k] ? '<small class="away">+' + fmt(away[k]) + ' w drodze</small>' : '') + '</div></header>' +
         '<ul class="u-stats">' +
-        '<li><small>Atak</small><b>' + U.att + '</b></li><li><small>Obrona</small><b>' + U.def + '</b></li>' +
-        '<li><small>Szybkość</small><b>' + U.speed + ' s</b></li><li><small>Łup</small><b>' + U.carry + '</b></li><li><small>Farma</small><b>' + U.pop + '</b></li></ul>';
+        '<li><small>Atak</small><b>' + r1(U.att * um) + '</b>' + bonusTag(upPct, 'ulepszenie jednostki') + '</li><li><small>Obrona</small><b>' + r1(U.def * um) + '</b>' + bonusTag(upPct, 'ulepszenie jednostki') + '</li>' +
+        '<li><small>Szybkość</small><b>' + r1(U.speed * pfx.march) + ' s</b>' + bonusTag(-pctOf(1 - pfx.march), 'badanie Trakty') + '</li><li><small>Łup</small><b>' + Math.floor(U.carry * pfx.carry) + '</b>' + bonusTag(pctOf(pfx.carry - 1), 'badanie Grabież') + '</li><li><small>Farma</small><b>' + U.pop + '</b></li></ul>';
       if (locked) {
         html += '<p class="lockmsg">' + info.reason + '</p>';
       } else {

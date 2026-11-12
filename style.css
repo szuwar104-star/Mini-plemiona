@@ -914,3 +914,7 @@ html, body { max-width: 100%; overflow-x: clip; }
 /* Autopilot: dziennik ostatnich decyzji bota */
 .plog { list-style: none; margin: .4rem 0 0; padding: 0; display: grid; gap: .25rem; font-size: .86rem; }
 .plog li { padding: .3rem .5rem; background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--r-sm); }
+
+/* Bonus z technologii przy statystyce jednostki / efekcie budynku */
+.tb { display: inline-block; margin-left: .25rem; padding: 0 .3rem; border-radius: 3px; font-size: .68rem; font-weight: 800; font-style: normal; background: rgba(110, 190, 120, .18); color: #8fd69a; vertical-align: middle; }
+.u-stats .tb { display: block; margin: .1rem auto 0; width: fit-content; }
