@@ -58,7 +58,7 @@ function twoVillages() {
   ok(sup.every(m => m.arrive < arrive), 'posiłki zdążą przed atakiem');
   ok(sup.every(m => E.sumUnits(m.units) === m.units.spear + m.units.guard), 'wysyłane są tylko jednostki obronne');
   ok(!sup.some(m => m.from === far.id) || sup.every(m => m.arrive < arrive), 'zbyt odległa wioska nie wysyła spóźnionych posiłków');
-  ok(B.units.spear < 100 && B.units.spear >= 100 - Math.floor(100 * C.PILOT.supportShare), 'wioska pomocnicza zostawia część obrony w domu');
+  ok(B.units.spear < 100 && B.units.spear >= 100 - Math.floor(100 * C.PILOT.supportShareMass), 'wioska pomocnicza zostawia część obrony w domu');
   const before = JSON.stringify(s.movements.filter(m => m.type === 'support').length);
   E.advance(s, t0 + 4000);
   ok(JSON.stringify(s.movements.filter(m => m.type === 'support').length) === before, 'ten sam atak nie wywołuje drugiej tury posiłków');
@@ -70,6 +70,22 @@ function twoVillages() {
   ok(left === 0 && (back.length > 0 || E.villagesOf(s, 'player').every(v => v.units.spear > 0)), 'po zagrożeniu posiłki wracają do domu');
   E.advance(s, arrive + 30 * MIN);
   ok(B.units.spear > 100 - Math.floor(100 * C.PILOT.supportShare) + 10, 'jednostki wróciły do wioski macierzystej (' + B.units.spear + ')');
+}
+
+// 3a. Cel obrony zależy od liczby fal i siły fal wroga (nie tylko od stałego progu)
+{
+  const mkCase = (n, wave) => {
+    const { s, A } = twoVillages();
+    MP.Pilot.configure(s, { on: true, garrison: false, build: false, recruit: 'off', tech: false, defLevel: 5 }, s.now);
+    const ai = Object.values(s.villages).find(v => v.owner && v.owner !== 'player');
+    ai.x = A.x + 6; ai.y = A.y; ai.units = E.emptyUnits(); ai.units.axe = 5000;
+    s.pilot.waveMax = { [ai.owner]: wave };
+    for (let i = 0; i < n; i++) E.sendAttack(s, ai.id, A.id, { axe: 5 }, s.now + i);
+    E.advance(s, s.now + 3000);
+    return s.movements.filter(m => m.type === 'support' && m.owner === 'player' && m.to === A.id).length;
+  };
+  const small = mkCase(1, 1), big = mkCase(1, 1e6);
+  ok(big > small && big >= 2, 'przy dużych falach wroga posiłki idą z większej liczby wiosek niż przy małych (' + big + ' vs ' + small + ')');
 }
 
 // 3b. Atakowana wioska wywozi surowce kupcami do bezpiecznej wioski
@@ -90,7 +106,7 @@ function twoVillages() {
 // 4. Wyłączona obrona nie wysyła posiłków
 {
   const { s, A } = twoVillages();
-  MP.Pilot.configure(s, { on: true, defend: false, build: false, recruit: 'off', tech: false }, s.now);
+  MP.Pilot.configure(s, { on: true, defend: false, garrison: false, build: false, recruit: 'off', tech: false }, s.now);
   const ai = Object.values(s.villages).find(v => v.owner && v.owner !== 'player');
   ai.x = A.x + 6; ai.y = A.y; ai.units = E.emptyUnits(); ai.units.axe = 300;
   E.sendAttack(s, ai.id, A.id, { axe: 100 }, s.now);

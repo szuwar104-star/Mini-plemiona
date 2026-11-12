@@ -92,33 +92,57 @@
       list.forEach(m => { p.seen[m.id] = t; });
       if (!p.defend) return;
       const first = Math.min.apply(null, list.map(m => m.arrive));
-      const goal = E.points(v) * p.defLevel * P().supportGoal;
+      // Cel: stała podłoga (punkty × defLevel × supportGoal) ALBO – gdy to więcej – liczba fal × typowa siła fali tego wroga.
+      // Wroga nie podglądamy: siłę fali znamy z raportów z wcześniejszych starć (p.waveMax), a bez nich bierze się waveDefault.
+      const est = list.reduce((s, m) => s + waveEst(state, p, m.owner), 0) * P().threatCover;
+      const floor = E.points(v) * p.defLevel * P().supportGoal;
+      const goal = Math.max(floor, est);
+      const share = est > floor ? P().supportShareMass : P().supportShare;
       let have = E.villageDefenseDef(v, null, ups);
       state.movements.forEach(m => { if (m.type === 'support' && m.owner === 'player' && m.to === v.id) have += E.defensePower(m.units, ups); });
       const helpers = vs.filter(h => h.id !== v.id && roleOf(p, h) !== 'off' && !incomingOn(state, h).length).sort((a, b) => E.dist(a, v) - E.dist(b, v));
-      let sentFrom = 0, sentUnits = 0;
+      let sentFrom = 0, sentUnits = 0, late = 0;
       for (const h of helpers) {
         if (have >= goal) break;
         const spare = E.emptyUnits();
         let n = 0;
-        Object.keys(C.UNITS).forEach(k => { if (isDef(k)) { spare[k] = Math.floor(h.units[k] * P().supportShare); n += spare[k]; } });
+        Object.keys(C.UNITS).forEach(k => { if (isDef(k)) { spare[k] = Math.floor(h.units[k] * share); n += spare[k]; } });
         if (n < P().supportMin) continue;
-        if (t + E.travelTime(h, v, spare, 'player') >= first) continue;   // nie zdąży
+        if (t + E.travelTime(h, v, spare, 'player') >= first) { late++; continue; }   // nie zdąży
         const r = E.sendSupport(state, h.id, v.id, spare, t, 'support');
         if (!r.ok) continue;
         have += E.defensePower(spare, ups);
         p.deployed[v.id + '|' + h.id] = t;
         sentFrom++; sentUnits += n;
       }
+      const covered = have >= goal;
+      // Niedobór (nikt więcej nie zdążył / nie ma wolnych obrońców): nie oznaczaj fal jako obsłużonych – następna tura spróbuje ponownie.
+      if (!covered && sentFrom === 0) list.forEach(m => { delete p.seen[m.id]; });
       if (sentFrom) {
         acts.support += sentFrom;
-        const txt = 'Obrona dla ' + v.name + ': ' + sentUnits + ' jednostek z ' + sentFrom + ' wiosek';
+        const txt = 'Obrona dla ' + v.name + ': ' + sentUnits + ' jednostek z ' + sentFrom + ' wiosek' + (covered ? '' : ' (cel ' + Math.round(goal) + ', brakuje ' + Math.round(goal - have) + ')');
         E.notice(state, t, 'info', 'Autopilot – ' + txt + '.');
         note(state, p, t, txt);
-      } else {
-        note(state, p, t, 'Atak na ' + v.name + ': brak posiłków, które zdążą');
+      } else if (covered) {
+        note(state, p, t, 'Atak na ' + v.name + ': obrona wystarcza (' + list.length + ' fal)');
+      } else if (!p.noHelpAt || p.noHelpAt[tid] !== list.length) {
+        p.noHelpAt = p.noHelpAt || {}; p.noHelpAt[tid] = list.length;
+        note(state, p, t, 'Atak na ' + v.name + ': za mało obrony (cel ' + Math.round(goal) + ', jest ' + Math.round(have) + '), ' + (late ? late + ' wiosek nie zdąży' : 'brak wolnych obrońców'));
       }
     });
+  }
+
+  // Szacunek siły jednej fali danej frakcji: największa fala widziana w raportach z obrony (zapamiętana w p.waveMax).
+  function waveEst(state, p, owner) {
+    p.waveMax = p.waveMax || {};
+    const ups = E.upgradesOf(state, owner);
+    (state.reports || []).forEach(r => {
+      if (r.kind === 'defense' && r.attacker === owner && r.attUnits && !(r.id in (p.waveSeen = p.waveSeen || {}))) {
+        p.waveSeen[r.id] = 1;
+        p.waveMax[owner] = Math.max(p.waveMax[owner] || 0, E.attackPower(r.attUnits, ups));
+      }
+    });
+    return p.waveMax[owner] || P().waveDefault;
   }
 
   /* ---------- 1b. garnizony na froncie ---------- */
@@ -130,7 +154,11 @@
     const ups = E.upgradesOf(state, 'player');
     const front = [], rear = [];
     vs.forEach(v => { if (exposed(state, v, t)) front.push(v); else if (roleOf(p, v) !== 'off') rear.push(v); });   // ofensywne z zaplecza nie oddają obrony – jej nie szkolą
-    if (!front.length || !rear.length) return;
+    // Dawcami są też defensywne wioski frontowe z dużą nadwyżką (ponad garrisonSurplusKeep × własny cel garnizonu).
+    const surplus = v => roleOf(p, v) !== 'off' && exposed(state, v, t) &&
+      E.villageDefenseDef(v, null, ups) > E.points(v) * p.defLevel * P().garrisonGoal * P().garrisonSurplusKeep;
+    const donors = rear.concat(front.filter(surplus));
+    if (!front.length || !donors.length) return;
     const need = v => E.points(v) * p.defLevel * P().garrisonGoal * (roleOf(p, v) === 'off' ? P().split.offGarrison : 1);
     front.sort((a, b) => (E.villageDefenseDef(a, null, ups) / Math.max(1, need(a))) - (E.villageDefenseDef(b, null, ups) / Math.max(1, need(b))));
     for (const f of front) {
@@ -138,11 +166,11 @@
       state.movements.forEach(m => { if (m.type === 'support' && m.owner === 'player' && m.to === f.id) have += E.defensePower(m.units, ups); });
       const goal = need(f);
       if (have >= goal) continue;
-      const helpers = rear.filter(h => !threatened[h.id] && !incomingOn(state, h).length).sort((a, b) => E.dist(a, f) - E.dist(b, f));
+      const helpers = donors.filter(h => h.id !== f.id && !threatened[h.id] && !incomingOn(state, h).length).sort((a, b) => E.dist(a, f) - E.dist(b, f));
       let sentUnits = 0, sentFrom = 0;
       for (const h of helpers) {
         if (have >= goal) break;
-        const hdef = E.villageDefenseDef(h, null, ups), keep = E.points(h) * p.defLevel * P().garrisonKeep;
+        const hdef = E.villageDefenseDef(h, null, ups), keep = E.points(h) * p.defLevel * (exposed(state, h, t) ? P().garrisonGoal * P().garrisonSurplusKeep : P().garrisonKeep);
         if (hdef <= keep) continue;
         const frac = Math.min(P().garrisonShare, (hdef - keep) / hdef);
         const spare = E.emptyUnits();

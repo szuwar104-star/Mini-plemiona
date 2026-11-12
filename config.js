@@ -347,10 +347,13 @@
       split: {
         defPopFill: 0.9,         // wioska defensywna szkoli obrońców, dopóki farma (z kolejką) nie jest zapełniona w tym stopniu
         ratio: 3,                // domyślnie: na 1 wioskę ofensywną przypada tyle defensywnych
-        offGarrison: 0.5         // cel garnizonu przygranicznej wioski ofensywnej = zwykły cel garnizonu × ta wartość (obrona idzie z defensywnych)
+        offGarrison: 1           // cel garnizonu przygranicznej wioski ofensywnej = zwykły cel garnizonu × ta wartość (obrona idzie z defensywnych)
       },
       scouts: 20,                // tylu zwiadowców trzyma w każdej wiosce (więcej = skuteczniejszy zwiad i obrona przed wrogim zwiadem)
       supportShare: 0.6,         // maks. część obrońców wysyłana z wioski jako posiłki
+      supportShareMass: 0.85,    // maks. część obrońców wysyłana jako posiłki, gdy szacowana siła ataku przekracza stały cel
+      threatCover: 0.8,          // jaką część szacowanej siły fal (liczba fal × największa znana fala wroga) obrona ma pokryć
+      waveDefault: 60000,        // siła jednej fali, gdy nie ma jeszcze raportów z walk z tym wrogiem (typowa fala ≈ 67 tys.)
       supportMin: 5,             // mniejszych oddziałów nie wysyła
       supportGoal: 3,            // cel obrony atakowanej wioski = punkty × defLevel × ta wartość
       recallMin: 10,             // po tylu minutach od ostatniego ataku posiłki wracają do domu
@@ -359,7 +362,8 @@
       garrisonGoal: 1.5,         // cel obrony wioski przygranicznej = zwykły cel × ta wartość (szkolenie i dosyłanie)
       garrisonKeep: 0.8,         // wioska z zaplecza oddaje tylko obronę ponad tę część swojego zwykłego celu
       garrisonShare: 0.4,        // maks. część obrońców oddawana z jednej wioski zaplecza w jednej turze
-      garrisonEveryMin: 5,       // jak często bot przesuwa obronę na front (minuty)
+      garrisonSurplusKeep: 2,    // wioska frontowa oddaje tylko obronę ponad tyle × swój cel garnizonu
+      garrisonEveryMin: 2,       // jak często bot przesuwa obronę na front (minuty)
       supplyKeep: 0.3,           // wioska-dawca zostawia sobie tyle magazynu (i rezerwę na własny budynek), reszta idzie do wiosek z pustą kolejką budowy
       supplyFill: 0.8,           // wioska z pustą kolejką budowy jest dopełniana do tej części magazynu (każdy surowiec), nie tylko do kosztu budynku
       coinFrom: 0.85, coinTo: 0.6, // zakup monet: gdy magazyn > coinFrom, schodzi do coinTo
