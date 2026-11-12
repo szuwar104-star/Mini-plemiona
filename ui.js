@@ -443,7 +443,7 @@
         '<small>w wioskach ' + fmt(army) + (allTotal > army ? ' + poza ' + fmt(allTotal - army) : '') + '</small></div>' +
       '<div class="kpi"><small>Moc konta</small><b>' + fmt(pw.total) + '</b><small>bud. ' + fmt(pw.buildings) + ' + woj. ' + fmt(pw.army) + '</small></div>' +
       '<div class="kpi ov-units"><small>Wszystkie jednostki wg rodzaju (wioski, wsparcie, marsz)</small><div class="ov-units-list">' +
-        (allTotal ? E.UNITS.filter(k => all[k] > 0).map(k => '<span class="uchip">' + ico(k) + C.UNITS[k].name + ' <b>' + fmt(all[k]) + '</b></span>').join('') : '<span class="muted">brak</span>') +
+        (allTotal ? E.UNITS.filter(k => all[k] > 0).map(k => '<span class="uov" title="' + C.UNITS[k].name + ': ' + fmt(all[k]) + '">' + ico(k) + '<span class="uov-txt"><small>' + C.UNITS[k].name + '</small><b>' + fmt(all[k]) + '</b></span></span>').join('') : '<span class="muted">brak</span>') +
       '</div></div></div></section>' +
       '<section class="panel"><div class="tablewrap"><table class="units ov">' +
       '<thead><tr><th>Wioska</th><th>' + ico('wood') + 'Drewno</th><th>' + ico('clay') + 'Glina</th><th>' + ico('iron') + 'Żelazo</th><th>' + ico('pop') + 'Farma</th><th>Budowa</th><th>Rekrutacja</th><th>Wojsko</th><th>Ataki</th></tr></thead>' +
@@ -1306,6 +1306,7 @@
       (p && p.on && p.next ? '<div><span>Następna tura bota</span><b>' + clock(p.next) + '</b></div>' : '') +
       (ago !== null ? '<div class="wide"><span>Ostatnia tura (' + ago + ' min temu)</span><b>budowy: ' + p.last.built + ', wojsko: ' + p.last.recruited +
         ', posiłki: ' + p.last.support + ', badania: ' + p.last.research + ', osadnicy: ' + (p.last.settled || 0) + (p.attack ? ', ataki: ' + (p.last.attacked || 0) : '') + '</b></div>' : '') +
+      (p && p.on && p.attack && p.warWhy ? '<div class="wide"><span>Atak (' + Math.max(0, Math.round((s.now - p.warWhy.t) / 60000)) + ' min temu)</span><b>' + esc(p.warWhy.key === 'sent' ? p.warWhy.text : 'brak fali – ' + p.warWhy.text) + '</b></div>' : '') +
       (p ? '<div class="wide"><span>Łącznie od włączenia</span><b>budowy ' + (stat.built || 0) + ', wojsko ' + fmt(stat.recruited || 0) + ', wysłane posiłki ' + (stat.support || 0) +
         ', zasilone surowce ' + fmt(stat.supplied || 0) + ', badania ' + (stat.research || 0) + ', monety ' + (stat.coins || 0) + ', nowe osady ' + (stat.settled || 0) + (p.attack || stat.attacked ? ', fale ataku ' + (stat.attacked || 0) + ', zwiady ' + (stat.spied || 0) + ', przejęte wioski ' + (stat.conquered || 0) : '') + '</b></div>' : '') + '</div>' + log +
       '<div class="actions"><button class="btn ghost" data-act="close">Anuluj</button><button class="btn" data-act="pilot-save">Zapisz</button></div>';

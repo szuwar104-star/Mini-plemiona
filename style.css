@@ -239,8 +239,14 @@ main { padding: 1.25rem; min-width: 0; }
 .ov-kpis .kpi small:last-child { color: var(--green); }
 .ov-kpis .ov-units { grid-column: 1 / -1; }
 .ov-kpis .ov-units small { color: var(--muted); }
-.ov-units-list { display: flex; flex-wrap: wrap; gap: .35rem .9rem; margin-top: .25rem; }
-.ov-units-list .uchip b { font-size: .95rem; }
+.ov-units-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .5rem; margin-top: .5rem; }
+/* kafelek jednostki: duża ikona, nazwa małą czcionką, liczba pod nią – nazwa nie zlewa się z liczbą */
+.uov { display: flex; align-items: center; gap: .6rem; min-width: 0; padding: .45rem .65rem .45rem .5rem; border-radius: var(--r-sm); background: rgba(255, 255, 255, .05); box-shadow: inset 0 0 0 1px var(--line); }
+.uov .ico { width: 36px; height: 36px; margin: 0; padding: 3px; border-radius: 8px; background: rgba(0, 0, 0, .22); filter: none; }
+.uov-txt { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+.uov-txt small { color: var(--muted); font-size: .76rem; font-weight: 700; text-transform: none; letter-spacing: 0; overflow-wrap: anywhere; }
+.uov-txt b { color: var(--text); font-size: 1.12rem; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+@media (max-width: 520px) { .ov-units-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 table.ov td { vertical-align: middle; }
 table.ov th .ico { width: 18px; height: 18px; }
 table.ov .vname { position: sticky; left: 0; background: var(--surface); z-index: 1; }
