@@ -460,6 +460,7 @@
         powerPerPoint: 80,       // min. siła wyprawy = (minPower osobowości + punkty wioski × ta wartość) × mnożnik czasu gry
         waveGrowthPerHour: 0.05, // o tyle rośnie mnożnik min. siły wyprawy z każdą godziną gry (armie rosną razem z gospodarką)
         waveGrowthMax: 6,        // sufit mnożnika (po ok. 100 godzinach gry)
+        freeMinShare: 0.5,       // min. siła wyprawy na wolną osadę (zajęcie) = ta część minPower osobowości; reszta zależy od obrony celu
         // raids (osobowość): chęć grabienia wolnych osad po osiągnięciu limitu wiosek; 0 = nie grabi
         scoutCap: 6, siegeCap: 20
       },
