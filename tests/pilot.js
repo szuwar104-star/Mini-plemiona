@@ -211,5 +211,17 @@ function twoVillages() {
   }
 }
 
+// 12. Bez limitu bot zakłada osady także po przekroczeniu celu gry
+{
+  const s = mk(9); Object.values(s.factions).forEach(f => { if (f.ai) f.nextThink = 1e15; });
+  s.winVillages = 2;
+  MP.Pilot.configure(s, { on: true, build: false, recruit: 'off', tech: false, settle: true }, s.now);
+  for (let i = 0; i < 8; i++) {
+    E.villagesOf(s, 'player').forEach(x => { const c = E.storageCap(x); x.res = { wood: c, clay: c, iron: c }; x.buildings.hq = 8; x.buildings.barracks = 3; x.buildings.farm = 12; x.buildings.storage = 12; x.units.spear = 2000; });
+    E.advance(s, s.now + HOUR);
+  }
+  ok(E.villagesOf(s, 'player').length > 2, 'bez limitu bot zakłada osady ponad cel gry (' + E.villagesOf(s, 'player').length + ' > 2)');
+}
+
 if (fails) { console.error('\nBłędy: ' + fails); process.exit(1); }
 console.log('\nWszystkie testy Autopilota przeszły.');

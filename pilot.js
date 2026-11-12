@@ -273,7 +273,7 @@
   }
   // Wysyła gotowych osadników, a gdy żadnego nie ma w grze – zleca kolejnego. Zwraca { id, cost }: wioska, która odkłada surowce na osadnika.
   function settleStep(state, p, vs, t, threatened, acts) {
-    const cap = Math.min(p.settleMax > 0 ? p.settleMax : Infinity, E.winVillages(state));
+    const cap = p.settleMax > 0 ? p.settleMax : Infinity;      // puste = bez limitu (gra toczy się dalej także po osiągnięciu celu)
     let memo = {};
     const spotOf = v => (v.id in memo ? memo[v.id] : (memo[v.id] = findSpot(state, v)));
     for (const v of vs) {
