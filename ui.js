@@ -96,7 +96,7 @@
 
   function renderNav() {
     const s = st();
-    const unread = s.reports.filter(r => !r.read).length;
+    const unread = s.reports.filter(r => !r.read && r.kind !== 'news').length; // Kronika świata nie liczy się do plakietki
     const incoming = incomingAttacks(s).length;
     document.querySelectorAll('[data-screen]').forEach(b => {
       b.classList.toggle('active', b.dataset.screen === UI.screen);
@@ -725,13 +725,13 @@
   function renderReports() {
     const s = st(), el = $('#screen-reports');
     const list = filteredReports(s);
-    const sig = JSON.stringify([UI.filter, s.reports.length, s.reports[0] && s.reports[0].id, s.reports.filter(r => !r.read).length]);
+    const sig = JSON.stringify([UI.filter, s.reports.length, s.reports[0] && s.reports[0].id, s.reports.filter(r => !r.read && r.kind !== 'news').length]);
     if (UI.sigs.reports === sig) return;
     UI.sigs.reports = sig;
     const filters = [['all', 'Wszystkie'], ['attack', 'Moje ataki'], ['defense', 'Obrona'], ['spy', 'Zwiad'], ['news', 'Kronika świata']];
     let html = '<section class="panel"><h2>Raporty</h2><div class="toolbar">' +
       filters.map(f => '<button class="btn tab' + (UI.filter === f[0] ? ' on' : '') + '" data-act="filter" data-f="' + f[0] + '">' + f[1] + '</button>').join('') +
-      '<span class="spacer"></span><button class="btn ghost" data-act="read-all"' + (s.reports.some(r => !r.read) ? '' : ' disabled') + '>Oznacz jako przeczytane</button>' +
+      '<span class="spacer"></span><button class="btn ghost" data-act="read-all"' + (s.reports.some(r => !r.read && r.kind !== 'news') ? '' : ' disabled') + '>Oznacz jako przeczytane</button>' +
       '<button class="btn ghost" data-act="clear-reports"' + (s.reports.length ? '' : ' disabled') + '>Usuń wszystkie</button></div>';
     if (!list.length) {
       html += '<p class="muted">Brak raportów. Raport pojawi się po pierwszej bitwie.</p>';

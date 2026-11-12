@@ -1086,7 +1086,7 @@
       return;
     }
     const v = makeVillage(state, m.x, m.y, m.owner, C.SETTLE.buildings, emptyUnits(), C.SETTLE.resources, t);
-    addReport(state, { id: newId(state, 'r'), time: t, kind: 'news', read: m.owner !== 'player', settled: true,
+    addReport(state, { id: newId(state, 'r'), time: t, kind: 'news', read: true, settled: true,
       attacker: m.owner, defender: null, toName: v.name, toX: v.x, toY: v.y, to: v.id });
     if (m.owner === 'player') notice(state, t, 'good', 'Założono nową osadę: ' + v.name + ' (' + v.x + ':' + v.y + ')!');
     checkWin(state, m.owner, t);
@@ -1286,7 +1286,7 @@
           (conquered ? ' i została utracona!' : '.'));
       }
     } else if (conquered) {
-      addReport(state, { id: newId(state, 'r'), time: t, kind: 'news', read: false, attacker: m.owner, defender: defOwner,
+      addReport(state, { id: newId(state, 'r'), time: t, kind: 'news', read: true, attacker: m.owner, defender: defOwner,
         toName: target.name, toX: target.x, toY: target.y, to: target.id, conquered: true });
     }
   }
@@ -1330,7 +1330,7 @@
       if (prevOwner === 'player') {
         if (!state.ended) state.ended = { type: 'defeat', time: t, seen: false };
       } else {
-        addReport(state, { id: newId(state, 'r'), time: t, kind: 'news', read: false, eliminated: prevOwner,
+        addReport(state, { id: newId(state, 'r'), time: t, kind: 'news', read: true, eliminated: prevOwner,
           attacker: newOwner, defender: prevOwner, toName: v.name, toX: v.x, toY: v.y, to: v.id });
       }
     }
