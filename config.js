@@ -466,6 +466,11 @@
       // przez rampMin minut do pełnej. Przy pełnej: wymagana przewaga nad graczem spada do ratioFloor (część zwykłej), próg siły wyprawy
       // o powerCut, częstość prób rośnie o chanceBoost, a waga gracza jako celu o biasBoost, zasięg ataku na gracza rośnie o rangeBoost (×2), a od połowy presji wioska może wysłać o jedną wyprawę więcej. Presja liczona jest osobno dla każdej frakcji: jej własny atak na gracza zeruje ją tylko jej (inne frakcje nie dostają „zerowania”). Zasięg ataku na gracza rośnie przy pełnej presji co najmniej do rangeMapShare boku mapy.
       pressure: { startMin: 20, rampMin: 60, ratioFloor: 0.4, powerCut: 0.5, chanceBoost: 0.6, biasBoost: 1.5, rangeBoost: 1, rangeMapShare: 0.5 },
+      // Wojny AI z AI: rzadkie i duże. powerMult – ile razy większa min. siła wyprawy niż na gracza/wolne osady; ratioMult – ile razy
+      // większa wymagana przewaga nad obroną celu; weightMult – ile razy mniej atrakcyjny cel niż gracz/wolna osada; cooldownMin – przerwa
+      // (minuty gry) między atakami tej samej frakcji na tę samą frakcję (po zemście/dla lidera × revengeCooldown); maxConcurrent – ile
+      // wypraw na frakcje AI frakcja może mieć w drodze naraz; playerSpacingMin – min. odstęp (minuty gry) między wyprawami jednej frakcji na gracza (żeby duże armie nie robiły ciągłego szturmu).
+      versus: { powerMult: 2.5, ratioMult: 1.6, weightMult: 0.3, cooldownMin: 120, revengeCooldown: 0.5, maxConcurrent: 1, playerSpacingMin: 30 },
       // Taktyka wspólna dla wszystkich frakcji (ai.js)
       tactics: {
         buildQueue: 3,           // ile budów AI trzyma w kolejce
