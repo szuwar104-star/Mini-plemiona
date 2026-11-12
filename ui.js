@@ -1755,10 +1755,11 @@
     const myPacts = D.pactsOf(s, 'player', t);
     let html = '<h2>' + ico('scroll') + 'Dyplomacja</h2>' +
       '<p class="muted">Pakt o nieagresji trwa ' + Math.round(cfg.pactMin / 60) + ' h: żadna ze stron nie może wtedy atakować drugiej. Masz ' + myPacts.length + ' z ' + cfg.playerMaxPacts + ' paktów. ' +
+      'Sojusz (po co najmniej ' + cfg.alliance.pactFirstMin + ' min paktu i przy wysokim zaufaniu) nie wygasa i nie zajmuje miejsca na pakt; sojusznik wypowiada wojnę temu, kto uderzy w Ciebie. Sojusz rozpada się, gdy zbliżysz się do zwycięstwa. ' +
       'Wypowiedzenie chroni jeszcze ' + cfg.breakNoticeMin + ' min, a zrywający traci zaufanie wszystkich frakcji. Zwiad pozostaje dozwolony.</p>';
     if (offers.length) {
       html += '<section><h3>Oferty dla Ciebie</h3><ul class="dp-list">' + offers.map(o =>
-        '<li class="dp-card"><div class="dp-top"><span>' + flag(s, o.from) + ' <small class="muted">' + (o.renew ? 'proponuje przedłużenie paktu' : 'proponuje pakt o nieagresji') + '</small></span>' +
+        '<li class="dp-card"><div class="dp-top"><span>' + flag(s, o.from) + ' <small class="muted">' + (o.alliance ? 'proponuje sojusz' : o.renew ? 'proponuje przedłużenie paktu' : 'proponuje pakt o nieagresji') + '</small></span>' +
         '<span class="muted">wygasa za <span class="timer" data-end="' + o.expires + '"></span></span></div>' +
         '<div class="actions left"><button class="btn" data-act="diplo-accept" data-id="' + o.id + '">Przyjmij</button>' +
         '<button class="btn ghost" data-act="diplo-decline" data-id="' + o.id + '">Odrzuć</button></div></li>').join('') + '</ul></section>';
@@ -1771,8 +1772,14 @@
       const others = D.pactsOf(s, f.id, t).map(p => D.partnerOf(p, f.id)).filter(x => x !== 'player');
       const leader = D.isLeader(s, f.id, t);
       const allies = D.blocOf(s, f.id).filter(x => x !== f.id);
+      const isAlly = D.allied(s, 'player', f.id);
+      const aa = isAlly ? { ok: false } : D.assessAlliance(s, f.id, t);
+      const pendAl = offers.some(o => o.from === f.id && o.alliance);
       let status, btns = '';
-      if (pact) {
+      if (isAlly) {
+        status = '<span class="dp-ok">Sojusz: nikt nikogo nie atakuje</span>';
+        btns += '<button class="btn danger" data-act="diplo-leave-ally" data-id="' + f.id + '">Opuść sojusz</button>';
+      } else if (pact) {
         status = pact.breakAt != null
           ? '<span class="dp-warn">Pakt wypowiedziany – chroni jeszcze <span class="timer" data-end="' + pact.breakAt + '"></span></span>'
           : '<span class="dp-ok">Pakt o nieagresji: jeszcze <span class="timer" data-end="' + pact.end + '"></span></span>';
@@ -1785,7 +1792,11 @@
         status = '<span class="muted">Brak paktu</span>';
         btns += '<button class="btn"' + (pend ? ' disabled title="Ta frakcja złożyła Ci już ofertę"' : '') + ' data-act="diplo-propose" data-id="' + f.id + '">Zaproponuj pakt</button>';
       }
-      const hint = pact ? '' : pend ? 'Ta frakcja złożyła Ci ofertę.' : a.ok ? 'Skłonna do paktu.' : esc(a.reason) + (a.need ? ' (brakuje ok. ' + a.need + ' pkt nastawienia)' : '');
+      if (!isAlly && !(pact && pact.breakAt != null)) {
+        btns += '<button class="btn' + (pact || pendAl ? '' : ' ghost') + '"' + (aa.ok || pendAl ? '' : ' disabled title="' + esc(aa.reason || '') + '"') + ' data-act="diplo-ally" data-id="' + f.id + '">' + (pendAl ? 'Przyjmij sojusz' : 'Zaproponuj sojusz') + '</button>';
+      }
+      const hint = isAlly ? '' : pact ? (pendAl ? 'Ta frakcja złożyła Ci ofertę sojuszu.' : aa.ok ? 'Skłonna do sojuszu.' : esc(aa.reason) + (aa.need ? ' (brakuje ok. ' + aa.need + ' pkt nastawienia)' : ''))
+        : pend ? 'Ta frakcja złożyła Ci ofertę.' : a.ok ? 'Skłonna do paktu.' : esc(a.reason) + (a.need ? ' (brakuje ok. ' + a.need + ' pkt nastawienia)' : '');
       const gv = v0 ? [3000, 6000, 12000].map(n => '<button class="btn ghost sm" data-act="diplo-gift" data-id="' + f.id + '" data-n="' + n + '" title="Dar z wioski ' + esc(v0.name) + '">' +
         fmt(n) + ' <small>+' + Math.min(cfg.giftMax, Math.floor(n / cfg.giftPerRes)) + '</small></button>').join('') : '';
       return '<li class="dp-card"><div class="dp-top"><span>' + flag(s, f.id) + ' <small class="muted">' + C.AI.personalities[f.personality].label + ', ' + E.villagesOf(s, f.id).length + ' wiosek</small>' +
@@ -2418,10 +2429,30 @@
         renderModal();
         break;
       }
+      case 'diplo-ally': {
+        const r = G.action(s => DIP().proposeAllianceFromPlayer(s, b.dataset.id, s.now));
+        toast(r.ok ? 'good' : 'bad', r.ok ? 'Sojusz zawarty.' : r.reason + (r.need ? ' (brakuje ok. ' + r.need + ' pkt nastawienia)' : ''));
+        renderModal();
+        break;
+      }
+      case 'diplo-leave-ally': {
+        UI.diploLeave = b.dataset.id;
+        const name = esc(E.ownerName(st(), b.dataset.id));
+        openModal('confirm', { title: 'Opuścić sojusz z ' + name + '?', text: 'Dawni sojusznicy stracą do Ciebie zaufanie (jak po zerwaniu paktu), a przez ' + Math.round(C.DIPLO.alliance.leaveGraceMin / 60) + ' h nie wypowiedzą Ci wojny.',
+          ok: 'diplo-leave-ally-ok', okLabel: 'Opuść sojusz' });
+        break;
+      }
+      case 'diplo-leave-ally-ok': {
+        UI.diploLeave = null;
+        const r = G.action(s => DIP().leavePlayerAlliance(s, s.now));
+        openModal('diplo');
+        toast(r.ok ? 'info' : 'bad', r.ok ? 'Opuszczono sojusz.' : r.reason);
+        break;
+      }
       case 'diplo-accept': case 'diplo-decline': {
         const acc = b.dataset.act === 'diplo-accept';
         const r = G.action(s => DIP().answerOffer(s, b.dataset.id, acc, s.now));
-        toast(r.ok ? 'good' : 'bad', r.ok ? (acc ? (r.renewed ? 'Pakt przedłużony.' : 'Pakt zawarty.') : 'Oferta odrzucona.') : r.reason);
+        toast(r.ok ? 'good' : 'bad', r.ok ? (acc ? (r.alliance ? 'Sojusz zawarty.' : r.renewed ? 'Pakt przedłużony.' : 'Pakt zawarty.') : 'Oferta odrzucona.') : r.reason);
         renderModal();
         break;
       }

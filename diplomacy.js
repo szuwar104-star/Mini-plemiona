@@ -59,7 +59,7 @@
     return ensure(state).pacts.find(p => pair(p.a, p.b) === k && active(p, t)) || null;
   }
   /* ---------- sojusze ---------- */
-  const allianceOf = (state, id) => (id === null || id === 'player' ? null : ensure(state).alliances.find(al => al.members.indexOf(id) >= 0) || null);
+  const allianceOf = (state, id) => (id === null ? null : ensure(state).alliances.find(al => al.members.indexOf(id) >= 0) || null);
   const allied = (state, a, b) => { if (a === null || b === null || a === b) return false; const al = allianceOf(state, a); return !!al && al.members.indexOf(b) >= 0; };
   // Blok frakcji: ona sama i jej sojusznicy (żywi).
   const blocOf = (state, id) => { const al = allianceOf(state, id); return al ? al.members.filter(x => alive(state, x)) : [id]; };
@@ -157,7 +157,8 @@
   function proposeFromPlayer(state, fid, t) {
     const d = ensure(state), cfg = DC();
     if (!isAI(state, fid) || !alive(state, fid)) return { ok: false, reason: 'Ta frakcja nie istnieje.' };
-    const pending = d.offers.find(o => o.from === fid);
+    if (allied(state, 'player', fid)) return { ok: false, reason: 'Jesteście w sojuszu – pakt nie jest potrzebny.' };
+    const pending = d.offers.find(o => o.from === fid && !o.alliance);
     if (pending) { const r = answerOffer(state, pending.id, true, t); return r.ok ? { ok: true, renewed: !!pending.renew } : r; } // własna oferta AI = zgoda
     const ex = pactBetween(state, 'player', fid, t);
     if (ex && ex.breakAt != null) return { ok: false, reason: 'Pakt jest wypowiedziany.' };
@@ -178,6 +179,14 @@
     const i = d.offers.findIndex(o => o.id === offerId);
     if (i < 0) return { ok: false, reason: 'Oferta wygasła.' };
     const o = d.offers[i];
+    if (accept && o.alliance) {
+      d.offers.splice(i, 1);
+      if (!alive(state, o.from)) return { ok: false, reason: 'Ta frakcja już nie istnieje.' };
+      const a = assessAlliance(state, o.from, t);
+      if (!a.ok) return { ok: false, reason: a.reason };
+      formAlliance(state, 'player', o.from, t);
+      return { ok: true, alliance: true };
+    }
     if (accept) {
       const ex = pactBetween(state, 'player', o.from, t);
       if (!ex && pactsOf(state, 'player', t).length >= cfg.playerMaxPacts) return { ok: false, reason: 'Masz już maksymalną liczbę paktów (' + cfg.playerMaxPacts + ').' };
@@ -189,6 +198,57 @@
     d.offers.splice(i, 1);
     d.cool[pair(o.from, 'player')] = t + cfg.rejectCoolMin * MIN;
     return { ok: true, declined: true };
+  }
+
+  // Czy frakcja AI `fid` zgodziłaby się na sojusz z graczem? Czysta ocena, bez skutków ubocznych.
+  // Warunki: pakt o nieagresji trwający co najmniej pactFirstMin, nastawienie ≥ minAttitude, nikt z bloku nie ma nic przeciw, jest miejsce.
+  function assessAlliance(state, fid, t) {
+    const d = ensure(state), cfg = DC(), AL = cfg.alliance, D = params(state, fid);
+    if (!D || !alive(state, fid)) return { ok: false, code: 'dead', reason: 'Ta frakcja nie istnieje.' };
+    if (allied(state, 'player', fid)) return { ok: false, code: 'allied', reason: 'Jesteście już w sojuszu.' };
+    if (isLeader(state, 'player', t)) return { ok: false, code: 'leader', reason: 'Jesteś zbyt blisko zwycięstwa – nikt nie chce z Tobą sojuszu.' };
+    if (isLeader(state, fid, t)) return { ok: false, code: 'leader', reason: 'Ta frakcja jest zbyt blisko zwycięstwa.' };
+    if ((d.rep.player || 0) >= D.repLimit) return { ok: false, code: 'distrust', reason: 'Nie ufa komuś, kto zrywa pakty i sojusze.' };
+    if ((d.cool[pair(fid, 'player')] || 0) > t) return { ok: false, code: 'cooldown', reason: 'Niedawno odrzuciła propozycję – spróbuj później.' };
+    const p = pactBetween(state, 'player', fid, t);
+    if (!p || p.breakAt != null || t - p.start < AL.pactFirstMin * MIN) {
+      return { ok: false, code: 'pact', reason: 'Najpierw zawrzyjcie pakt o nieagresji i utrzymajcie go co najmniej ' + AL.pactFirstMin + ' min.' };
+    }
+    const att = attitude(state, fid, 'player');
+    if (att < AL.minAttitude) return { ok: false, code: 'cold', need: Math.ceil(AL.minAttitude - att), reason: 'Jeszcze Ci nie ufa na tyle, by zawrzeć sojusz. Poprawi to czas bez ataków albo dar.' };
+    const mine = allianceOf(state, 'player'), his = allianceOf(state, fid);
+    if (mine && his) return { ok: false, code: 'other', reason: 'Ta frakcja należy do innego sojuszu.' };
+    const al = mine || his;
+    if (al) {
+      if (al.members.length >= maxMembers(state)) return { ok: false, code: 'full', reason: 'Sojusz ma już komplet członków.' };
+      const newcomer = mine ? fid : 'player';
+      for (const m of al.members) {
+        if (m === 'player' || m === newcomer) continue;
+        if (attitude(state, m, newcomer) < AL.minAttitude - 5) return { ok: false, code: 'ally', reason: nameOf(state, m) + ' nie ufa ' + (mine ? 'tej frakcji' : 'Tobie') + ' na tyle, by przyjąć ' + (mine ? 'ją' : 'Cię') + ' do sojuszu.' };
+        if ((d.rep[newcomer] || 0) >= params(state, m).repLimit) return { ok: false, code: 'ally', reason: nameOf(state, m) + ' nie ufa komuś, kto zrywa pakty i sojusze.' };
+        if (newcomer !== 'player' && warBetween(state, newcomer, m, t)) return { ok: false, code: 'war', reason: 'Ta frakcja toczy wojnę z członkiem Twojego sojuszu.' };
+      }
+    }
+    return { ok: true };
+  }
+  function proposeAllianceFromPlayer(state, fid, t) {
+    const d = ensure(state), cfg = DC();
+    if (!isAI(state, fid) || !alive(state, fid)) return { ok: false, reason: 'Ta frakcja nie istnieje.' };
+    const pending = d.offers.find(o => o.from === fid && o.alliance);
+    if (pending) return answerOffer(state, pending.id, true, t); // własna oferta AI = zgoda
+    const a = assessAlliance(state, fid, t);
+    if (!a.ok) {
+      if (a.code === 'cold' || a.code === 'distrust') d.cool[pair(fid, 'player')] = t + cfg.rejectCoolMin * MIN;
+      return { ok: false, reason: a.reason, code: a.code, need: a.need };
+    }
+    formAlliance(state, 'player', fid, t);
+    return { ok: true, alliance: true };
+  }
+  // Wyjście gracza z sojuszu: dawni sojusznicy tracą do niego zaufanie (jak przy zerwaniu paktu) i mają okres karencji bez wojny.
+  function leavePlayerAlliance(state, t) {
+    if (!allianceOf(state, 'player')) return { ok: false, reason: 'Nie należysz do sojuszu.' };
+    leaveAlliance(state, 'player', t, 'quit');
+    return { ok: true };
   }
 
   // Dar surowców dla frakcji AI (znika z wioski) podnosi jej nastawienie.
@@ -216,6 +276,7 @@
 
   /* ---------- skutki walk ---------- */
   function onBattle(state, att, def, won, conquered, t) {
+    if (def === 'player' && isAI(state, att)) { defendPlayer(state, att, t); return; }
     if (def === null || !isAI(state, def) || att === def) return;
     const d = ensure(state), cfg = DC();
     adjust(state, def, att, -(conquered ? cfg.hitConquer : won ? cfg.hitWin : cfg.hitLoss));
@@ -226,6 +287,21 @@
     // zmęczenie wojną: po maxBattles bitwach między stronami wojna kończy się rozejmem
     const w = isAI(state, att) ? warBetween(state, att, def, t) : null;
     if (w && ++w.battles >= cfg.war.maxBattles) endWar(state, w, t, 'weary');
+  }
+
+  // Sojusznicy gracza mają za złe atak na niego: spada ich nastawienie do napastnika, a bliscy wypowiadają mu (ograniczoną) wojnę.
+  function defendPlayer(state, att, t) {
+    const al = allianceOf(state, 'player'), d = ensure(state), cfg = DC();
+    if (!al) return;
+    al.members.slice().forEach(m => {
+      if (m === 'player' || !alive(state, m) || allied(state, m, att)) return;
+      adjust(state, m, att, -cfg.allyOutrage);
+      if (warBetween(state, m, att, t) || (d.peace[pair(m, att)] || 0) > t || minDistance(state, m, att) > cfg.war.range) return;
+      if (openWar(state, m, att, t, t + cfg.war.durationMin * MIN, true)) {
+        chronicle(state, t, 'war', m, att, null);
+        E.notice(state, t, 'info', nameOf(state, m) + ' wypowiada wojnę frakcji ' + nameOf(state, att) + ' w obronie sojuszu.');
+      }
+    });
   }
 
   // Mnożnik atrakcyjności celu dla AI: 0 = pakt (nie atakuje), >1 = zemsta albo lider, <1 = sympatia.
@@ -255,6 +331,7 @@
     // pakty między członkami są zbędne – zwalniają limit paktów
     d.pacts = d.pacts.filter(p => !(al.members.indexOf(p.a) >= 0 && al.members.indexOf(p.b) >= 0));
     al.members.forEach(x => al.members.forEach(y => { if (x !== y) adjust(state, x, y, DC().alliance.joinBonus); }));
+    if (al.members.indexOf('player') >= 0) E.notice(state, t, 'good', 'Sojusz: ' + al.members.map(m => nameOf(state, m)).join(', ') + '.');
     return al;
   }
   function leaveAlliance(state, id, t, why) {
@@ -263,18 +340,23 @@
     const rest = al.members.filter(x => x !== id);
     al.members = rest;
     if (rest.length < 2) d.alliances = d.alliances.filter(x => x !== al);
+    const bad = why === 'betray' || why === 'quit';
     rest.forEach(x => {
       d.peace[pair(id, x)] = t + cfg.leaveGraceMin * MIN;
-      if (why === 'betray') adjust(state, x, id, -cfg.leavePenalty);
+      if (bad) adjust(state, x, id, -cfg.leavePenalty);
     });
-    if (why === 'betray') d.rep[id] = (d.rep[id] || 0) + DC().repPerBreak;
+    if (bad) d.rep[id] = (d.rep[id] || 0) + DC().repPerBreak;
     chronicle(state, t, why === 'betray' ? 'betray' : 'leave', id, rest[0] || null, rest.length >= 2 ? rest.slice() : null);
+    if (id === 'player' && why === 'leader') E.notice(state, t, 'info', 'Sojusznicy odwracają się od Ciebie: jesteś zbyt blisko zwycięstwa. Sojusz się rozpadł.');
+    else if (id !== 'player' && rest.indexOf('player') >= 0) {
+      E.notice(state, t, why === 'betray' ? 'danger' : 'info', nameOf(state, id) + (why === 'betray' ? ' zdradza sojusz i odchodzi.' : ' opuszcza Twój sojusz.') + (rest.length < 2 ? ' Sojusz się rozpadł.' : ''));
+    }
   }
 
   /* ---------- wojny: wypowiedzenie i rozejm ---------- */
   function openWar(state, x, y, t, end, joined) {
     const d = ensure(state);
-    if (x === y || allied(state, x, y) || warBetween(state, x, y, t)) return null;
+    if (x === y || x === 'player' || y === 'player' || allied(state, x, y) || warBetween(state, x, y, t)) return null;
     const w = { id: 'w' + (++d.seq), a: x, b: y, start: t, end, battles: 0, joined: !!joined };
     d.wars.push(w);
     adjust(state, x, y, -10); adjust(state, y, x, -10);
@@ -284,7 +366,7 @@
     const wc = DC().war, end = t + wc.durationMin * MIN;
     const w = openWar(state, a, b, t, end, false);
     if (!w) return null;
-    const mine = blocOf(state, a).filter(x => x !== a), theirs = blocOf(state, b).filter(x => x !== b);
+    const mine = blocOf(state, a).filter(x => x !== a && x !== 'player'), theirs = blocOf(state, b).filter(x => x !== b && x !== 'player');
     theirs.forEach(m => openWar(state, a, m, t, end, true)); // sojusznicy obrońcy stają po jego stronie
     mine.forEach(m => { // sojusznicy agresora dołączają z pewną szansą (tylko jeśli cel jest w zasięgu)
       if (E.rand(state) < wc.joinChance && minDistance(state, m, b) <= wc.range) openWar(state, m, b, t, end, true);
@@ -304,11 +386,11 @@
   }
 
   /* ---------- tick co minutę czasu gry ---------- */
-  function offerToPlayer(state, fid, t, renew) {
+  function offerToPlayer(state, fid, t, renew, alliance) {
     const d = ensure(state), cfg = DC();
     if (d.offers.some(o => o.from === fid)) return;
-    d.offers.push({ id: 'o' + (++d.seq), from: fid, renew: !!renew, time: t, expires: t + cfg.offerTtlMin * MIN });
-    E.notice(state, t, 'info', nameOf(state, fid) + (renew ? ' proponuje przedłużenie paktu.' : ' proponuje pakt o nieagresji.') + ' Zobacz: Menu → Dyplomacja.');
+    d.offers.push({ id: 'o' + (++d.seq), from: fid, renew: !!renew, alliance: !!alliance, time: t, expires: t + cfg.offerTtlMin * MIN });
+    E.notice(state, t, 'info', nameOf(state, fid) + (alliance ? ' proponuje sojusz.' : renew ? ' proponuje przedłużenie paktu.' : ' proponuje pakt o nieagresji.') + ' Zobacz: Menu → Dyplomacja.');
   }
 
   function tick(state, t) {
@@ -411,11 +493,12 @@
       const D = params(state, a);
       if (!D.allyChance || isLeader(state, a, t) || E.rand(state) >= D.allyChance * (dt / MIN)) return;
       const myAl = allianceOf(state, a);
-      if (myAl && myAl.members.length >= maxMembers(state)) return;
+      if (myAl && (myAl.members.length >= maxMembers(state) || myAl.members.indexOf('player') >= 0)) return; // sojusz z graczem rozszerza tylko gracz
       const cands = ais.filter(b => b !== a && !allied(state, a, b) && !isLeader(state, b, t) && !((d.peace[pair(a, b)] || 0) > t) &&
         attitude(state, a, b) >= AL.minAttitude && attitude(state, b, a) >= AL.minAttitude)
         .filter(b => {
           const bAl = allianceOf(state, b);
+          if (bAl && bAl.members.indexOf('player') >= 0) return false;
           if (myAl && bAl) return false;                                    // dwa istniejące sojusze się nie łączą
           const al = myAl || bAl, newcomer = myAl ? b : a;
           if (al && al.members.length >= maxMembers(state)) return false;
@@ -425,6 +508,13 @@
         })
         .map(b => ({ b, d: minDistance(state, a, b) })).filter(c => c.d <= AL.range).sort((x, y) => x.d - y.d);
       if (cands.length) formAlliance(state, a, cands[0].b, t);
+    });
+
+    // 5b. przychylne frakcje po paktach z graczem same proponują mu sojusz (rzadziej niż między sobą)
+    ais.forEach(a => {
+      const D = params(state, a);
+      if (!D.allyChance || d.offers.some(o => o.from === a) || allied(state, a, 'player') || E.rand(state) >= D.allyChance * 0.5 * (dt / MIN)) return;
+      if (attitude(state, a, 'player') >= AL.minAttitude + 10 && assessAlliance(state, a, t).ok) offerToPlayer(state, a, t, false, true);
     });
 
     // 6. wojny: agresywne frakcje czasem wypowiadają wojnę sąsiadowi, ale nie blokowi silniejszemu od własnego
@@ -443,5 +533,6 @@
 
   MP.Diplomacy = { ensure, attitude, adjust, attitudeLabel, pactBetween, pactsOf, partnerOf, blocked, isLeader, assess,
     signPact, breakPact, proposeFromPlayer, answerOffer, gift, onBattle, targetWeight, tick,
-    allianceOf, allied, blocOf, maxMembers, warBetween, warsOf, formAlliance, leaveAlliance, declareWar, endWar };
+    allianceOf, allied, blocOf, maxMembers, warBetween, warsOf, formAlliance, leaveAlliance, declareWar, endWar,
+    assessAlliance, proposeAllianceFromPlayer, leavePlayerAlliance };
 })(typeof window !== 'undefined' ? window : globalThis);

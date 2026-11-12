@@ -702,7 +702,9 @@
     if (from.id === to.id) return { ok: false, reason: 'Nie można zaatakować tej samej wioski' };
     if (to.owner === from.owner) return { ok: false, reason: 'To Twoja wioska' };
     if (type === 'attack' && to.owner !== null && MP.Diplomacy && MP.Diplomacy.blocked(state, from.owner, to.owner, t)) {
-      return { ok: false, reason: 'Pakt o nieagresji z ' + ownerName(state, to.owner) + ' – najpierw go wypowiedz (Menu → Dyplomacja).' };
+      return { ok: false, reason: MP.Diplomacy.allied(state, from.owner, to.owner)
+        ? 'Sojusz z ' + ownerName(state, to.owner) + ' – najpierw go opuść (Menu → Dyplomacja).'
+        : 'Pakt o nieagresji z ' + ownerName(state, to.owner) + ' – najpierw go wypowiedz (Menu → Dyplomacja).' };
     }
     tickVillage(state, from, t);
     const u = cleanUnits(units);
@@ -1265,7 +1267,7 @@
       const units = Object.assign(emptyUnits(), m.units);
       state.movements.push({ id: newId(state, 'm'), type: 'return', owner: m.owner, from: m.from, to: m.to, bounced: true,
         units, loot: null, start: t, arrive: t + travelTime(target, origin, units, m.owner) });
-      if (m.owner === 'player') notice(state, t, 'info', 'Pakt z ' + ownerName(state, target.owner) + ' – wojsko zawraca do ' + origin.name + '.');
+      if (m.owner === 'player') notice(state, t, 'info', (MP.Diplomacy.allied(state, m.owner, target.owner) ? 'Sojusz z ' : 'Pakt z ') + ownerName(state, target.owner) + ' – wojsko zawraca do ' + origin.name + '.');
       return;
     }
 
