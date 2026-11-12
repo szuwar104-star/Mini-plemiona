@@ -67,7 +67,7 @@
   const C = {
     out: '#2b1d10', wall: '#e6d3a6', wallSh: '#c5ae7d', wood: '#7a4a22', woodL: '#a2693a', door: '#4a2e17',
     win: '#f4d679', stone: '#a7a59c', stoneL: '#c5c3b8', stoneD: '#7d7b72', dirt: '#a98f5d', dirtL: '#bca26d', dirtD: '#8e7547',
-    pineO: '#183219', pineH: '#4b8a3a', pineM: '#336b2c', pineS: '#24522a',
+    pineO: '#183219', pineH: '#4b8a3a', pineHH: '#6fae4e', pineM: '#336b2c', pineS: '#24522a',
     oakO: '#1d3a1b', oakM: '#3f7a2f', oakH: '#5a9a3e', oakHH: '#79b14f', trunk: '#5a3a1e',
     rockO: '#3c3a2e', rockL: '#b8b39a', rockM: '#99937a', rockS: '#7a7461', snow: '#f3f2ea', snowS: '#cfd3d8'
   };
@@ -77,29 +77,38 @@
 
   /* ---------- obiekty krajobrazu ---------- */
   function pine(p, x, by, h) {
-    p.alpha(0.28); p.ellipse(x + 2, by, 4, 1, '#0d1a08'); p.alpha(1);
-    p.rect(x - 1, by - 3, 2, 3, C.trunk);
+    p.alpha(0.28); p.ellipse(x + 3, by, 5, 1, '#0d1a08'); p.alpha(1);
+    p.rect(x - 1, by - 3, 2, 3, C.trunk); p.px(x - 1, by - 3, '#7a5230');
     const top = by - h, body = h - 3;
     for (let r = 0; r < body; r++) {
       const y = top + r;
       let half = Math.round(0.4 + (r / body) * 4.6);
       if (r > 2 && r % 4 === 0) half -= 1;
+      const under = r > 2 && r % 4 === 3;                 // spód piętra gałęzi: ciemniejszy
       for (let dx = -half; dx <= half; dx++) {
         let c = dx === -half || dx === half ? C.pineO : dx < -half / 3 ? C.pineH : dx <= half / 3 ? C.pineM : C.pineS;
+        if (c === C.pineH && hash(x + dx, y, 7) < 0.18) c = C.pineHH;          // igły w słońcu
+        if (c !== C.pineO && under) c = dx < 0 ? C.pineM : C.pineS;
         if (r === 0) c = C.pineO;
         p.px(x + dx, y, c);
       }
     }
+    p.px(x - 1, top + 2, C.pineHH);
+  }
+  function blob(p, cx, cy, r) {
+    p.ellipse(cx, cy, r, r, C.oakO);
+    p.ellipse(cx, cy, r - 1, r - 1, C.oakM);
+    p.ellipse(cx - 1, cy - 1, Math.max(1, r - 2), Math.max(1, r - 2), C.oakH);
+    if (r > 3) p.ellipse(cx - 2, cy - 2, Math.max(1, r - 4), Math.max(1, r - 4), C.oakHH);
   }
   function oak(p, x, by, r) {
-    p.alpha(0.28); p.ellipse(x + 2, by, r, 1, '#0d1a08'); p.alpha(1);
-    p.rect(x - 1, by - 4, 2, 4, C.trunk);
-    const cy = by - 3 - r;
-    p.ellipse(x, cy, r, r, C.oakO);
-    p.ellipse(x, cy, r - 1, r - 1, C.oakM);
-    p.ellipse(x - 1, cy - 1, r - 2, r - 2, C.oakH);
-    p.ellipse(x - 2, cy - 2, Math.max(1, r - 4), Math.max(1, r - 4), C.oakHH);
-    p.px(x + r - 2, cy + 1, C.oakO); p.px(x + 1, cy + r - 2, C.oakO);
+    p.alpha(0.28); p.ellipse(x + 3, by, r + 1, 1, '#0d1a08'); p.alpha(1);
+    p.rect(x - 1, by - 4, 2, 4, C.trunk); p.px(x - 1, by - 4, '#7a5230'); p.px(x, by - 1, '#3a240f');
+    const cy = by - 3 - r, q = Math.max(2, Math.round(r * 0.7));
+    blob(p, x + Math.round(r * 0.45), cy + 1, q);          // prawy (zasłonięty) płat
+    blob(p, x - Math.round(r * 0.45), cy + 1, q);
+    blob(p, x, cy - Math.round(r * 0.25), r - 1 + (r > 4 ? 1 : 0));
+    p.px(x + r - 2, cy + 2, C.oakO); p.px(x + 1, cy + r - 1, C.oakO);
   }
   function mountain(p, cx, by, w, h, seed) {
     p.alpha(0.25); p.ellipse(cx + 3, by, Math.round(w / 2) + 1, 2, '#1a1a10'); p.alpha(1);
@@ -121,23 +130,52 @@
   }
 
   /* ---------- budynki (wspólne dla mapy i widoku wioski) ---------- */
+  function smoke(p, x, y) {
+    p.alpha(0.42); p.ellipse(x, y, 1, 1, '#e8e4dc'); p.ellipse(x + 1, y - 3, 1, 1, '#d6d2ca'); p.ellipse(x + 2, y - 6, 2, 2, '#c4c0b8'); p.alpha(1);
+  }
   function house(p, x, by, w, h, roof, opts) {
     opts = opts || {};
-    const rl = shade(roof, 1.22), rd = shade(roof, 0.72);
-    p.rect(x, by - h, w, h, opts.wall || C.wall);
-    p.rect(x + w - 2, by - h, 1, h, opts.wallSh || C.wallSh);
+    const wall = opts.wall || C.wall, wl = shade(wall, 1.1), wd = shade(wall, 0.8), wdd = shade(wall, 0.62);
+    const rl = shade(roof, 1.32), rd = shade(roof, 0.72);
+    // ściana: jasna lewa krawędź, cień po prawej, belki szachulca
+    p.rect(x, by - h, w, h, wall);
+    p.rect(x + 1, by - h, 1, h, wl);
+    p.rect(x + w - 3, by - h, 2, h, wd);
+    p.rect(x + 1, by - 2, w - 2, 1, wd);
+    if (w >= 8) { p.rect(x + 2, by - h + 1, 1, h - 3, C.wood); p.rect(x + w - 4, by - h + 1, 1, h - 3, C.wood); }
     p.rect(x, by - h, 1, h, C.out); p.rect(x + w - 1, by - h, 1, h, C.out); p.rect(x, by - 1, w, 1, C.out);
-    if (w >= 6) p.rect(x + Math.floor(w / 2) - 1, by - 3, 2, 2, C.door);
-    if (w >= 6 && h >= 5) { p.px(x + 2, by - h + 2, C.win); if (w >= 9) p.px(x + w - 3, by - h + 2, C.win); }
+    if (w >= 6) {
+      const dx = x + Math.floor(w / 2) - 1;
+      p.rect(dx, by - 4, 2, 3, C.door); p.px(dx, by - 5, C.door); p.px(dx + 1, by - 5, C.out);
+      p.px(dx + 1, by - 3, '#d9b45a');
+    }
+    if (w >= 6 && h >= 5) {
+      const win = (wx) => { p.rect(wx, by - h + 2, 2, 2, C.win); p.px(wx, by - h + 2, '#fff6c0'); p.px(wx - 1, by - h + 2, C.wood); p.px(wx + 2, by - h + 2, C.wood); };
+      win(x + 3); if (w >= 9) win(x + w - 5);
+    }
+    // dach: gonty w pasach, grzbiet rozjaśniony, okap rzuca cień na ścianę
     const c = x + (w - 1) / 2, rh = Math.min(Math.ceil((w + 1) / 2), opts.roofMax || 99);
     const topHalf = Math.max(0, Math.ceil((w + 1) / 2) - rh);
     for (let r = 0; r <= rh; r++) {
       const y = by - h - rh + r;
       const l = Math.round(c - topHalf - r - 0.5 * (r === rh ? 1 : 0)), rr = Math.round(c + topHalf + r + 0.5 * (r === rh ? 1 : 0));
       for (let xx = l; xx <= rr; xx++) {
-        const col = xx === l || xx === rr || r === 0 || r === rh ? C.out : (xx < c ? rl : rd);
+        let col;
+        if (xx === l || xx === rr || r === 0 || r === rh) col = C.out;
+        else {
+          const lit = xx < c, band = r % 2 === 0;
+          col = lit ? (band ? rl : shade(roof, 1.18)) : (band ? rd : shade(roof, 0.82));
+          if (r === 1) col = shade(roof, 1.5);
+          else if (hash(xx, y, 21) < 0.1) col = lit ? shade(roof, 1.42) : shade(roof, 0.62);
+        }
         p.px(xx, y, col);
       }
+    }
+    p.rect(x + 1, by - h + 1, w - 2, 1, wdd);
+    if (opts.chimney !== false && w >= 8) {
+      const cx2 = x + w - 5, ry = by - h - rh + Math.max(0, Math.round(Math.abs(cx2 - c)) - topHalf);
+      p.rect(cx2, ry - 3, 2, 4, '#8a7f72'); p.px(cx2, ry - 3, '#b3a898'); p.rect(cx2 - 1, ry - 4, 4, 1, C.out);
+      if (opts.smoke !== false) smoke(p, cx2 + 1, ry - 6);
     }
     return { x: x - 1, y: by - h - rh, w: w + 2, h: h + rh };
   }
@@ -155,22 +193,48 @@
     p.px(x + 8, top + 2, C.out); p.px(x + 8, top + 3, C.out);
   }
   function tower(p, x, by, w, h, roof, withFlag) {
+    const bl = shade(C.stone, 0.82);
     p.rect(x, by - h, w, h, C.stone);
     p.rect(x + 1, by - h, 1, h, C.stoneL);
     p.rect(x + w - 2, by - h, 1, h, C.stoneD);
+    for (let r = 0; r < h - 2; r += 3) {                    // mur z kamiennych bloków
+      p.rect(x + 1, by - h + 3 + r, w - 2, 1, bl);
+      for (let i = ((r / 3) % 2) * 2; i < w - 2; i += 4) p.px(x + 1 + i, by - h + 4 + r, bl);
+    }
     p.rect(x, by - h, 1, h, C.out); p.rect(x + w - 1, by - h, 1, h, C.out); p.rect(x, by - 1, w, 1, C.out);
-    p.rect(x + Math.floor(w / 2), by - h + 3, 1, 2, C.out);
-    for (let i = 0; i < w; i += 2) p.rect(x + i, by - h - 1, 1, 1, C.out);
+    p.rect(x + Math.floor(w / 2), by - h + 5, 1, 3, C.out);    // strzelnica
+    if (w >= 10) p.rect(x + Math.floor(w / 2) - 3, by - h + 11, 1, 3, C.out);
+    for (let i = 0; i < w - 1; i += 3) { p.rect(x + i, by - h - 2, 2, 2, C.stone); p.px(x + i, by - h - 2, C.stoneL); p.rect(x + i, by - h - 3, 2, 1, C.out); }
+    p.rect(x, by - h - 1, w, 1, C.out);
     const c = x + (w - 1) / 2, rh = Math.ceil(w / 2) + 2;
     for (let r = 0; r <= rh; r++) {
       const half = Math.round((r / rh) * (w / 2 + 0.5));
       for (let dx = -half; dx <= half; dx++) {
-        const xx = Math.round(c + dx);
-        p.px(xx, by - h - 1 - rh + r, dx === -half || dx === half || r === rh ? C.out : dx < 0 ? shade(roof, 1.2) : shade(roof, 0.75));
+        const xx = Math.round(c + dx), yy = by - h - 1 - rh + r;
+        let col = dx === -half || dx === half || r === rh ? C.out : dx < 0 ? shade(roof, r % 2 ? 1.2 : 1.35) : shade(roof, r % 2 ? 0.75 : 0.66);
+        if (col !== C.out && hash(xx, yy, 33) < 0.1) col = dx < 0 ? shade(roof, 1.5) : shade(roof, 0.55);
+        p.px(xx, yy, col);
       }
     }
     if (withFlag) flag(p, Math.round(c), by - h - rh - 12, roof);
     return { x, y: by - h - rh - (withFlag ? 12 : 1), w, h: h + rh + (withFlag ? 12 : 1) };
+  }
+  function haystack(p, x, by, s) {
+    p.alpha(0.25); p.ellipse(x + 1, by, 3 * s + 1, 1, '#102008'); p.alpha(1);
+    p.ellipse(x, by - 2 * s, 2 * s + 1, 2 * s, '#8a6a22');
+    p.ellipse(x - 1, by - 2 * s - 1, 2 * s, 2 * s - 1, '#d8b84a');
+    p.px(x - 1, by - 2 * s - 2, '#f6e08a'); p.px(x, by - 2 * s - 1, '#f6e08a');
+  }
+  function well(p, x, by) {
+    p.alpha(0.25); p.ellipse(x + 1, by, 5, 1, '#102008'); p.alpha(1);
+    p.ellipse(x, by - 1, 4, 2, C.out); p.ellipse(x, by - 1, 3, 1, C.stoneL); p.ellipse(x, by - 2, 2, 1, '#3d6a8a');
+    p.rect(x - 4, by - 6, 1, 5, C.wood); p.rect(x + 3, by - 6, 1, 5, C.wood);
+    p.rect(x - 5, by - 8, 11, 1, C.out); p.rect(x - 4, by - 7, 9, 1, '#a8432a'); p.px(x - 3, by - 7, '#d2694a');
+  }
+  function logpile(p, x, by) {
+    [[0, 0], [3, 0], [6, 0], [1, -2], [4, -2], [2, -4]].forEach(o => {
+      p.rect(x + o[0], by + o[1] - 2, 3, 2, '#7a4a22'); p.px(x + o[0], by + o[1] - 2, '#dcb479'); p.px(x + o[0] + 1, by + o[1] - 1, '#a8703a');
+    });
   }
   function fence(p, cx, cy, rx, ry, front, stone) {
     for (let a = 0; a < 360; a += 4) {
@@ -185,7 +249,11 @@
   }
   function field(p, x, y, w, h, ripe) {
     p.rect(x, y, w, h, '#6a5a32');
-    for (let r = 0; r < h; r++) if (r % 2 === 0) p.rect(x + 1, y + r, w - 2, 1, ripe ? '#d8bc54' : '#7fa346');
+    p.rect(x, y, w, 1, '#8a7646');
+    for (let r = 0; r < h; r++) if (r % 2 === 0) {
+      p.rect(x + 1, y + r, w - 2, 1, ripe ? '#d8bc54' : '#7fa346');
+      for (let i = 1; i < w - 2; i += 3) p.px(x + i, y + r, ripe ? '#f0da7a' : '#9bc25a');
+    }
   }
 
   function villageTier(points) { return points <= 9 ? 0 : points <= 20 ? 1 : points <= 38 ? 2 : 3; }
@@ -197,23 +265,27 @@
     p.alpha(0.28); p.ellipse(cx, by + 1, 15 + tier, 4, '#102008'); p.alpha(1);   // cień pod osadą
     if (tier === 0) {
       field(p, cx + 3, by - 7, 9, 6, true);
+      haystack(p, cx + 13, by - 1, 1);
       house(p, cx - 9, by, 10, 6, roof);
       if (showFlag) flag(p, cx - 12, by - 21, roof);
     } else if (tier === 1) {
       field(p, cx - 14, by - 3, 6, 5, true);
-      house(p, cx - 10, by - 2, 9, 6, roof);
+      haystack(p, cx + 14, by - 5, 1);
+      house(p, cx - 10, by - 2, 9, 6, roof, { smoke: false });
       house(p, cx + 1, by + 1, 11, 7, roof);
       if (showFlag) flag(p, cx + 10, by - 22, roof);
     } else if (tier === 2) {
       fence(p, cx, by - 5, 13, 8, false, false);
-      house(p, cx - 12, by - 2, 8, 6, roof);
+      house(p, cx - 12, by - 2, 8, 6, roof, { smoke: false });
       house(p, cx + 4, by - 3, 8, 6, roof);
+      well(p, cx + 12, by - 1);
       tower(p, cx - 4, by + 1, 8, 12, roof, showFlag);
       fence(p, cx, by - 5, 13, 8, true, false);
     } else {
       fence(p, cx, by - 5, 14, 9, false, true);
-      house(p, cx - 13, by - 1, 8, 6, roof);
+      house(p, cx - 13, by - 1, 8, 6, roof, { smoke: false });
       house(p, cx + 5, by - 1, 8, 6, roof);
+      logpile(p, cx + 8, by + 6);
       tower(p, cx - 6, by + 2, 12, 15, roof, showFlag);
       fence(p, cx, by - 5, 14, 9, true, true);
     }
@@ -448,6 +520,7 @@
     });
     return cv;
   }
+
 
   MP.Art = { AP, terrain, territory, villages, minimap, shade, mix, canvas, villageTier };
 })(typeof window !== 'undefined' ? window : globalThis);
