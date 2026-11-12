@@ -417,6 +417,7 @@
       '<button class="btn" data-act="auto-open"' + (own.length > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"') + '>' + ico('merchant') + 'Konwoje' +
         (s.auto && s.auto.on ? ' <small>(wł.)</small>' : '') + '</button>' +
       '<button class="btn" data-act="tech-open">' + ico('scroll') + 'Technologia</button>' +
+      '<button class="btn" data-act="pilot-open">' + ico('wall') + 'Autopilot' + (s.pilot && s.pilot.on ? ' <small>(wł.)</small>' : '') + '</button>' +
       '<button class="btn" data-act="diplo-open">' + ico('scroll') + 'Dyplomacja' + (diploOffers(s) ? ' <small>(' + diploOffers(s) + ')</small>' : '') + '</button></div></div>' +
       '<div class="army-kpis ov-kpis">' + E.RES.map(r => '<div class="kpi"><small>' + C.RESOURCES[r].name + ' razem</small><b>' + fmt(total[r]) + '</b><small>+' + Math.round(prod[r]) + ' / min</small></div>').join('') +
       '<div class="kpi"><small>Wojsko w wioskach</small><b>' + fmt(army) + '</b></div>' +
@@ -1219,6 +1220,39 @@
       '<div class="actions"><button class="btn ghost" data-act="close">Anuluj</button><button class="btn" data-act="auto-save">Zapisz</button></div>';
   }
 
+  /* ---------- autopilot ---------- */
+  function pilotDefaults() {
+    const s = st(), p = s.pilot || {}, D = C.PILOT.defaults;
+    return { on: p.on !== undefined ? p.on : true, build: p.build !== undefined ? p.build : D.build, recruit: p.recruit || D.recruit,
+      tech: p.tech !== undefined ? p.tech : D.tech, defend: p.defend !== undefined ? p.defend : D.defend, defLevel: p.defLevel || D.defLevel };
+  }
+  function pilotModal() {
+    const s = st(), g = UI.pilot, p = s.pilot;
+    const stat = p && p.stats || {};
+    const ago = p && p.last ? Math.max(0, Math.round((s.now - p.last.t) / 60000)) : null;
+    const opt = (v, cur, label) => '<option value="' + v + '"' + (String(v) === String(cur) ? ' selected' : '') + '>' + label + '</option>';
+    const log = p && p.log && p.log.length ? '<ul class="plog">' + p.log.slice(-8).reverse().map(l => '<li><small class="muted">' + clock(l.t) + '</small> ' + esc(l.text) + '</li>').join('') + '</ul>' : '';
+    return '<h2>' + ico('wall') + 'Autopilot – gra za Ciebie</h2>' +
+      '<p class="muted">Gdy zostawisz grę włączoną, bot sam prowadzi wszystkie Twoje wioski. Bot nie widzi siły wrogich wojsk (tak jak Ty), więc wysyła obronę „na zapas”. ' +
+      'Działa też po zamknięciu gry – po powrocie gra nadrabia czas, a bot podejmuje decyzje tak, jakby cały czas był przy komputerze. Nie działa w pauzie. ' +
+      'Przy włączonym Autopilocie ekran urządzenia nie będzie się wygaszał (jeśli przeglądarka na to pozwala).</p>' +
+      '<label class="chk big-chk"><input type="checkbox" data-pon' + (g.on ? ' checked' : '') + '>Autopilot włączony</label>' +
+      '<label class="chk"><input type="checkbox" data-pbuild' + (g.build ? ' checked' : '') + '>Rozbudowuj budynki we wszystkich wioskach</label>' +
+      '<label class="field">Wojsko <select data-prec>' + opt('defense', g.recruit, 'Tylko obrona (Pikinierzy, Łucznicy, Tarczownicy)') +
+        opt('balanced', g.recruit, 'Obrona, a po osiągnięciu celu także armia ataku') + opt('off', g.recruit, 'Nie szkol wojska') + '</select></label>' +
+      '<label class="field">Cel obrony wioski <select data-pdef>' + opt(25, g.defLevel, 'Niski') + opt(40, g.defLevel, 'Średni') + opt(60, g.defLevel, 'Wysoki') + opt(90, g.defLevel, 'Twierdza') +
+        ([25, 40, 60, 90].indexOf(Number(g.defLevel)) < 0 ? opt(g.defLevel, g.defLevel, 'Własny (' + g.defLevel + ')') : '') + '</select></label>' +
+      '<label class="chk"><input type="checkbox" data-pdefend' + (g.defend ? ' checked' : '') + '>Wysyłaj obronę z innych wiosek do atakowanych (po ataku wraca)</label>' +
+      '<label class="chk"><input type="checkbox" data-ptech' + (g.tech ? ' checked' : '') + '>Kupuj monety z nadwyżek surowców i badaj Technologię (wymaga Targowiska)</label>' +
+      '<div class="summary"><div><span>Stan</span><b>' + (p && p.on ? 'włączony' : 'wyłączony') + '</b></div>' +
+      (p && p.on && p.next ? '<div><span>Następna tura bota</span><b>' + clock(p.next) + '</b></div>' : '') +
+      (ago !== null ? '<div class="wide"><span>Ostatnia tura (' + ago + ' min temu)</span><b>budowy: ' + p.last.built + ', wojsko: ' + p.last.recruited +
+        ', posiłki: ' + p.last.support + ', badania: ' + p.last.research + '</b></div>' : '') +
+      (p ? '<div class="wide"><span>Łącznie od włączenia</span><b>budowy ' + (stat.built || 0) + ', wojsko ' + fmt(stat.recruited || 0) + ', wysłane posiłki ' + (stat.support || 0) +
+        ', badania ' + (stat.research || 0) + ', monety ' + (stat.coins || 0) + '</b></div>' : '') + '</div>' + log +
+      '<div class="actions"><button class="btn ghost" data-act="close">Anuluj</button><button class="btn" data-act="pilot-save">Zapisz</button></div>';
+  }
+
   function massModal() {
     const g = UI.mass;
     return '<h2>' + ico('barracks') + 'Szkolenie we wszystkich wioskach</h2>' +
@@ -1484,6 +1518,9 @@
       '<div class="goal"><i style="width:' + Math.min(100, own / E.winVillages(s) * 100) + '%"></i></div>' + raceLeader(s) + '</section>' +
       '<section><h3>Technologia</h3><p class="muted">Drzewko badań płatne monetami: ulepszenia wojska, magazyny, kurs wymiany.</p>' +
       '<div class="actions left"><button class="btn" data-act="tech-open">' + ico('scroll') + 'Otwórz Technologię</button></div></section>' +
+      '<section><h3>Autopilot</h3><p class="muted">Bot buduje, szkoli wojsko, bada technologie i wysyła obronę do atakowanych wiosek, gdy Cię nie ma.' +
+        (s.pilot && s.pilot.on ? ' <b>Teraz włączony.</b>' : '') + '</p>' +
+      '<div class="actions left"><button class="btn" data-act="pilot-open">' + ico('wall') + 'Ustawienia Autopilota</button></div></section>' +
       '<section><h3>Dyplomacja</h3><p class="muted">Pakty o nieagresji z frakcjami, dary i oferty. Pakt chroni obie strony przed atakiem.' +
         (diploOffers(s) ? ' <b>Masz ' + diploOffers(s) + ' ofert do rozpatrzenia.</b>' : '') + '</p>' +
       '<div class="actions left"><button class="btn" data-act="diplo-open">' + ico('scroll') + 'Otwórz Dyplomację</button></div></section>' +
@@ -1586,6 +1623,7 @@
     else if (UI.modal.type === 'mass') inner = massModal();
     else if (UI.modal.type === 'buildall') inner = buildAllModal();
     else if (UI.modal.type === 'auto') inner = autoModal();
+    else if (UI.modal.type === 'pilot') inner = pilotModal();
     else if (UI.modal.type === 'report') inner = reportModal(s.reports.find(r => r.id === UI.modal.id));
     else if (UI.modal.type === 'menu') inner = menuModal();
     else if (UI.modal.type === 'diplo') inner = diploModal();
@@ -2109,6 +2147,14 @@
         else toast('bad', r.reason);
         break;
       }
+      case 'pilot-open': if (UI.modal) closeModal(); UI.pilot = pilotDefaults(); openModal('pilot'); break;
+      case 'pilot-save': {
+        const g = UI.pilot;
+        const r = G.action(s => MP.Pilot.configure(s, g, s.now));
+        if (r.ok) { toast('info', g.on ? 'Autopilot włączony – bot przejmuje wioski.' : 'Autopilot wyłączony.'); UI.pilot = null; closeModal(); invalidate(); render(); G.keepAwake(true); }
+        else toast('bad', r.reason);
+        break;
+      }
       case 'tunits-all': {
         const on = b.dataset.on === '1';
         E.UNITS.forEach(k => { UI.troops.units[k] = on; });
@@ -2238,6 +2284,12 @@
     else if (t.hasAttribute && t.hasAttribute('data-akeep')) { UI.auto.keep = t.value; }
     else if (t.hasAttribute && t.hasAttribute('data-aevery')) { UI.auto.everyMin = Number(t.value); }
     else if (t.hasAttribute && t.hasAttribute('data-acoins')) { UI.auto.coins = t.checked; renderModal(); }
+    else if (t.hasAttribute && t.hasAttribute('data-pon')) { UI.pilot.on = t.checked; }
+    else if (t.hasAttribute && t.hasAttribute('data-pbuild')) { UI.pilot.build = t.checked; }
+    else if (t.hasAttribute && t.hasAttribute('data-prec')) { UI.pilot.recruit = t.value; }
+    else if (t.hasAttribute && t.hasAttribute('data-pdef')) { UI.pilot.defLevel = Number(t.value); }
+    else if (t.hasAttribute && t.hasAttribute('data-pdefend')) { UI.pilot.defend = t.checked; }
+    else if (t.hasAttribute && t.hasAttribute('data-ptech')) { UI.pilot.tech = t.checked; }
     else if (t.hasAttribute && t.hasAttribute('data-mmax')) { UI.mass.max = t.checked; renderModal(); }
     else if (t.dataset && t.dataset.msrc) { if (t.checked) delete UI.mass.off[t.dataset.msrc]; else UI.mass.off[t.dataset.msrc] = true; updateMassPlan(); }
     else if (t.hasAttribute && t.hasAttribute('data-ttarget')) { UI.troops.target = t.value; UI.troops.off = {}; renderModal(); }

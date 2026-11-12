@@ -610,6 +610,7 @@
       state.lastHit = state.lastHit || {};
       state.lastHit[to.id] = t;
       notice(state, t, 'danger', 'Nadciąga atak na ' + to.name + ' (' + to.x + ':' + to.y + ')!');
+      if (state.pilot && state.pilot.on && C.PILOT) state.pilot.next = Math.min(state.pilot.next || Infinity, t + C.PILOT.alertDelaySec * 1000); // Autopilot reaguje od razu
     }
     return { ok: true, movement: m };
   }
@@ -1373,6 +1374,7 @@
       if (f.ai && f.alive) consider(f.nextThink, 'ai', fid);
     }
     if (state.auto && state.auto.on && state.auto.next) consider(state.auto.next, 'auto', null);
+    if (state.pilot && state.pilot.on && state.pilot.next) consider(state.pilot.next, 'pilot', null);
     return best;
   }
 
@@ -1400,6 +1402,9 @@
       if (MP.AI) MP.AI.think(state, f.id, t);
     } else if (ev.kind === 'auto') {
       runAuto(state, t);
+    } else if (ev.kind === 'pilot') {
+      if (MP.Pilot) MP.Pilot.run(state, t);
+      else state.pilot.next = t + 60000;
     }
   }
 

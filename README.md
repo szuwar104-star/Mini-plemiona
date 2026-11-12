@@ -75,6 +75,7 @@ Wolną osadę przejmujesz, wygrywając bitwę. Wioskę frakcji AI – wysyłają
 | `engine.js` | stan gry, centralny procesor zdarzeń, ekonomia, walka, podbój |
 | `diplomacy.js` | dyplomacja: nastawienie, pakty o nieagresji, dary, zdrada, lider |
 | `ai.js` | skrypt czterech frakcji AI (agresywna, gospodarcza, obronna, ekspansywna) |
+| `pilot.js` | Autopilot: bot prowadzący Twoje wioski (budowa, wojsko, technologia, obrona) |
 | `database.js` | zapis IndexedDB + kopia w localStorage, wersjonowanie, eksport/import JSON |
 | `cloud.js` | synchronizacja zapisu między urządzeniami (klient: kod, wysyłanie, pobieranie) |
 | `worker.mjs`, `wrangler.jsonc`, `.assetsignore` | worker Cloudflare: statyczne pliki gry + API zapisu w KV (`/api/save/<kod>`) |
@@ -252,3 +253,15 @@ Test: `node tests/empire.js`.
 - Stare zapisy: osady zaczynają rozwój od pierwszego przeliczenia po aktualizacji.
 
 Test: `node tests/neutral.js`.
+
+## Autopilot (bot dla gracza)
+
+Przycisk **Autopilot** na ekranie *Przegląd* (albo Menu) włącza bota, który prowadzi wszystkie Twoje wioski, gdy zostawisz grę włączoną. Działa w tym samym procesorze zdarzeń co AI (`pilot.js`), więc po zamknięciu gry albo uśpieniu urządzenia gra nadrabia czas, a bot podejmuje decyzje chronologicznie, tak jakby cały czas był aktywny. Nie działa w pauzie. Przy włączonym bocie gra prosi przeglądarkę o blokadę wygaszania ekranu (Screen Wake Lock, pada po ukryciu karty i jest ponawiana po powrocie).
+
+- **Obrona** – nowy atak na Twoją wioskę uruchamia turę bota po sekundzie. Bot wysyła *wsparcie* (jednostki obronne) z najbliższych wiosek, ale tylko takie, które zdążą przed atakiem, i oddaje najwyżej 60% obrońców z wioski. Siła wroga jest nieznana (tak jak w grze), więc cel to obrona = punkty wioski × poziom obrony × 3. Po 10 minutach bez ataku wsparcie wysłane przez bota wraca do domu (wsparcia wysłanego ręcznie bot nie rusza).
+- **Budowa** – kolejka każdej wioski jest stale zapełniona (2 budowy). Pilne są Farma (zajętość > 85%) i Ratusz (magazyn > 85% lub blokada poziomu); poza tym wybierany jest najniżej rozbudowany budynek wg wag (`PILOT.buildWeights`). Bot oszczędza na budynek, którego jeszcze nie stać.
+- **Wojsko** – do celu obrony (punkty wioski × poziom: Niski 25, Średni 40, Wysoki 60, Twierdza 90) szkoli jednostki obronne, wybierając tę, która najlepiej pasuje do zapasów surowców; trzyma 3 zwiadowców; przy zagrożeniu wydaje wszystko na obronę. Tryb „zbalansowany” po osiągnięciu celu szkoli też Topornika i Lekką kawalerię. Nie szkoli dowódców, osadników ani taranów.
+- **Technologia** – nadwyżki z magazynów (> 85%, aż do 60%) zamieniane są na monety w wioskach z Targowiskiem, a monety na badania wg listy priorytetów (`PILOT.techPriority`: Pospolite ruszenie, Narzędzia, Kupiectwo, Magazyny, ulepszenia obrońców…). Gałąź ataku bot bada tylko w trybie zbalansowanym.
+- Bot **nie zakłada nowych osad ani nie atakuje**. Ustawienia i statystyki (ostatnie decyzje, liczba budów, szkolenia, posiłków, badań) są w oknie Autopilota i w zapisie gry (`state.pilot`, bez zmiany wersji zapisu).
+
+Test: `node tests/pilot.js` (rozwój vs brak bota, skok czasu = małe kroki, posiłki zdążające przed atakiem i powrót, monety i badania, tryby wojska, zapis i odczyt, 48 h gry). Wszystkie liczby: `PILOT` w `config.js`.

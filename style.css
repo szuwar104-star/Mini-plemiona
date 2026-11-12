@@ -910,3 +910,7 @@ html, body { max-width: 100%; overflow-x: clip; }
 .dp-hint { margin: 0; font-size: .84rem; }
 .dp-gift { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; }
 .dp-gift .btn.sm { padding: .3rem .55rem; font-size: .82rem; }
+
+/* Autopilot: dziennik ostatnich decyzji bota */
+.plog { list-style: none; margin: .4rem 0 0; padding: 0; display: grid; gap: .25rem; font-size: .86rem; }
+.plog li { padding: .3rem .5rem; background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--r-sm); }
