@@ -520,7 +520,7 @@
       case 'queue': return 'Kolejka budowy i rekrutacji ' + line(l => '+' + (e.per * l) + ' miejsce');
       case 'march': return 'Czas marszu Twoich wojsk ' + line(l => '−' + pc(Math.min(0.5, -e.per * l)) + '%');
       case 'heal': return 'Ranni wracający z ataków ' + line(l => pc(Math.min(0.3, e.per * l)) + '% poległych');
-      case 'fort': return 'Bonus muru ' + line(l => '+' + pc(e.per * l) + '% (mur 10: +' + Math.round(C.BUILDINGS.wall.bonus[C.MAX_LEVEL] * (1 + e.per * l) * 100) + '% obrony)');
+      case 'fort': return 'Bonus muru ' + line(l => '+' + pc(e.per * l) + '% (mur ' + C.MAX_LEVEL + ': +' + Math.round(C.BUILDINGS.wall.bonus[C.MAX_LEVEL] * (1 + e.per * l) * 100) + '% obrony)');
       case 'command': return 'Spadek poparcia od Twojego Dowódcy ' + line(l => '+' + (e.per * l) + ' p.p.');
       case 'militia': return 'Stała obrona wioski ' + line(l => '+' + (e.per * l));
       case 'siege': return 'Skuteczność taranów ' + line(l => '+' + pc(e.per * l) + '%');
