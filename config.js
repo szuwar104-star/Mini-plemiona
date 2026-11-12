@@ -270,7 +270,7 @@
       storeUrgent: 0.85,         // zapełnienie magazynu, od którego Ratusz ma pierwszeństwo
       storeSpend: 0.9,           // od tego zapełnienia wydaje na wojsko wszystko (nic się nie marnuje)
       recruitShare: 0.8,         // jaką część nadwyżki (ponad rezerwę na budynek) wydaje na wojsko
-      scouts: 3,                 // tylu zwiadowców trzyma w każdej wiosce
+      scouts: 20,                // tylu zwiadowców trzyma w każdej wiosce (więcej = skuteczniejszy zwiad i obrona przed wrogim zwiadem)
       supportShare: 0.6,         // maks. część obrońców wysyłana z wioski jako posiłki
       supportMin: 5,             // mniejszych oddziałów nie wysyła
       supportGoal: 3,            // cel obrony atakowanej wioski = punkty × defLevel × ta wartość
@@ -301,10 +301,11 @@
         noblesMax: 10,           // górny limit Dowódców
         villagesPerNoble: 12,    // limit rośnie o 1 Dowódcę na tyle wiosek (więcej wiosek = więcej równoległych podbojów)
         rams: 12,                // tyle Taranów szkoli w każdej wiosce (gdy Koszary pozwalają)
-        waveScouts: 2,           // zwiadowcy w fali (po bitwie dają nowy obraz celu: mur, poparcie, wojsko)
-        spyScouts: 3,            // tylu zwiadowców wysyła na zwiad
+        waveScouts: 4,           // zwiadowcy w fali (po bitwie dają nowy obraz celu: mur, poparcie, wojsko)
+        spyScouts: 10,           // tylu zwiadowców wysyła na zwiad (maks.; wysyła tylu, ilu wioska ma)
+        spyMin: 3,               // wioska z mniejszą liczbą zwiadowców nie zwiaduje
         spyEveryMin: 15,         // jak często ponawia zwiad tego samego celu
-        spyPerTurn: 5,           // maks. zwiadów wysłanych w jednej turze
+        spyPerTurn: 12,          // maks. zwiadów wysłanych w jednej turze
         intelMaxMin: 40,         // zwiad starszy niż tyle minut jest nieaktualny
         wallGuess: 8,            // zakładany mur, gdy nie ma raportu o budynkach
         maxWaves: 12,            // maks. liczba fal naraz w drodze (z kolejnymi falami ciągów)
@@ -331,7 +332,7 @@
         perTurn: 15,             // maks. nowych fal w jednej turze
         cooldownMin: 20,         // przerwa przed ponownym grabieniem tego samego celu
         waveScouts: 1,           // zwiadowca w fali odświeża obraz celu po bitwie
-        spyScouts: 3, spyEveryMin: 20, spyPerTurn: 8, intelMaxMin: 60, wallGuess: 4
+        spyScouts: 10, spyMin: 3, spyEveryMin: 20, spyPerTurn: 20, intelMaxMin: 60, wallGuess: 4
       },
       buildWeights: { hq: 1, wood: 1.1, clay: 1.1, iron: 1.1, farm: 1, barracks: 0.8, market: 0.5, wall: 0.7 },
       techPriority: [['militia', 2], ['tools', 2], ['trade', 1], ['store', 3], ['u_spear', 3], ['u_archer', 3], ['u_guard', 3],

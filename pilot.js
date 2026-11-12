@@ -8,7 +8,7 @@
       Wioski przygraniczne (wróg w zasięgu ataku) dostają stały garnizon: wyższy cel szkolenia obrony
       i dosyłanie nadwyżek obrony z zaplecza (przeniesienie na stałe) – bo na ostrzeżenie często brakuje czasu.
    2. Budowa – kolejka każdej wioski stale zapełniona (pilne: Farma, Ratusz/magazyn).
-   3. Wojsko – jednostki obronne do celu zależnego od rozbudowy wioski, kilku zwiadowców,
+   3. Wojsko – jednostki obronne do celu zależnego od rozbudowy wioski, 20 zwiadowców,
       opcjonalnie armia ataku; przy zagrożeniu wszystkie surowce idą na obronę.
    4. Technologia – nadwyżki surowców -> monety (Targowisko) -> badania wg priorytetów.
    5. Podbój (opcja „attack”) – Dowódcy (limit rośnie z liczbą wiosek), Tarany i armia ataku; zwiad celu, mniejsze stosy
@@ -488,6 +488,8 @@
   }
 
   /* ---------- 6. podbój: zwiad, zbiórka armii, fale z Dowódcą ---------- */
+  // zwiadowców na jeden zwiad: do spyScouts, ale najwyżej połowa wioski – reszta chroni przed wrogim zwiadem i starcza na drugi zwiad równolegle
+  const spyN = (cfg, v) => Math.min(cfg.spyScouts, Math.max(cfg.spyMin, Math.floor((v.units.scout || 0) / 2)));
   const isAtt = k => { const U = C.UNITS[k]; return !U.role && !U.conquer && !U.settler && !U.scout; };
   const attUnits = v => { const u = E.emptyUnits(); Object.keys(C.UNITS).forEach(k => { if (isAtt(k)) u[k] = v.units[k] || 0; }); return u; };
   const attPower = (state, v) => E.attackPower(attUnits(v), E.upgradesOf(state, 'player'));
@@ -633,9 +635,9 @@
           dg.noIntel++;
           // brak świeżego zwiadu – zwiadowcy z najbliższej wioski (wolne osady zwiadujemy zawsze, wioski frakcji gdy jest Dowódca)
           if ((!nobles && !neutral) || spies >= W.spyPerTurn || (p.spied[o.id] && t - p.spied[o.id] < W.spyEveryMin * 60000)) return;
-          const sc = vs.filter(h => (h.units.scout || 0) >= W.spyScouts && !incomingOn(state, h).length).sort((a, b) => E.dist(a, o) - E.dist(b, o))[0];
+          const sc = vs.filter(h => (h.units.scout || 0) >= W.spyMin && !incomingOn(state, h).length).sort((a, b) => E.dist(a, o) - E.dist(b, o))[0];
           if (!sc || E.dist(sc, o) > W.range + 4) return;
-          if (E.sendSpy(state, sc.id, o.id, W.spyScouts, t).ok) { p.spied[o.id] = t; acts.spied++; spies++; }
+          if (E.sendSpy(state, sc.id, o.id, spyN(W, sc), t).ok) { p.spied[o.id] = t; acts.spied++; spies++; }
           return;
         }
         if (!neutral && !v.units.noble) { dg.noble++; return; }
@@ -657,7 +659,7 @@
       if (!dg.inRange) { key = 'range'; msg = 'w zasięgu ' + W.range + ' pól od wiosek z armią (' + sources.length + ') nie ma celu (wrogich wiosek i wolnych osad bez paktu: ' + foes.length + ')'; }
       else if (dg.noIntel && dg.noIntel >= dg.inRange) {
         key = 'intel';
-        msg = 'brak świeżego zwiadu celów w zasięgu (' + dg.noIntel + ') – zwiad w toku albo brak wioski z ' + W.spyScouts + '+ zwiadowcami w pobliżu celu' + (nobles ? '' : ' (wioski frakcji zwiadowane dopiero, gdy bot ma Dowódcę)');
+        msg = 'brak świeżego zwiadu celów w zasięgu (' + dg.noIntel + ') – zwiad w toku albo brak wioski z ' + W.spyMin + '+ zwiadowcami w pobliżu celu' + (nobles ? '' : ' (wioski frakcji zwiadowane dopiero, gdy bot ma Dowódcę)');
       } else if (dg.noble && !dg.weak) { key = 'noble'; msg = 'Dowódca podboju nie stoi w żadnej wiosce z armią (Dowódców razem: ' + nobles + ') – są w drodze albo w innych wioskach'; }
       else if (dg.weak) { key = 'weak'; msg = 'za słaba fala: najłatwiejszy cel wymaga siły ' + Math.round(dg.need) + ' (obrona × ' + W.ratio + '), a najlepsza wioska wyśle ' + Math.round(dg.A) + ' – fala rusza z jednej wioski (limit: farma)'; }
       else { key = 'other'; msg = 'brak odpowiedniego celu'; }
@@ -743,9 +745,9 @@
       if (!intel || intel.owner !== o.owner || t - intel.time > F.intelMaxMin * 60000) {
         dg.spy++;
         if (spies >= F.spyPerTurn || (p.spied[o.id] && t - p.spied[o.id] < F.spyEveryMin * 60000)) continue;
-        const sc = vs.filter(h => (h.units.scout || 0) >= F.spyScouts && !incomingOn(state, h).length).sort((a, b) => E.dist(a, o) - E.dist(b, o))[0];
+        const sc = vs.filter(h => (h.units.scout || 0) >= F.spyMin && !incomingOn(state, h).length).sort((a, b) => E.dist(a, o) - E.dist(b, o))[0];
         if (!sc || E.dist(sc, o) > F.range + 4) continue;
-        if (E.sendSpy(state, sc.id, o.id, F.spyScouts, t).ok) { p.spied[o.id] = t; acts.spied++; spies++; }
+        if (E.sendSpy(state, sc.id, o.id, spyN(F, sc), t).ok) { p.spied[o.id] = t; acts.spied++; spies++; }
         continue;
       }
       if (intel.res && intel.res.wood + intel.res.clay + intel.res.iron < F.minLoot) { dg.poor++; continue; }
