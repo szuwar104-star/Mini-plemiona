@@ -253,7 +253,7 @@
     const needDef = E.villageDefense(v, null, ups) < target;
     let role;
     if (needDef) role = 'def';
-    else if (p.recruit === 'balanced' || p.attack) role = 'att';
+    else if (p.recruit === 'balanced' || p.attack || p.farm) role = 'att';
     else if (full) role = 'def';            // pełny magazyn: nadwyżka idzie na dodatkową obronę, nic się nie marnuje
     else return;
 
@@ -325,7 +325,7 @@
   /* ---------- 4. technologia ---------- */
   function techAllowed(node, p) {
     if (node.branch !== 'war') return true;
-    return node.id === 'drill' || p.recruit === 'balanced' || !!p.attack;
+    return node.id === 'drill' || p.recruit === 'balanced' || !!p.attack || !!p.farm;
   }
   function techOrder(p) {
     const out = P().techPriority.slice();
@@ -649,6 +649,77 @@
     }
   }
 
+  /* ---------- 7. farmienie: armia ataku grabi wszystko wokoło ---------- */
+  const farmUnits = v => { const u = attUnits(v); Object.keys(u).forEach(k => { if (C.UNITS[k].wallPower) u[k] = 0; }); return u; };
+
+  function farmStep(state, p, vs, t, threatened, acts) {
+    const F = P().farm;
+    p.farmAt = p.farmAt || {}; p.farmFail = p.farmFail || {}; p.spied = p.spied || {};
+    p.ops = p.ops || {};
+    // wyniki: przegrana fala podnosi wymagania i wydłuża przerwę
+    const seen = p.farmRepT || 0;
+    if (state.reports.length) p.farmRepT = Math.max(seen, state.reports[0].time);
+    for (const r of state.reports) {
+      if (r.time <= seen) break;
+      if (r.kind !== 'attack' || r.attacker !== 'player' || p.ops[r.to] || r.conquered) continue;
+      if (!r.attackerWon) { p.farmFail[r.to] = { n: ((p.farmFail[r.to] || {}).n || 0) + 1, t }; p.farmAt[r.to] = t + 3 * F.cooldownMin * 60000; }
+    }
+    Object.keys(p.farmFail).forEach(id => { if (t - p.farmFail[id].t > P().war.retryMin * 60000) delete p.farmFail[id]; });
+    Object.keys(p.farmAt).forEach(id => { if (p.farmAt[id] < t - 3600000) delete p.farmAt[id]; });
+
+    const targets = Object.values(state.villages).filter(o => o.owner !== 'player' && !p.ops[o.id] && !(p.farmAt[o.id] > t) &&
+      !(o.owner && foeBlocked(state, o, t)));
+    const out = state.movements.filter(m => m.type === 'attack' && m.owner === 'player' && !p.ops[m.to]);
+    const busy = new Set(state.movements.filter(m => m.type === 'attack' && m.owner === 'player').map(m => m.to));
+    const hosts = vs.filter(v => !threatened[v.id] && !incomingOn(state, v).length && canHost(state, p, v))
+      .map(v => ({ v, u: farmUnits(v) })).map(s2 => Object.assign(s2, { A: E.attackPower(s2.u, E.upgradesOf(state, 'player')) }))
+      .filter(s2 => s2.A >= F.minPower);
+    const dg = { inRange: 0, spy: 0, weak: 0, poor: 0, sent: 0 };
+    if (!hosts.length || !targets.length) { p.farmInfo = { t, text: !hosts.length ? 'brak wioski z armią ataku ≥ ' + F.minPower + ', własną obroną i pełnym poparciem' : 'brak celów' }; return; }
+    let waves = out.length, spies = 0;
+    const cand = [];
+    targets.forEach(o => {
+      if (busy.has(o.id)) return;
+      let near = null, dn = Infinity;
+      hosts.forEach(h => { const d = E.dist(h.v, o); if (d < dn) { dn = d; near = h; } });
+      if (near && dn <= F.range) cand.push({ o, d: dn });
+    });
+    cand.sort((a, b) => a.d - b.d);
+    dg.inRange = cand.length;
+    for (const c of cand) {
+      if (acts.farmed >= F.perTurn || waves >= F.maxWaves) break;
+      const o = c.o, intel = state.intel[o.id];
+      if (!intel || intel.owner !== o.owner || t - intel.time > F.intelMaxMin * 60000) {
+        dg.spy++;
+        if (spies >= F.spyPerTurn || (p.spied[o.id] && t - p.spied[o.id] < F.spyEveryMin * 60000)) continue;
+        const sc = vs.filter(h => (h.units.scout || 0) >= F.spyScouts && !incomingOn(state, h).length).sort((a, b) => E.dist(a, o) - E.dist(b, o))[0];
+        if (!sc || E.dist(sc, o) > F.range + 4) continue;
+        if (E.sendSpy(state, sc.id, o.id, F.spyScouts, t).ok) { p.spied[o.id] = t; acts.spied++; spies++; }
+        continue;
+      }
+      if (intel.res && intel.res.wood + intel.res.clay + intel.res.iron < F.minLoot) { dg.poor++; continue; }
+      const wall = intel.buildings ? intel.buildings.wall : F.wallGuess;
+      const need = E.defenseFrom(intel.units, wall, null) * F.ratio * (1 + P().war.failPenalty * ((p.farmFail[o.id] || { n: 0 }).n));
+      const src = hosts.filter(h => E.dist(h.v, o) <= F.range && h.A >= need).sort((a, b) => E.dist(a.v, o) - E.dist(b.v, o))[0];
+      if (!src) { dg.weak++; continue; }
+      // tyle jednostek, by pokonać obronę ORAZ unieść cały łup (zwiad pokazuje surowce celu)
+      const loot = intel.res ? intel.res.wood + intel.res.clay + intel.res.iron : 0;
+      const carry = Object.keys(src.u).reduce((a, k) => a + src.u[k] * (C.UNITS[k].carry || 0), 0);
+      const f = Math.min(1, Math.max(need * 1.15 / src.A, carry > 0 ? loot / carry : 0)), send = E.emptyUnits();
+      Object.keys(src.u).forEach(k => { send[k] = Math.min(src.u[k], Math.ceil(src.u[k] * f)); });
+      if (E.sumUnits(send) < F.minUnits) continue;
+      send.scout = Math.max(0, Math.min(F.waveScouts, (src.v.units.scout || 0) - 1));
+      const r = E.sendAttack(state, src.v.id, o.id, send, t, 'attack', { raid: o.owner === null });
+      if (!r.ok) continue;
+      Object.keys(src.u).forEach(k => { src.u[k] -= send[k]; });
+      src.A = E.attackPower(src.u, E.upgradesOf(state, 'player'));
+      p.farmAt[o.id] = t + F.cooldownMin * 60000;
+      acts.farmed++; waves++; dg.sent++;
+    }
+    p.farmInfo = { t, text: 'cele w zasięgu ' + dg.inRange + ', wysłano ' + dg.sent + ', czeka na zwiad ' + dg.spy + ', za silne ' + dg.weak + ', ubogie ' + dg.poor };
+    if (dg.sent) note(state, p, t, 'Farmienie: ' + dg.sent + ' fal (' + p.farmInfo.text + ')');
+  }
+
   /* ---------- tura bota ---------- */
   function run(state, t) {
     const p = state.pilot;
@@ -657,7 +728,7 @@
     const vs = own(state);
     if (!vs.length) return;
     vs.forEach(v => E.tickVillage(state, v, t));
-    const acts = { built: 0, recruited: 0, support: 0, research: 0, coins: 0, recalled: 0, settled: 0, garrisoned: 0, supplied: 0, attacked: 0, spied: 0, conquered: 0 };
+    const acts = { built: 0, recruited: 0, support: 0, research: 0, coins: 0, recalled: 0, settled: 0, garrisoned: 0, supplied: 0, attacked: 0, spied: 0, conquered: 0, farmed: 0 };
     const threatened = {};
 
     defend(state, p, vs, t, acts, threatened);
@@ -685,9 +756,10 @@
     shield(state, p, vs, t, threatened, acts);
     if (p.tech) manageTech(state, p, vs, t, acts);
     if (p.attack) warStep(state, p, vs, t, threatened, acts);
+    if (p.farm) farmStep(state, p, vs, t, threatened, acts);
     recall(state, p, t, acts);
 
-    ['built', 'recruited', 'support', 'research', 'coins', 'recalled', 'settled', 'garrisoned', 'supplied', 'attacked', 'spied', 'conquered'].forEach(k => { p.stats[k] = (p.stats[k] || 0) + acts[k]; });
+    ['built', 'recruited', 'support', 'research', 'coins', 'recalled', 'settled', 'garrisoned', 'supplied', 'attacked', 'spied', 'conquered', 'farmed'].forEach(k => { p.stats[k] = (p.stats[k] || 0) + acts[k]; });
     p.last = { t, built: acts.built, recruited: acts.recruited, support: acts.support, research: acts.research, settled: acts.settled, supplied: acts.supplied, attacked: acts.attacked, conquered: acts.conquered };
   }
 
@@ -704,6 +776,7 @@
     if (cfg.convoy !== undefined) o.convoy = !!cfg.convoy;
     if (cfg.settle !== undefined) o.settle = !!cfg.settle;
     if (cfg.attack !== undefined) o.attack = !!cfg.attack;
+    if (cfg.farm !== undefined) o.farm = !!cfg.farm;
     if (cfg.settleMax !== undefined) { const n = Math.floor(Number(cfg.settleMax)); o.settleMax = n >= 1 && n <= 200 ? n : 0; }
     if (cfg.hub !== undefined) o.hub = cfg.hub || null;
     if (cfg.defLevel !== undefined) { const n = Number(cfg.defLevel); if (n >= 5 && n <= 400) o.defLevel = Math.round(n); }
