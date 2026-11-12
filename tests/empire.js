@@ -18,19 +18,19 @@ function setup(seed, n) {
   const { s, vs } = setup(31);
   vs.forEach(v => { v.res = { wood: 5000, clay: 5000, iron: 5000 }; });
   const before = JSON.stringify(vs.map(v => [v.res, v.buildQueue]));
-  const plan = E.planBuildAll(s, C.BUILD_TEMPLATES.eco.items, 1);
+  const plan = E.planBuildAll(s, E.templateItems('eco', 10), 1);
   ok(JSON.stringify(vs.map(v => [v.res, v.buildQueue])) === before, 'plan nie wydaje surowców');
   ok(plan.rows.length === vs.length && plan.total > 0, 'plan: ' + plan.total + ' budów w ' + vs.length + ' wioskach');
   ok(vs.every(v => v.buildQueue.length === 0), 'plan nie zmienia stanu gry');
   ok(plan.rows.every(r => r.items.length <= E.queueMax(s.villages[r.villageId], 'build')), 'plan mieści się w kolejkach');
-  const r = E.buildAll(s, C.BUILD_TEMPLATES.eco.items, 1);
+  const r = E.buildAll(s, E.templateItems('eco', 10), 1);
   ok(r.ok && r.queued === plan.total, 'zakolejkowano ' + r.queued + ' budów');
-  ok(vs.every(v => v.buildQueue.every(e => C.BUILD_TEMPLATES.eco.items.some(([k]) => k === e.building))), 'tylko budynki z szablonu');
+  ok(vs.every(v => v.buildQueue.every(e => E.templateItems('eco', 10).some(([k]) => k === e.building))), 'tylko budynki z szablonu');
   // kolejność: najpierw budynek najdalej od celu
   const o = setup(37), w = o.p;
   Object.assign(w.buildings, { hq: 9, wood: 8, clay: 2, iron: 5, farm: 8 });
   w.res = { wood: 20000, clay: 20000, iron: 20000 };
-  const po = E.planBuildAll(o.s, C.BUILD_TEMPLATES.eco.items, 1).rows.find(r => r.villageId === w.id);
+  const po = E.planBuildAll(o.s, E.templateItems('eco', 10), 1).rows.find(r => r.villageId === w.id);
   ok(po.items[0].key === 'clay', 'najpierw najdalszy od celu (Cegielnia 2 z 10): ' + po.items.map(i => i.key + i.level).join(', '));
   // jeden budynek do poziomu
   const a = setup(32); a.vs.forEach(v => { v.res = { wood: 9000, clay: 9000, iron: 9000 }; v.buildings.wall = 0; });
@@ -40,7 +40,7 @@ function setup(seed, n) {
   ok(again.total === 0 && again.rows.every(r => r.skip), 'cel już zakolejkowany – nic więcej');
   // pominięte wioski i brak surowców
   const b = setup(33); b.vs.forEach(v => { v.res = { wood: 0, clay: 0, iron: 0 }; });
-  const pb = E.planBuildAll(b.s, C.BUILD_TEMPLATES.full.items, 1, { [b.vs[0].id]: true });
+  const pb = E.planBuildAll(b.s, E.templateItems('all', 10), 1, { [b.vs[0].id]: true });
   ok(pb.total === 0 && pb.rows[0].skip && pb.rows.find(r => r.villageId === b.vs[0].id).off, 'brak surowców i pominięta wioska');
 }
 

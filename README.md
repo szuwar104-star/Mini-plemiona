@@ -115,7 +115,7 @@ Budynki mają teraz 20 poziomów (`LEVELS` w `config.js`); inne budynki nadal wy
 - **zyski maleją**: produkcja na poz. 20 to 1460/min (poz. 10: 410), więc zwrot z kolejnych poziomów trwa coraz dłużej,
 - magazyn 66 000, Farma 9 000 miejsc, 75 kupców, Mur do +108% obrony (stała obrona 680), Ratusz skraca budowę do 45%, Koszary szkolenie do 35%.
 
-Szablon „Maksymalna rozbudowa” buduje wszystko do 20; pozostałe szablony nadal celują w poz. 10. Test: `node tests/levels.js`.
+Szablony „Buduj we wszystkich wioskach” mają wspólne pole „Do poziomu” (1–20): cele szablonu skalują się do niego (Farma i Ratusz tam, gdzie wystarczą, o 2 niżej). Test: `node tests/levels.js`.
 
 ## Zapis
 
@@ -238,7 +238,7 @@ Frakcje AI nie kupują badań, ale ich jednostki same zyskują ulepszenia (jak g
 
 ## Zarządzanie wieloma wioskami
 
-- **Buduj we wszystkich wioskach** (Przegląd): szablon (Gospodarka, Wojsko, Handel, Pełna rozbudowa – `BUILD_TEMPLATES` w `config.js`) albo jeden budynek do wybranego poziomu. Każda wioska kolejkuje tyle, ile zmieści się w kolejce i na ile ją stać, najpierw budynek najdalej od celu. Podgląd pokazuje, co trafi do kolejki w każdej wiosce, i pozwala wioski odznaczyć.
+- **Buduj we wszystkich wioskach** (Przegląd): szablon (Gospodarka, Surowce, Wojsko, Handel, Pełna rozbudowa – `BUILD_TEMPLATES` w `config.js`) albo jeden budynek, oba do wybranego poziomu (pole „Do poziomu”, domyślnie 10). Każda wioska kolejkuje tyle, ile zmieści się w kolejce i na ile ją stać, najpierw budynek najdalej od celu. Podgląd pokazuje, co trafi do kolejki w każdej wiosce, i pozwala wioski odznaczyć.
 - **Konwoje** (Przegląd): wybierasz wioskę centralną, próg (domyślnie: wioska z magazynem ponad 80% wysyła nadwyżkę, zostawiając 40%) i częstotliwość (5/15/30 min). Kupcy jadą sami, także podczas nieobecności (gra nadrabia czas), ale nie w pauzie. Opcjonalnie wioska centralna od razu kupuje monety (maks. limitu, najobfitszym surowcem). Wysyłające wioski potrzebują Targowiska. Utrata wioski centralnej wyłącza konwoje. Ustawienia są w zapisie gry.
 
 Test: `node tests/empire.js`.
