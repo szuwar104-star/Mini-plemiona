@@ -170,12 +170,13 @@
     return saving;
   }
 
-  /* ---------- 2b. zasilanie wiosek z pustą kolejką budowy ---------- */
-  // Wioska, której kolejka budowy stoi pusta (bot nie ma z czego zapłacić za następny budynek), dostaje brakujące surowce
-  // od wiosek, które mają je ponad własną rezerwę. Najbliższe wioski oddają pierwsze; liczą się surowce już jadące.
+  /* ---------- 2b. zasilanie wiosek z brakiem surowców na budowę ---------- */
+  // Wioska, która czeka na surowce na następny budynek (kolejka pusta albo niepełna), dostaje surowce
+  // od wiosek, które mają je ponad własną rezerwę – nie tylko brakujące na budynek, ale tyle, by magazyn wioski miał
+  // PILOT.supplyFill (80%) pojemności każdego surowca. Najbliższe wioski oddają pierwsze; liczą się surowce już jadące.
   function supply(state, p, vs, t, reserves, threatened, acts) {
     if (p.supply === false || vs.length < 2) return;
-    const needy = vs.filter(v => !threatened[v.id] && v.buildQueue.length === 0 && reserves[v.id] && !incomingOn(state, v).length);
+    const needy = vs.filter(v => !threatened[v.id] && reserves[v.id] && !incomingOn(state, v).length);   // reserves[id] ustawione = wioska czeka na surowce na następny budynek
     if (!needy.length) return;
     const needyIds = {};
     needy.forEach(v => { needyIds[v.id] = true; });
@@ -191,9 +192,10 @@
       Math.min.apply(null, E.RES.map(r => b.res[r] / Math.max(1, reserves[b.id][r] || 1))));
     needy.forEach(v => {
       const cost = reserves[v.id], inc = E.incomingRes(state, v.id), lack = {};
+      const fill = E.storageCap(v) * P().supplyFill;         // cel: co najmniej 80% magazynu, a gdy budynek kosztuje więcej – jego koszt
       let any = false;
-      E.RES.forEach(r => { lack[r] = Math.max(0, Math.ceil((cost[r] || 0) - v.res[r] - inc[r])); if (lack[r] > 0) any = true; });
-      if (!any) return;                                     // brakujące surowce już jadą
+      E.RES.forEach(r => { lack[r] = Math.max(0, Math.ceil(Math.max(cost[r] || 0, fill) - v.res[r] - inc[r])); if (lack[r] > 0) any = true; });
+      if (!any) return;                                     // surowce już są albo jadą
       const sorted = donors.slice().sort((a, b) => E.dist(a, v) - E.dist(b, v));
       let sentFrom = 0, sentTotal = 0;
       for (const d of sorted) {

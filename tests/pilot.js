@@ -172,6 +172,8 @@ function twoVillages() {
   ok((s.pilot.stats.supplied || 0) > 0, 'bot zasilił wioskę z pustą kolejką (' + (s.pilot.stats.supplied || 0) + ' surowców)');
   ok(A.buildQueue.length > 0 || s.movements.some(m => m.type === 'transport' && m.to === A.id), 'A dostała surowce / ruszyła budowa');
   ok(B.res.wood < cap && B.res.wood >= cap * C.PILOT.supplyKeep - 1, 'dawca zachował rezerwę magazynu');
+  // dopełnianie: wysyła dużo więcej niż koszt budynku (~1000 każdego surowca) – do 80% magazynu, w granicach udźwigu kupców i rezerwy dawcy
+  ok(s.pilot.stats.supplied > 10000, 'zasilanie dopełnia magazyn, a nie tylko koszt budynku (' + s.pilot.stats.supplied + ' surowców)');
   const sent = s.pilot.stats.supplied;
   E.advance(s, t0 + 4 * MIN);
   ok(s.pilot.stats.supplied - sent < sent, 'surowce w drodze nie są wysyłane drugi raz');
