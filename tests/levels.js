@@ -40,12 +40,8 @@ ok(E.buildInfo(st, v, 'hq').code === 'max', 'poziom 20 to maksimum');
 ok(E.storageCap(v) >= B.hq.storage[20], 'pojemność magazynu przy Ratuszu 20');
 ok(E.points(v) === 8 * 20, 'punkty wioski z budynkami na 20: 160');
 
-// Szablony rozwoju: poziom docelowy skaluje cele, nic nie wychodzi poza 1..MAX_LEVEL.
-const tp = (id, L) => Object.fromEntries(E.templateItems(id, L));
-ok(tp('all', 20).wall === 20 && tp('all', 10).wall === 10, 'szablon „Pełna rozbudowa” skaluje się do wybranego poziomu');
-ok(tp('eco', 10).farm === 8 && tp('eco', 20).farm === 18 && tp('army', 20).hq === 18 && tp('trade', 10).hq === 8, 'Farma/Ratusz w szablonach są o 2 niżej od celu');
-ok(Object.values(tp('army', 1)).every(x => x >= 1) && Object.values(tp('all', 99)).every(x => x <= C.MAX_LEVEL), 'cele szablonów mieszczą się w 1..MAX_LEVEL');
-ok(Object.keys(C.BUILD_TEMPLATES).every(id => C.BUILD_TEMPLATES[id].items.every(([k, o]) => B[k] && o <= 0 && o >= -C.HQ_LEVEL_GAP)), 'szablony odwołują się do istniejących budynków, różnice 0..−2');
+// Szablony rozwoju zawsze celują w maksymalny poziom.
+ok(Object.keys(C.BUILD_TEMPLATES).every(id => C.BUILD_TEMPLATES[id].items.every(([k, L]) => B[k] && L === C.MAX_LEVEL)), 'każdy szablon ulepsza budynki do maksymalnego poziomu');
 
 // Zapis z budynkami na poz. 20 przechodzi walidację i migrację bez zmian.
 const clone = JSON.parse(JSON.stringify(st));

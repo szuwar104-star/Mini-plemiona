@@ -242,20 +242,19 @@
       ]
     },
 
-    // Szablony „Buduj we wszystkich wioskach”: [budynek, różnica względem wybranego poziomu docelowego L] (0 = L, -2 = L−2).
-    // Poziom L wybiera gracz (1–MAX_LEVEL), więc jeden szablon obsługuje i poziom 10, i 20. Wioska buduje najpierw to, co jest najdalej od celu.
-    // Ratusz wystarcza o 2 poziomy niższy niż reszta (HQ_LEVEL_GAP), stąd −2 tam, gdzie Ratusz jest tylko „przepustką”.
+    // Szablony „Buduj we wszystkich wioskach”: [budynek, docelowy poziom]. Zawsze celują w maksymalny poziom (LEVELS).
+    // Wioska buduje najpierw to, co jest najdalej od celu; poziom częściowy wybierzesz trybem „Jeden budynek”.
     BUILD_TEMPLATES: {
-      eco:   { label: 'Gospodarka', desc: 'Tartak, Cegielnia, Kopalnia i Ratusz do poziomu docelowego, Farma o 2 niżej.',
-               items: [['wood', 0], ['clay', 0], ['iron', 0], ['hq', 0], ['farm', -2]] },
-      res:   { label: 'Surowce', desc: 'Tylko Tartak, Cegielnia i Kopalnia, po równo. Bez Ratusza: wioska zatrzyma się na poziomie Ratusza + 2.',
-               items: [['wood', 0], ['clay', 0], ['iron', 0]] },
-      army:  { label: 'Wojsko', desc: 'Koszary, Farma i Mur do poziomu docelowego, Ratusz o 2 niżej (tyle wystarcza do budowy reszty).',
-               items: [['barracks', 0], ['farm', 0], ['wall', 0], ['hq', -2]] },
-      trade: { label: 'Handel', desc: 'Targowisko do poziomu docelowego (kupcy i monety), Ratusz o 2 niżej.',
-               items: [['market', 0], ['hq', -2]] },
-      all:   { label: 'Pełna rozbudowa', desc: 'Wszystkie budynki do poziomu docelowego, po równo. Wysokie poziomy są drogie – pochłaniają nadwyżki surowców.',
-               items: [['hq', 0], ['wood', 0], ['clay', 0], ['iron', 0], ['farm', 0], ['barracks', 0], ['market', 0], ['wall', 0]] }
+      eco:   { label: 'Gospodarka', desc: 'Tartak, Cegielnia, Kopalnia, Ratusz i Farma do maksymalnego poziomu.',
+               items: [['wood', LEVELS], ['clay', LEVELS], ['iron', LEVELS], ['hq', LEVELS], ['farm', LEVELS]] },
+      res:   { label: 'Surowce', desc: 'Tylko Tartak, Cegielnia i Kopalnia do maksymalnego poziomu, po równo. Bez Ratusza: wioska zatrzyma się na poziomie Ratusza + 2.',
+               items: [['wood', LEVELS], ['clay', LEVELS], ['iron', LEVELS]] },
+      army:  { label: 'Wojsko', desc: 'Koszary, Farma, Mur i Ratusz do maksymalnego poziomu.',
+               items: [['barracks', LEVELS], ['farm', LEVELS], ['wall', LEVELS], ['hq', LEVELS]] },
+      trade: { label: 'Handel', desc: 'Targowisko (kupcy i monety) i Ratusz do maksymalnego poziomu.',
+               items: [['market', LEVELS], ['hq', LEVELS]] },
+      all:   { label: 'Pełna rozbudowa', desc: 'Wszystkie budynki do maksymalnego poziomu, po równo. Drogie i długie – pochłania nadwyżki surowców.',
+               items: [['hq', LEVELS], ['wood', LEVELS], ['clay', LEVELS], ['iron', LEVELS], ['farm', LEVELS], ['barracks', LEVELS], ['market', LEVELS], ['wall', LEVELS]] }
     },
     // Konwoje (automatyczne odsyłanie nadwyżek do wioski centralnej)
     AUTO: { everyMin: [5, 15, 30], defaults: { high: 80, keep: 40, everyMin: 15, coins: true } },
