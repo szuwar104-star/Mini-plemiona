@@ -223,5 +223,43 @@ function twoVillages() {
   ok(E.villagesOf(s, 'player').length > 2, 'bez limitu bot zakłada osady ponad cel gry (' + E.villagesOf(s, 'player').length + ' > 2)');
 }
 
+// 13. Garnizony: zaplecze przenosi nadwyżkę obrony do wioski przygranicznej (wróg w zasięgu ataku)
+{
+  const setup = () => {
+    const { s, A, B, C: Cc } = twoVillages();
+    const ai = Object.values(s.villages).find(v => v.owner && v.owner !== 'player');
+    Object.keys(s.villages).forEach(id => { const o = s.villages[id]; if (o.owner && o.owner !== 'player' && id !== ai.id) delete s.villages[id]; });
+    Object.assign(ai, { x: 4, y: 2 }); Object.assign(A, { x: 2, y: 2 }); Object.assign(B, { x: 12, y: 12 }); Object.assign(Cc, { x: 13, y: 11 });
+    return { s, A, B, C: Cc };
+  };
+  const cfg = extra => Object.assign({ on: true, build: false, recruit: 'off', tech: false, defend: false, defLevel: 40 }, extra);
+  const { s, A, B, C: Cc } = setup();
+  const sum = v => v.units.spear + v.units.guard;
+  const before = sum(A) + sum(B) + sum(Cc);
+  MP.Pilot.configure(s, cfg({}), s.now);
+  E.advance(s, s.now + 90000);
+  const mv = s.movements.filter(m => m.type === 'support' && m.owner === 'player' && m.to === A.id);
+  ok(mv.length >= 1 && mv.every(m => m.stay === true), 'zaplecze wysyła garnizon do wioski przygranicznej na stałe (' + mv.length + ' oddziałów)');
+  ok(s.pilot.stats.garrisoned > 0, 'statystyka garnizonów rośnie (' + s.pilot.stats.garrisoned + ')');
+  E.advance(s, s.now + 30 * MIN);
+  ok(sum(A) > 20 + 50, 'wioska przygraniczna ma więcej obrony (' + sum(A) + ')');
+  const keepB = E.points(B) * 40 * C.PILOT.garrisonKeep;
+  ok(E.villageDefense(B, null, E.upgradesOf(s, 'player')) >= keepB * 0.9 || sum(B) >= 100 * (1 - C.PILOT.garrisonShare) * 0.9, 'zaplecze zostawia sobie własną obronę');
+  ok(sum(A) + sum(B) + sum(Cc) <= before, 'garnizon przenosi wojsko, nie tworzy go');
+  ok(E.villagesOf(s, 'player').every(v => E.popUsed(s, v) <= E.popCap(v) + 1), 'garnizon mieści się na farmie');
+
+  const o = setup();
+  MP.Pilot.configure(o.s, cfg({ garrison: false }), o.s.now);
+  E.advance(o.s, o.s.now + 20 * MIN);
+  ok(!o.s.movements.some(m => m.type === 'support') && o.A.units.spear === 20, 'wyłączone garnizony = brak przesunięć');
+
+  const f = setup();
+  Object.values(f.s.villages).forEach(v => { if (v.owner && v.owner !== 'player') { v.x = 14; v.y = 0; } });
+  f.A.x = 2; f.A.y = 14; f.B.x = 8; f.B.y = 14; f.C.x = 5; f.C.y = 14;
+  MP.Pilot.configure(f.s, cfg({}), f.s.now);
+  E.advance(f.s, f.s.now + 20 * MIN);
+  ok(!f.s.movements.some(m => m.type === 'support') && f.A.units.spear === 20, 'bez wrogów w zasięgu nie ma garnizonów');
+}
+
 if (fails) { console.error('\nBłędy: ' + fails); process.exit(1); }
 console.log('\nWszystkie testy Autopilota przeszły.');

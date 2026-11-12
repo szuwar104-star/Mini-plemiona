@@ -1267,7 +1267,7 @@
   function pilotDefaults() {
     const s = st(), p = s.pilot || {}, D = C.PILOT.defaults;
     return { on: p.on !== undefined ? p.on : true, build: p.build !== undefined ? p.build : D.build, recruit: p.recruit || D.recruit,
-      tech: p.tech !== undefined ? p.tech : D.tech, defend: p.defend !== undefined ? p.defend : D.defend, defLevel: p.defLevel || D.defLevel,
+      tech: p.tech !== undefined ? p.tech : D.tech, defend: p.defend !== undefined ? p.defend : D.defend, garrison: p.garrison !== undefined ? p.garrison : D.garrison, defLevel: p.defLevel || D.defLevel,
       settle: !!p.settle, settleMax: p.settleMax || 0, convoy: !!p.convoy, hub: p.hub || (s.auto && s.auto.hub) || (autoDefaults().hub) };
   }
   function pilotModal() {
@@ -1287,6 +1287,7 @@
       '<label class="field">Cel obrony wioski <select data-pdef>' + opt(25, g.defLevel, 'Niski') + opt(40, g.defLevel, 'Średni') + opt(60, g.defLevel, 'Wysoki') + opt(90, g.defLevel, 'Twierdza') +
         ([25, 40, 60, 90].indexOf(Number(g.defLevel)) < 0 ? opt(g.defLevel, g.defLevel, 'Własny (' + g.defLevel + ')') : '') + '</select></label>' +
       '<label class="chk"><input type="checkbox" data-pdefend' + (g.defend ? ' checked' : '') + '>Wysyłaj obronę z innych wiosek do atakowanych (po ataku wraca)</label>' +
+      '<label class="chk"><input type="checkbox" data-pgar' + (g.garrison ? ' checked' : '') + '>Stałe garnizony: wioski blisko wrogów mają więcej obrony (zaplecze przenosi tam nadwyżkę wojska)</label>' +
       '<label class="chk"><input type="checkbox" data-ptech' + (g.tech ? ' checked' : '') + '>Kupuj monety z nadwyżek surowców i badaj Technologię (wymaga Targowiska)</label>' +
       '<label class="chk"><input type="checkbox" data-pset' + (g.settle ? ' checked' : '') + '>Szkol osadników i zakładaj nowe wioski w pobliżu (jeden osadnik naraz)</label>' +
       '<label class="field">Maks. liczba wiosek (puste = bez limitu)<input type="number" inputmode="numeric" min="1" max="200" placeholder="bez limitu" data-psmax value="' + nz(g.settleMax) + '"></label>' +
@@ -2339,6 +2340,7 @@
     else if (t.hasAttribute && t.hasAttribute('data-prec')) { UI.pilot.recruit = t.value; }
     else if (t.hasAttribute && t.hasAttribute('data-pdef')) { UI.pilot.defLevel = Number(t.value); }
     else if (t.hasAttribute && t.hasAttribute('data-pdefend')) { UI.pilot.defend = t.checked; }
+    else if (t.hasAttribute && t.hasAttribute('data-pgar')) { UI.pilot.garrison = t.checked; }
     else if (t.hasAttribute && t.hasAttribute('data-pset')) { UI.pilot.settle = t.checked; }
     else if (t.hasAttribute && t.hasAttribute('data-psmax')) { UI.pilot.settleMax = t.value; }
     else if (t.hasAttribute && t.hasAttribute('data-pconv')) { UI.pilot.convoy = t.checked; }

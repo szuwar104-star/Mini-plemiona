@@ -259,7 +259,7 @@
     },
     // Autopilot (pilot.js): bot rozwijający Twoje wioski. Czasy w sekundach/minutach CZASU GRY.
     PILOT: {
-      defaults: { on: false, build: true, recruit: 'defense', tech: true, defend: true, defLevel: 40, convoy: false, hub: null, settle: false, settleMax: 0 },
+      defaults: { on: false, build: true, recruit: 'defense', tech: true, defend: true, garrison: true, defLevel: 40, convoy: false, hub: null, settle: false, settleMax: 0 },
       tickSec: 60,               // co ile sekund bot sprawdza wioski
       alertDelaySec: 1,          // po wykryciu nowego ataku bot działa po tylu sekundach
       buildDepth: 2,             // ile budów trzyma w kolejce każda wioska
@@ -274,6 +274,12 @@
       supportMin: 5,             // mniejszych oddziałów nie wysyła
       supportGoal: 3,            // cel obrony atakowanej wioski = punkty × defLevel × ta wartość
       recallMin: 10,             // po tylu minutach od ostatniego ataku posiłki wracają do domu
+      // Garnizony: wioska z cudzą wioską w zasięgu ataku ma stale więcej obrony niż zaplecze (posiłki w ostatniej chwili nie zdążą).
+      garrisonRange: 8,          // wioska jest „przygraniczna”, gdy wioska innej frakcji (bez paktu) leży bliżej niż tyle pól
+      garrisonGoal: 1.5,         // cel obrony wioski przygranicznej = zwykły cel × ta wartość (szkolenie i dosyłanie)
+      garrisonKeep: 0.8,         // wioska z zaplecza oddaje tylko obronę ponad tę część swojego zwykłego celu
+      garrisonShare: 0.4,        // maks. część obrońców oddawana z jednej wioski zaplecza w jednej turze
+      garrisonEveryMin: 5,       // jak często bot przesuwa obronę na front (minuty)
       coinFrom: 0.85, coinTo: 0.6, // zakup monet: gdy magazyn > coinFrom, schodzi do coinTo
       logMax: 30,
       settleRanges: [5, 8],      // w jakim promieniu od wioski macierzystej bot szuka miejsca na osadę (najpierw bliżej)

@@ -5,6 +5,8 @@
    Co robi w każdej turze (C.PILOT.tickSec sekund czasu gry):
    1. Obrona – nowy atak na Twoją wioskę = natychmiastowa tura: posiłki z innych wiosek
       (tylko jednostki obronne, tylko takie, które zdążą przed atakiem); po ataku wracają.
+      Wioski przygraniczne (wróg w zasięgu ataku) dostają stały garnizon: wyższy cel szkolenia obrony
+      i dosyłanie nadwyżek obrony z zaplecza (przeniesienie na stałe) – bo na ostrzeżenie często brakuje czasu.
    2. Budowa – kolejka każdej wioski stale zapełniona (pilne: Farma, Ratusz/magazyn).
    3. Wojsko – jednostki obronne do celu zależnego od rozbudowy wioski, kilku zwiadowców,
       opcjonalnie armia ataku; przy zagrożeniu wszystkie surowce idą na obronę.
@@ -23,6 +25,11 @@
   const popRatio = (state, v) => E.popUsed(state, v) / Math.max(1, E.popCap(v));
   const incomingOn = (state, v) => state.movements.filter(m => m.type === 'attack' && m.owner !== 'player' && m.to === v.id);
   const isDef = k => C.UNITS[k].role === 'def';
+  // Wioska przygraniczna: w zasięgu ataku leży wioska innej frakcji (z paktem o nieagresji nie liczy się).
+  function exposed(state, v, t) {
+    return Object.values(state.villages).some(o => o.owner && o.owner !== 'player' && E.dist(o, v) <= P().garrisonRange &&
+      !(MP.Diplomacy && MP.Diplomacy.blocked(state, o.owner, 'player', t)));
+  }
 
   function note(state, p, t, text) {
     p.log.push({ t, text });
@@ -74,6 +81,50 @@
         note(state, p, t, 'Atak na ' + v.name + ': brak posiłków, które zdążą');
       }
     });
+  }
+
+  /* ---------- 1b. garnizony na froncie ---------- */
+  // Wioski z zaplecza (bez wrogów w zasięgu) przenoszą na stałe nadwyżkę obrony do wiosek przygranicznych.
+  function garrison(state, p, vs, t, acts, threatened) {
+    if (p.garrison === false || vs.length < 2) return;
+    if (p.garrisonAt && t < p.garrisonAt) return;
+    p.garrisonAt = t + P().garrisonEveryMin * 60000;
+    const ups = E.upgradesOf(state, 'player');
+    const front = [], rear = [];
+    vs.forEach(v => { (exposed(state, v, t) ? front : rear).push(v); });
+    if (!front.length || !rear.length) return;
+    const need = v => E.points(v) * p.defLevel * P().garrisonGoal;
+    front.sort((a, b) => (E.villageDefense(a, null, ups) / Math.max(1, need(a))) - (E.villageDefense(b, null, ups) / Math.max(1, need(b))));
+    for (const f of front) {
+      let have = E.villageDefense(f, null, ups);
+      state.movements.forEach(m => { if (m.type === 'support' && m.owner === 'player' && m.to === f.id) have += E.defensePower(m.units, ups); });
+      const goal = need(f);
+      if (have >= goal) continue;
+      const helpers = rear.filter(h => !threatened[h.id] && !incomingOn(state, h).length).sort((a, b) => E.dist(a, f) - E.dist(b, f));
+      let sentUnits = 0, sentFrom = 0;
+      for (const h of helpers) {
+        if (have >= goal) break;
+        const hdef = E.villageDefense(h, null, ups), keep = E.points(h) * p.defLevel * P().garrisonKeep;
+        if (hdef <= keep) continue;
+        const frac = Math.min(P().garrisonShare, (hdef - keep) / hdef);
+        const spare = E.emptyUnits();
+        let n = 0;
+        Object.keys(C.UNITS).forEach(k => { if (isDef(k)) { spare[k] = Math.floor(h.units[k] * frac); n += spare[k]; } });
+        const room = E.supportRoom(state, f);
+        if (E.unitsPop(spare) > room) {
+          const sc = Math.max(0, room) / Math.max(1, E.unitsPop(spare));
+          n = 0; Object.keys(spare).forEach(k => { spare[k] = Math.floor(spare[k] * sc); n += spare[k]; });
+        }
+        if (n < P().supportMin) continue;
+        if (!E.sendSupport(state, h.id, f.id, spare, t, 'stay').ok) continue;
+        have += E.defensePower(spare, ups);
+        sentUnits += n; sentFrom++;
+      }
+      if (sentFrom) {
+        acts.garrisoned += sentUnits;
+        note(state, p, t, 'Garnizon dla ' + f.name + ': ' + sentUnits + ' jednostek z ' + sentFrom + ' wiosek zaplecza');
+      }
+    }
   }
 
   // Po zakończeniu zagrożenia wsparcie wysłane przez bota wraca do domu.
@@ -141,7 +192,8 @@
       }
     }
 
-    const target = E.points(v) * p.defLevel * (threatened ? 1.5 : 1);
+    const border = p.garrison !== false && exposed(state, v, t);
+    const target = E.points(v) * p.defLevel * (threatened ? 1.5 : 1) * (border ? P().garrisonGoal : 1);
     const needDef = E.villageDefense(v, null, ups) < target;
     let role;
     if (needDef) role = 'def';
@@ -336,10 +388,11 @@
     const vs = own(state);
     if (!vs.length) return;
     vs.forEach(v => E.tickVillage(state, v, t));
-    const acts = { built: 0, recruited: 0, support: 0, research: 0, coins: 0, recalled: 0, settled: 0 };
+    const acts = { built: 0, recruited: 0, support: 0, research: 0, coins: 0, recalled: 0, settled: 0, garrisoned: 0 };
     const threatened = {};
 
     defend(state, p, vs, t, acts, threatened);
+    garrison(state, p, vs, t, acts, threatened);
     const reserves = {};
     vs.forEach(v => {
       if (p.build && !threatened[v.id]) reserves[v.id] = buildVillage(state, v, p, t, acts);
@@ -355,7 +408,7 @@
     if (p.tech) manageTech(state, p, vs, t, acts);
     recall(state, p, t, acts);
 
-    ['built', 'recruited', 'support', 'research', 'coins', 'recalled', 'settled'].forEach(k => { p.stats[k] = (p.stats[k] || 0) + acts[k]; });
+    ['built', 'recruited', 'support', 'research', 'coins', 'recalled', 'settled', 'garrisoned'].forEach(k => { p.stats[k] = (p.stats[k] || 0) + acts[k]; });
     p.last = { t, built: acts.built, recruited: acts.recruited, support: acts.support, research: acts.research, settled: acts.settled };
   }
 
@@ -366,6 +419,7 @@
     if (cfg.build !== undefined) o.build = !!cfg.build;
     if (cfg.tech !== undefined) o.tech = !!cfg.tech;
     if (cfg.defend !== undefined) o.defend = !!cfg.defend;
+    if (cfg.garrison !== undefined) o.garrison = !!cfg.garrison;
     if (cfg.recruit !== undefined && ['defense', 'balanced', 'off'].indexOf(cfg.recruit) >= 0) o.recruit = cfg.recruit;
     if (cfg.convoy !== undefined) o.convoy = !!cfg.convoy;
     if (cfg.settle !== undefined) o.settle = !!cfg.settle;
@@ -378,7 +432,7 @@
     const old = state.pilot || {};
     const p = normalize(cfg || {}, old);
     p.log = old.log || []; p.stats = old.stats || {}; p.seen = old.seen || {}; p.threat = old.threat || {};
-    p.deployed = old.deployed || {}; p.last = old.last || null;
+    p.deployed = old.deployed || {}; p.last = old.last || null; p.garrisonAt = old.garrisonAt || 0;
     p.next = p.on ? t + 1000 : null;
     p.settleRetry = 0;                       // zmiana ustawień = szukaj wolnych pól od razu
     // Konwoje do stolicy: bot włącza wbudowane Konwoje (nadwyżki z wiosek > 80% magazynu wracają do wioski centralnej).
