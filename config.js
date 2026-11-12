@@ -293,19 +293,26 @@
       // Ataki i podbój wiosek frakcji (opcja „attack”): bot zwiadem sprawdza obronę celu, zbiera armię w najsilniejszej wiosce
       // i wysyła kolejne fale z Dowódcą podboju, aż poparcie spadnie do 0. Bot nie widzi ulepszeń ani posiłków wroga – stąd zapas (ratio).
       war: {
-        range: 14,               // maks. odległość celu od wioski, z której wyrusza fala
+        range: 18,               // maks. odległość celu od wioski, z której wyrusza fala
         ratio: 1.5,              // wymagana siła ataku = szacowana obrona celu × ratio
         failPenalty: 0.5,        // każda przegrana fala na ten cel podnosi wymagane ratio o tę część
         minPower: 1500,          // poniżej tej siły ataku bot nie zwiadowuje ani nie atakuje
-        nobles: 2,               // tylu Dowódców bot utrzymuje (w wioskach, w szkoleniu i w drodze)
+        nobles: 2,               // minimalna liczba Dowódców, których bot utrzymuje (w wioskach, w szkoleniu i w drodze)
+        noblesMax: 10,           // górny limit Dowódców
+        villagesPerNoble: 12,    // limit rośnie o 1 Dowódcę na tyle wiosek (więcej wiosek = więcej równoległych podbojów)
         rams: 12,                // tyle Taranów szkoli w każdej wiosce (gdy Koszary pozwalają)
         waveScouts: 2,           // zwiadowcy w fali (po bitwie dają nowy obraz celu: mur, poparcie, wojsko)
         spyScouts: 3,            // tylu zwiadowców wysyła na zwiad
         spyEveryMin: 15,         // jak często ponawia zwiad tego samego celu
-        spyPerTurn: 2,           // maks. zwiadów wysłanych w jednej turze
+        spyPerTurn: 5,           // maks. zwiadów wysłanych w jednej turze
         intelMaxMin: 40,         // zwiad starszy niż tyle minut jest nieaktualny
         wallGuess: 8,            // zakładany mur, gdy nie ma raportu o budynkach
-        maxWaves: 2,             // maks. liczba fal naraz w drodze
+        maxWaves: 12,            // maks. liczba fal naraz w drodze (z kolejnymi falami ciągów)
+        wavesPerTurn: 3,         // maks. nowych uderzeń (celów) w jednej turze
+        trainMax: 3,             // ile dodatkowych fal (z innych wiosek) dokłada do uderzenia, by poparcie spadło do 0 za jednym razem
+        escort: 0.25,            // jaka część armii ataku wioski idzie w fali kolejnej (z Dowódcą) – wybita obrona już nie stawia oporu
+        trainGapSec: 45,         // o tyle później niż pierwsza fala dochodzi kolejna
+        gatherBelow: 20000,      // wioski z armią ataku silniejszą niż to nie oddają jej do zbiórki – atakują i farmią sami
         gatherRange: 14,         // z jakiej odległości wioski przenoszą armię do najsilniejszej wioski
         gatherEveryMin: 5,       // jak często bot zbiera armię
         gatherMin: 5,            // mniejszych oddziałów nie przenosi

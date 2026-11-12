@@ -343,7 +343,7 @@ function twoVillages() {
     Object.values(s.factions).forEach(f => { if (f.ai) f.nextThink = 1e15; });
     const A = E.villagesOf(s, 'player')[0];
     const foe = Object.values(s.villages).filter(v => v.owner && v.owner !== 'player').sort((a, b) => E.dist(a, A) - E.dist(b, A))[0];
-    Object.keys(s.villages).forEach(id => { const o = s.villages[id]; if (o.owner && o.owner !== 'player' && id !== foe.id) o.owner = null; });
+    Object.keys(s.villages).forEach(id => { if (id !== A.id && id !== foe.id) delete s.villages[id]; });   // tylko cel i my (wolne osady też są celami)
     foe.x = A.x + 5; foe.y = A.y; foe.units = E.emptyUnits(); foe.units.spear = 10; foe.buildings.wall = 0;
     A.buildings.barracks = 5; A.buildings.farm = 20; A.buildings.storage = 20;
     A.units = Object.assign(E.emptyUnits(), units);
@@ -359,7 +359,8 @@ function twoVillages() {
   const atk = s.movements.filter(m => m.type === 'attack' && m.owner === 'player');
   const rep0 = s.reports.filter(r => r.kind === 'attack' && r.to === foe.id);
   ok(atk.length + rep0.length >= 1, 'po zwiadzie bot wysyła falę ataku');
-  ok(atk.concat(rep0).length >= 1 && (atk.every(m => m.units.noble === 1 && m.units.axe > 0 && m.units.ram > 0)), 'fala niesie Dowódcę, armię i Tarany');
+  const firstWave = rep0.length ? rep0[rep0.length - 1].attUnits : (atk[0] && atk[0].units);   // pierwsza fala (późniejsze mogą być bez Taranów – giną w bitwach)
+  ok(firstWave && firstWave.noble === 1 && firstWave.axe > 0 && firstWave.ram > 0, 'pierwsza fala niesie Dowódcę, armię i Tarany');
   ok(atk.every(m => m.units.spear === 0 && m.units.guard === 0), 'fala nie zabiera obrońców');
   E.advance(s, s.now + 3 * HOUR);
   ok(foe.owner === 'player', 'wioska frakcji przejęta po kolejnych falach (właściciel: ' + foe.owner + ', poparcie ' + Math.floor(foe.loyalty) + ')');
@@ -394,13 +395,52 @@ function twoVillages() {
   ok(!pk.s.reports.some(r => r.kind === 'attack') && pk.foe.owner !== 'player', 'cel z paktem nie jest atakowany');
   ok(pk.s.pilot.warWhy && pk.s.pilot.warWhy.key === 'foes', 'powód: pakt o nieagresji (' + (pk.s.pilot.warWhy && pk.s.pilot.warWhy.text) + ')');
 }
+// 14b. Podbój wolnej osady zwykłą armią (bez Dowódcy) i ciąg uderzeń z kilku wiosek na wioskę frakcji
+{
+  const base = (n) => {
+    const s = E.newGame(T0, 31, 'normal', 'small');
+    Object.values(s.factions).forEach(f => { if (f.ai) f.nextThink = 1e15; });
+    const A = E.villagesOf(s, 'player')[0];
+    A.buildings.barracks = 5; A.buildings.farm = 20; A.buildings.storage = 20;
+    return { s, A };
+  };
+  // wolna osada: bez Dowódcy, same Topornicy + zwiad
+  {
+    const { s, A } = base();
+    const neut = Object.values(s.villages).filter(v => v.owner === null).sort((a, b) => E.dist(a, A) - E.dist(b, A))[0];
+    Object.keys(s.villages).forEach(id => { if (id !== A.id && id !== neut.id) delete s.villages[id]; });
+    neut.x = A.x + 4; neut.y = A.y; neut.units = E.emptyUnits(); neut.units.spear = 5; neut.buildings.wall = 0; neut.garrison = E.emptyUnits(); neut.garrison.spear = 5;
+    A.units = Object.assign(E.emptyUnits(), { axe: 600, scout: 6, spear: 200, guard: 100 });
+    MP.Pilot.configure(s, { on: true, build: false, recruit: 'off', tech: false, defend: false, garrison: false, attack: true }, s.now);
+    E.advance(s, s.now + 4 * HOUR);
+    ok(neut.owner === 'player', 'wolna osada zdobyta zwykłą armią bez Dowódcy (poparcie ' + Math.floor(neut.loyalty) + ', właściciel ' + neut.owner + ')');
+    ok(A.units.spear === 200 && A.units.guard === 100, 'obrońcy zostali w domu');
+  }
+  // ciąg: wioska frakcji z pełnym poparciem, 3 wioski z Dowódcami -> podbój dużo szybciej niż pojedynczymi falami
+  {
+    const { s, A } = base();
+    const foe = Object.values(s.villages).filter(v => v.owner && v.owner !== 'player').sort((a, b) => E.dist(a, A) - E.dist(b, A))[0];
+    Object.keys(s.villages).forEach(id => { if (id !== A.id && id !== foe.id) delete s.villages[id]; });
+    foe.x = A.x + 6; foe.y = A.y; foe.units = E.emptyUnits(); foe.units.spear = 10; foe.buildings.wall = 0; foe.loyalty = 100;
+    const mkv = (dx, name) => { const v = JSON.parse(JSON.stringify(A)); Object.assign(v, { id: 'vq' + name, name, x: A.x + dx, y: A.y + 1, buildQueue: [], recruitQueue: [], support: {}, lastTick: s.now }); s.villages[v.id] = v; return v; };
+    const B = mkv(1, 'B'), Cc = mkv(2, 'C');
+    [A, B, Cc].forEach(v => { v.units = Object.assign(E.emptyUnits(), { axe: 500, ram: 6, noble: 1, scout: 5, spear: 100, guard: 50 }); });
+    MP.Pilot.configure(s, { on: true, build: false, recruit: 'off', tech: false, defend: false, garrison: false, attack: true }, s.now);
+    E.advance(s, s.now + 12 * MIN);
+    const planned = (s.pilot.pending || []).length + s.movements.filter(m => m.type === 'attack' && m.owner === 'player' && m.units.noble > 0).length + s.reports.filter(r => r.kind === 'attack' && r.attUnits.noble > 0).length;
+    ok(planned >= 2, 'uderzenie to kilka fal z Dowódcami z różnych wiosek (' + planned + ')');
+    E.advance(s, s.now + 40 * MIN);
+    ok(foe.owner === 'player', 'wioska frakcji przejęta jednym uderzeniem w ciągu 50 min (poparcie ' + Math.floor(foe.loyalty) + ', właściciel ' + foe.owner + ')');
+  }
+}
+
 // 15. Zbiórka armii: zaplecze przenosi atak i Dowódcę do najsilniejszej wioski
 {
   const s = E.newGame(T0, 31, 'normal', 'small');
   Object.values(s.factions).forEach(f => { if (f.ai) f.nextThink = 1e15; });
   const A = E.villagesOf(s, 'player')[0];
   A.buildings.farm = 20;
-  Object.values(s.villages).forEach(o => { if (o.owner && o.owner !== 'player') o.owner = null; });   // bez wrogów – tylko zbiórka
+  Object.keys(s.villages).forEach(id => { if (s.villages[id].owner !== 'player') delete s.villages[id]; });   // bez celów – tylko zbiórka
   const B = JSON.parse(JSON.stringify(A));
   Object.assign(B, { id: 'vgB', name: 'B', x: A.x + 2, y: A.y + 1, buildQueue: [], recruitQueue: [], support: {}, lastTick: s.now });
   s.villages.vgB = B;
