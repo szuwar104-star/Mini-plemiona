@@ -7,17 +7,23 @@
 (function (root) {
   'use strict';
   const MP = root.MP = root.MP || {};
-  const LEVELS = 10;
+  const LEVELS = 20;       // maksymalny poziom budynków
+  const BASE_LEVELS = 10;  // do tego poziomu krzywe są „klasyczne”; powyżej rosną łagodniej (czas), a zyski maleją (produkcja)
 
-  // Tabela wartości dla poziomów 1..10 (indeks 0 = poziom 0).
-  function series(base, factor, roundTo) {
+  // Tabela wartości dla poziomów 1..LEVELS (indeks 0 = poziom 0).
+  // Powyżej poziomu 10 wykładnik wzrostu jest łagodzony (softness: 1 = bez zmian, 0 = płasko), żeby czasy budowy
+  // nie rosły w nieskończoność; koszty surowców zostawiamy ostre – wysokie poziomy mają pochłaniać nadwyżki.
+  function series(base, factor, roundTo, softness) {
     const out = [0];
+    const soft = softness == null ? 1 : softness;
+    let v = base;
     for (let lvl = 1; lvl <= LEVELS; lvl++) {
-      const v = base * Math.pow(factor, lvl - 1);
+      if (lvl > 1) v *= lvl > BASE_LEVELS ? 1 + (factor - 1) * soft : factor;
       out.push(Math.max(roundTo, Math.round(v / roundTo) * roundTo));
     }
     return out;
   }
+  const HIGH_TIME = 0.55;   // łagodzenie wzrostu czasu budowy powyżej poziomu 10
   function cost(wood, clay, iron, factor) {
     return { wood: series(wood, factor, 5), clay: series(clay, factor, 5), iron: series(iron, factor, 5) };
   }
@@ -91,66 +97,76 @@
         desc: 'Odblokowuje wyższe poziomy budynków, powiększa magazyn i skraca czas budowy.',
         start: 1,
         cost: cost(70, 70, 66, 1.33),
-        time: series(5, 1.55, 1),
-        storage: [800, 1200, 1600, 2100, 2800, 3600, 4700, 6100, 8000, 10500, 14000],
-        buildSpeed: [1, 1, 0.95, 0.9, 0.86, 0.82, 0.78, 0.74, 0.7, 0.67, 0.64]
+        time: series(5, 1.55, 1, HIGH_TIME),
+        storage: [800, 1200, 1600, 2100, 2800, 3600, 4700, 6100, 8000, 10500, 14000,
+                  16400, 19200, 22500, 26300, 30800, 36000, 42000, 49000, 57000, 66000],
+        buildSpeed: [1, 1, 0.95, 0.9, 0.86, 0.82, 0.78, 0.74, 0.7, 0.67, 0.64,
+                    0.62, 0.60, 0.58, 0.56, 0.54, 0.52, 0.50, 0.48, 0.46, 0.45]
       },
       wood: {
         name: 'Tartak',
         desc: 'Produkuje drewno.',
         start: 1,
         cost: cost(40, 50, 48, 1.3),
-        time: series(4, 1.5, 1),
-        prod: [10, 40, 55, 74, 98, 128, 165, 210, 265, 330, 410]
+        time: series(4, 1.5, 1, HIGH_TIME),
+        prod: [10, 40, 55, 74, 98, 128, 165, 210, 265, 330, 410,
+               470, 540, 620, 710, 810, 920, 1040, 1170, 1310, 1460]
       },
       clay: {
         name: 'Cegielnia',
         desc: 'Produkuje glinę.',
         start: 1,
         cost: cost(55, 40, 48, 1.3),
-        time: series(4, 1.5, 1),
-        prod: [10, 40, 55, 74, 98, 128, 165, 210, 265, 330, 410]
+        time: series(4, 1.5, 1, HIGH_TIME),
+        prod: [10, 40, 55, 74, 98, 128, 165, 210, 265, 330, 410,
+               470, 540, 620, 710, 810, 920, 1040, 1170, 1310, 1460]
       },
       iron: {
         name: 'Kopalnia',
         desc: 'Wydobywa żelazo.',
         start: 1,
         cost: cost(60, 65, 50, 1.31),
-        time: series(5, 1.5, 1),
-        prod: [10, 40, 55, 74, 98, 128, 165, 210, 265, 330, 410]
+        time: series(5, 1.5, 1, HIGH_TIME),
+        prod: [10, 40, 55, 74, 98, 128, 165, 210, 265, 330, 410,
+               470, 540, 620, 710, 810, 920, 1040, 1170, 1310, 1460]
       },
       farm: {
         name: 'Farma',
         desc: 'Wyżywi większą armię – zwiększa limit jednostek.',
         start: 1,
         cost: cost(45, 40, 34, 1.3),
-        time: series(5, 1.5, 1),
-        pop: [100, 240, 300, 380, 480, 600, 760, 960, 1200, 1500, 1900]
+        time: series(5, 1.5, 1, HIGH_TIME),
+        pop: [100, 240, 300, 380, 480, 600, 760, 960, 1200, 1500, 1900,
+             2200, 2550, 3000, 3500, 4100, 4800, 5600, 6500, 7600, 9000]
       },
       barracks: {
         name: 'Koszary',
         desc: 'Rekrutacja wojska. Wyższy poziom odblokowuje jednostki i skraca szkolenie.',
         start: 1,
         cost: cost(85, 85, 85, 1.33),
-        time: series(6, 1.55, 1),
-        recruitSpeed: [0, 1, 0.92, 0.85, 0.78, 0.72, 0.66, 0.61, 0.56, 0.52, 0.48]
+        time: series(6, 1.55, 1, HIGH_TIME),
+        recruitSpeed: [0, 1, 0.92, 0.85, 0.78, 0.72, 0.66, 0.61, 0.56, 0.52, 0.48,
+                       0.46, 0.44, 0.42, 0.41, 0.40, 0.39, 0.38, 0.37, 0.36, 0.35]
       },
       market: {
         name: 'Targowisko',
         desc: 'Kupcy przewożą surowce między Twoimi wioskami.',
         start: 0,
         cost: cost(65, 60, 60, 1.3),
-        time: series(6, 1.5, 1),
-        merchants: [0, 1, 2, 3, 4, 6, 8, 10, 13, 16, 20]
+        time: series(6, 1.5, 1, HIGH_TIME),
+        merchants: [0, 1, 2, 3, 4, 6, 8, 10, 13, 16, 20,
+                    24, 28, 32, 37, 42, 48, 54, 61, 68, 75]
       },
       wall: {
         name: 'Mur obronny',
         desc: 'Zwiększa obronę wioski. Tarany wroga mogą go burzyć.',
         start: 0,
         cost: cost(55, 75, 62, 1.32),
-        time: series(6, 1.5, 1),
-        flat: [0, 20, 40, 60, 85, 110, 140, 170, 200, 240, 280],          // stała obrona muru
-        bonus: [0, .05, .10, .16, .22, .29, .36, .44, .52, .61, .70]       // procentowy bonus obrony
+        time: series(6, 1.5, 1, HIGH_TIME),
+        flat: [0, 20, 40, 60, 85, 110, 140, 170, 200, 240, 280,
+               320, 360, 400, 440, 480, 520, 560, 600, 640, 680],          // stała obrona muru
+        bonus: [0, .05, .10, .16, .22, .29, .36, .44, .52, .61, .70,
+                .76, .815, .865, .91, .95, .985, 1.015, 1.04, 1.06, 1.08]       // procentowy bonus obrony
       }
     },
 
@@ -237,7 +253,9 @@
       trade: { label: 'Handel', desc: 'Targowisko do 10 (kupcy i monety), Ratusz do 8.',
                items: [['market', 10], ['hq', 8]] },
       full:  { label: 'Pełna rozbudowa', desc: 'Wszystkie budynki do poziomu 10, po równo.',
-               items: [['hq', 10], ['wood', 10], ['clay', 10], ['iron', 10], ['farm', 10], ['barracks', 10], ['market', 10], ['wall', 10]] }
+               items: [['hq', 10], ['wood', 10], ['clay', 10], ['iron', 10], ['farm', 10], ['barracks', 10], ['market', 10], ['wall', 10]] },
+      max:   { label: 'Maksymalna rozbudowa', desc: 'Wszystkie budynki do poziomu 20, po równo. Drogie i długie – pochłania nadwyżki surowców.',
+               items: [['hq', 20], ['wood', 20], ['clay', 20], ['iron', 20], ['farm', 20], ['barracks', 20], ['market', 20], ['wall', 20]] }
     },
     // Konwoje (automatyczne odsyłanie nadwyżek do wioski centralnej)
     AUTO: { everyMin: [5, 15, 30], defaults: { high: 80, keep: 40, everyMin: 15, coins: true } },
