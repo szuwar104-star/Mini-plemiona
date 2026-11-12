@@ -320,7 +320,7 @@
       light: {
         name: 'Lekka kawaleria', desc: 'Szybka i groźna, dużo zabiera łupów.',
         cost: { wood: 100, clay: 90, iron: 170 }, time: 16,
-        att: 130, def: 30, speed: 7, pop: 4, carry: 80, barracks: 3
+        att: 120, def: 28, speed: 7, pop: 3, carry: 80, barracks: 3
       },
       ram: {
         name: 'Taran', desc: 'Kruszy mur obronny wroga. Wolny i słaby w walce.',
