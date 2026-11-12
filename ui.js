@@ -1156,7 +1156,7 @@
   }
   /* ---------- budowa we wszystkich wioskach ---------- */
   function buildAllDefaults() { return { mode: 'tpl', tpl: 'eco', key: 'hq', level: 10, off: {} }; }
-  function buildAllItems(g) { return g.mode === 'tpl' ? C.BUILD_TEMPLATES[g.tpl].items : [[g.key, Math.max(1, Math.min(C.MAX_LEVEL, Number(g.level) || 1))]]; }
+  function buildAllItems(g) { return g.mode === 'tpl' ? E.templateItems(g.tpl, g.level) : [[g.key, Math.max(1, Math.min(C.MAX_LEVEL, Number(g.level) || 1))]]; }
   function buildAllModal() {
     const g = UI.buildall, tpl = g.mode === 'tpl';
     return '<h2>' + ico('hq') + 'Budowa we wszystkich wioskach</h2>' +
@@ -1165,8 +1165,8 @@
       '<button class="btn' + (tpl ? ' ghost' : '') + '" data-act="ba-mode" data-m="one">Jeden budynek</button></div>' +
       (tpl ? '<label class="field">Szablon <select data-batpl>' + Object.keys(C.BUILD_TEMPLATES).map(k => '<option value="' + k + '"' + (k === g.tpl ? ' selected' : '') + '>' +
           C.BUILD_TEMPLATES[k].label + '</option>').join('') + '</select></label><p class="muted seg-note">' + C.BUILD_TEMPLATES[g.tpl].desc + '</p>'
-        : '<div class="gopts"><label class="field">Budynek <select data-bakey>' + E.BUILDINGS.map(k => '<option value="' + k + '"' + (k === g.key ? ' selected' : '') + '>' + C.BUILDINGS[k].name + '</option>').join('') + '</select></label>' +
-          '<label class="field">Do poziomu <input type="number" inputmode="numeric" min="1" max="' + C.MAX_LEVEL + '" step="1" data-balevel value="' + esc(g.level) + '"></label></div>') +
+        : '<label class="field">Budynek <select data-bakey>' + E.BUILDINGS.map(k => '<option value="' + k + '"' + (k === g.key ? ' selected' : '') + '>' + C.BUILDINGS[k].name + '</option>').join('') + '</select></label>') +
+      '<label class="field">Do poziomu <input type="number" inputmode="numeric" min="1" max="' + C.MAX_LEVEL + '" step="1" data-balevel value="' + esc(g.level) + '"></label>' +
       '<div id="baPlan"></div>' +
       '<div class="actions"><button class="btn ghost" data-act="close">Anuluj</button><button class="btn" data-act="buildall-go" id="baGo">Kolejkuj</button></div>';
   }

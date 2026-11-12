@@ -823,6 +823,11 @@
   /* ---------- budowa w wielu wioskach naraz ---------- */
   // items: [[budynek, docelowy poziom], ...]. Plan bez skutków ubocznych: dla każdej wioski gracza lista budów,
   // które zmieszczą się w kolejce i na które starczy surowców (koszty liczone po kolei), albo powód pominięcia.
+  // Cele szablonu dla wybranego poziomu docelowego: [[budynek, poziom]] (poziom w granicach 1..MAX_LEVEL).
+  function templateItems(id, level) {
+    const L = Math.max(1, Math.min(C.MAX_LEVEL, Math.floor(Number(level)) || 1));
+    return C.BUILD_TEMPLATES[id].items.map(([k, off]) => [k, Math.max(1, Math.min(C.MAX_LEVEL, L + off))]);
+  }
   function planBuildAll(state, items, t, off) {
     const rows = [];
     villagesOf(state, 'player').sort((a, b) => a.name.localeCompare(b.name, 'pl')).forEach(v => {
@@ -1441,7 +1446,7 @@
   function hiddenRes(state, v) { return v.owner === 'player' ? Math.floor(storageCap(v) * hideShare(state)) : 0; }
 
   MP.Engine = {
-    queueMax, planBuildAll, buildAll, setAuto, runAuto,
+    queueMax, templateItems, planBuildAll, buildAll, setAuto, runAuto,
     RES, UNITS, BUILDINGS, ramCount, diff, useDifficulty, hiddenRes,
     rand, randInt, dist, emptyUnits, cleanUnits, sumUnits, attackPower, defensePower, upgradeMult, upgradesOf,
     exchange, exchangeMax, merchantCap, ramEff, exchangeGet, exchangeRate, exchangeQuick, coinQuick, buyCoinsAll, mintLimit, mintTokens, buyCoins, techInfo, researchTech, techNode, techLevel, techCost, techEffects,
