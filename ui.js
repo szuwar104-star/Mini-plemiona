@@ -393,7 +393,11 @@
     // odświeżanie co 5 s albo przy zmianie struktury – liczniki czasu tykają same
     const sig = JSON.stringify([own.map(v => [v.id, v.buildQueue.length, v.recruitQueue.length, E.sumUnits(v.units)]), incomingAttacks(s).length, diploOffers(s), UI.vid, Math.floor(s.now / 5000)]);
     if (UI.sigs.overview === sig) return;
+    // Użytkownik właśnie przewija – nie podmieniamy DOM (przerwałoby to przewijanie, także bezwładność na telefonie).
+    // Sygnatura zostaje stara, więc przerysowanie nastąpi w najbliższym ticku po zakończeniu przewijania.
+    if (userScrolling()) return;
     UI.sigs.overview = sig;
+    const keep = saveScroll(el);
     if (!own.length) { el.innerHTML = noVillages(); return; }
     const inc = incomingAttacks(s);
     const pw = E.accountPower(s, 'player');
@@ -439,6 +443,31 @@
       '<section class="panel"><div class="tablewrap"><table class="units ov">' +
       '<thead><tr><th>Wioska</th><th>' + ico('wood') + 'Drewno</th><th>' + ico('clay') + 'Glina</th><th>' + ico('iron') + 'Żelazo</th><th>' + ico('pop') + 'Farma</th><th>Budowa</th><th>Rekrutacja</th><th>Wojsko</th><th>Ataki</th></tr></thead>' +
       '<tbody>' + rows + '</tbody></table></div></section>';
+    restoreScroll(el, keep);
+  }
+
+  /* ---------- przewijanie a przerysowania ---------- */
+  // Przegląd jest przerysowywany często (Autopilot zmienia kolejki i wojsko). Bez tego przewijanie skakało na górę.
+  let lastUserScroll = 0, lastRestore = 0;
+  function markScroll(e) {
+    if (e.type === 'scroll' && Date.now() - lastRestore < 150) return;   // to nasze własne przywrócenie pozycji
+    lastUserScroll = Date.now();
+  }
+  ['wheel', 'touchstart', 'touchmove', 'touchend', 'touchcancel', 'mousedown', 'keydown'].forEach(ev =>
+    document.addEventListener(ev, markScroll, { passive: true, capture: true }));
+  document.addEventListener('scroll', markScroll, { passive: true, capture: true });
+  function userScrolling() { return Date.now() - lastUserScroll < 700; }
+  function saveScroll(el) {
+    const main = $('#main'), wrap = el.querySelector('.tablewrap');
+    return { main: main ? main.scrollTop : 0, win: window.scrollY, top: wrap ? wrap.scrollTop : 0, left: wrap ? wrap.scrollLeft : 0 };
+  }
+  function restoreScroll(el, k) {
+    if (!k) return;
+    lastRestore = Date.now();
+    const main = $('#main'), wrap = el.querySelector('.tablewrap');
+    if (wrap) { wrap.scrollTop = k.top; wrap.scrollLeft = k.left; }
+    if (main && main.scrollTop !== k.main) main.scrollTop = k.main;
+    if (window.scrollY !== k.win) window.scrollTo(0, k.win);
   }
 
   /* ---------- szybkie przyciski: monety i wymiana surowców ---------- */
@@ -1810,7 +1839,7 @@
   function show(screen) {
     UI.screen = screen;
     document.body.classList.toggle('on-map', screen === 'map' || screen === 'overview');
-    UI.sigs = {};
+    UI.sigs = {}; lastUserScroll = 0;
     render();
     if (screen === 'map') {
       requestAnimationFrame(() => {
@@ -1822,7 +1851,7 @@
     window.scrollTo(0, 0);
   }
 
-  function invalidate() { UI.sigs = {}; }
+  function invalidate() { UI.sigs = {}; lastUserScroll = 0; }
 
   /* ---------- obsługa zdarzeń ---------- */
   function download(name, text) {
