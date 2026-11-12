@@ -436,7 +436,7 @@
       '<button class="btn" data-act="auto-open"' + (own.length > 1 ? '' : ' disabled title="Potrzebujesz co najmniej dwóch wiosek"') + '>' + ico('merchant') + 'Konwoje' +
         (s.auto && s.auto.on ? ' <small>(wł.)</small>' : '') + '</button>' +
       '<button class="btn" data-act="tech-open">' + ico('scroll') + 'Technologia</button>' +
-      '<button class="btn" data-act="pilot-open">' + ico('wall') + 'Autopilot' + (s.pilot && s.pilot.on ? ' <small>(wł.)</small>' : '') + '</button>' +
+      '<button class="btn" data-act="pilot-open">' + ico('wall') + 'Autopilot' + (s.pilot && s.pilot.on ? ' <span class="pdot" title="Autopilot działa"></span>' : '') + '</button>' +
       '<button class="btn" data-act="diplo-open">' + ico('scroll') + 'Dyplomacja' + (diploOffers(s) ? ' <small>(' + diploOffers(s) + ')</small>' : '') + '</button></div></div>' +
       '<div class="army-kpis ov-kpis">' + E.RES.map(r => '<div class="kpi"><small>' + C.RESOURCES[r].name + ' razem</small><b>' + fmt(total[r]) + '</b><small>+' + Math.round(prod[r]) + ' / min</small></div>').join('') +
       '<div class="kpi"><small>Jednostki łącznie</small><b>' + fmt(allTotal) + '</b>' +
@@ -1294,40 +1294,72 @@
   function pilotModal() {
     const s = st(), g = UI.pilot, p = s.pilot;
     const stat = p && p.stats || {};
-    const ago = p && p.last ? Math.max(0, Math.round((s.now - p.last.t) / 60000)) : null;
+    const mins = t => Math.max(0, Math.round((s.now - t) / 60000));
+    const ago = p && p.last ? mins(p.last.t) : null;
     const opt = (v, cur, label) => '<option value="' + v + '"' + (String(v) === String(cur) ? ' selected' : '') + '>' + label + '</option>';
-    const log = p && p.log && p.log.length ? '<ul class="plog">' + p.log.slice(-8).reverse().map(l => '<li><small class="muted">' + clock(l.t) + '</small> ' + esc(l.text) + '</li>').join('') + '</ul>' : '';
-    return '<h2>' + ico('wall') + 'Autopilot – gra za Ciebie</h2>' +
-      '<p class="muted">Gdy zostawisz grę włączoną, bot sam prowadzi wszystkie Twoje wioski. Bot nie widzi siły wrogich wojsk (tak jak Ty), więc wysyła obronę „na zapas”, a przed atakiem wysyła zwiadowców. ' +
+    // Wiersz z przełącznikiem: ikona, tytuł, krótki opis. Pole <input> zostaje zwykłym checkboxem (obsługa w change).
+    const row = (attr, on, icon, title, desc, cls) => '<label class="opt' + (cls ? ' ' + cls : '') + '"><input type="checkbox" ' + attr + (on ? ' checked' : '') + '>' +
+      '<span class="opt-ico">' + ico(icon) + '</span><span class="opt-txt"><b>' + title + '</b><small>' + desc + '</small></span><i class="sw" aria-hidden="true"></i></label>';
+    const fld = (icon, title, desc, control) => '<label class="opt opt-field"><span class="opt-ico">' + ico(icon) + '</span><span class="opt-txt"><b>' + title + '</b>' + (desc ? '<small>' + desc + '</small>' : '') + '</span>' + control + '</label>';
+    const sec = (icon, title, body) => '<div class="pil-sec"><h3>' + ico(icon) + title + '</h3>' + body + '</div>';
+    const tile = (label, val, cls) => '<div class="pil-tile' + (cls ? ' ' + cls : '') + '"><b>' + val + '</b><small>' + label + '</small></div>';
+    const note = (icon, label, when, text) => '<div class="pil-note">' + ico(icon) + '<div><small>' + label + ' · ' + when + ' min temu</small><b>' + esc(text) + '</b></div></div>';
+
+    const hubs = E.villagesOf(s, 'player').sort((x, y) => x.name.localeCompare(y.name, 'pl')).map(v =>
+      '<option value="' + v.id + '"' + (v.id === g.hub ? ' selected' : '') + '>' + esc(v.name) + ' ' + xy(v.x, v.y) + ((v.buildings.market || 0) > 0 ? '' : ' – bez Targowiska') + '</option>').join('');
+
+    const on = !!(p && p.on);
+    const hero = '<div class="pil-hero"><span class="pil-badge' + (on ? ' on' : '') + '">' + ico('wall') + '</span><div class="pil-head"><h2>Autopilot</h2>' +
+      '<p class="muted">Bot prowadzi wszystkie Twoje wioski, gdy Cię nie ma.</p></div>' +
+      '<span class="pil-state ' + (on ? 'on' : 'off') + '"><i></i>' + (on ? 'działa' : 'wyłączony') + '</span></div>' +
+      '<div class="pil-meta">' + (on && p.next ? '<span>Następna tura <b>' + clock(p.next) + '</b></span>' : '') +
+        (ago !== null ? '<span>Ostatnia tura <b>' + ago + ' min temu</b></span>' : '') + '</div>' +
+      '<details class="pil-how"><summary>Jak to działa</summary><p class="muted">Bot nie widzi siły wrogich wojsk (tak jak Ty), więc wysyła obronę „na zapas”, a przed atakiem wysyła zwiadowców. ' +
       'Działa też po zamknięciu gry – po powrocie gra nadrabia czas, a bot podejmuje decyzje tak, jakby cały czas był przy komputerze. Nie działa w pauzie. ' +
-      'Przy włączonym Autopilocie ekran urządzenia nie będzie się wygaszał (jeśli przeglądarka na to pozwala).</p>' +
-      '<label class="chk big-chk"><input type="checkbox" data-pon' + (g.on ? ' checked' : '') + '>Autopilot włączony</label>' +
-      '<label class="chk"><input type="checkbox" data-pbuild' + (g.build ? ' checked' : '') + '>Rozbudowuj budynki we wszystkich wioskach</label>' +
-      '<label class="field">Wojsko <select data-prec>' + opt('defense', g.recruit, 'Tylko obrona (Pikinierzy, Łucznicy, Tarczownicy)') +
-        opt('balanced', g.recruit, 'Obrona, a po osiągnięciu celu także armia ataku') + opt('off', g.recruit, 'Nie szkol wojska') + '</select></label>' +
-      '<label class="field">Cel obrony wioski <select data-pdef>' + opt(25, g.defLevel, 'Niski') + opt(40, g.defLevel, 'Średni') + opt(60, g.defLevel, 'Wysoki') + opt(90, g.defLevel, 'Twierdza') +
-        ([25, 40, 60, 90].indexOf(Number(g.defLevel)) < 0 ? opt(g.defLevel, g.defLevel, 'Własny (' + g.defLevel + ')') : '') + '</select></label>' +
-      '<label class="chk"><input type="checkbox" data-pdefend' + (g.defend ? ' checked' : '') + '>Wysyłaj obronę z innych wiosek do atakowanych (po ataku wraca)</label>' +
-      '<label class="chk"><input type="checkbox" data-pgar' + (g.garrison ? ' checked' : '') + '>Stałe garnizony: wioski blisko wrogów mają więcej obrony (zaplecze przenosi tam nadwyżkę wojska)</label>' +
-      '<label class="chk"><input type="checkbox" data-psup' + (g.supply ? ' checked' : '') + '>Zasilaj surowcami wioski, którym brakuje na budowę (bogatsze wioski dopełniają ich magazyny do 80%; wymaga Targowiska)</label>' +
-      '<label class="chk"><input type="checkbox" data-ptech' + (g.tech ? ' checked' : '') + '>Kupuj monety z nadwyżek surowców i badaj Technologię (wymaga Targowiska)</label>' +
-      '<label class="chk"><input type="checkbox" data-pset' + (g.settle ? ' checked' : '') + '>Szkol osadników i zakładaj nowe wioski w pobliżu (jeden osadnik naraz)</label>' +
-      '<label class="field">Maks. liczba wiosek (puste = bez limitu)<input type="number" inputmode="numeric" min="1" max="200" placeholder="bez limitu" data-psmax value="' + nz(g.settleMax) + '"></label>' +
-      '<label class="chk"><input type="checkbox" data-patk' + (g.attack ? ' checked' : '') + '><b>Podbój</b>: zajmuj wioski wrogich frakcji i wolne osady (szkoli Dowódców i Tarany, zwiadem sprawdza obronę, kilka wiosek uderza naraz; wolne osady zdobywa zwykłą armią; wymaga szkolenia wojska, nie atakuje frakcji z paktem)</label>' +
-      '<label class="chk"><input type="checkbox" data-pfarm' + (g.farm ? ' checked' : '') + '><b>Grabież</b>: armia ataku grabi wioski przeciwnika i wolne osady wokoło (po zwiadzie, bez Dowódców – wioski zostają na swoim miejscu; wymaga szkolenia wojska i zwiadowców; nie grabi frakcji z paktem)</label>' +
-      '<label class="chk"><input type="checkbox" data-pconv' + (g.convoy ? ' checked' : '') + '>Wysyłaj nadwyżki surowców do stolicy (Konwoje co 15 min)</label>' +
-      '<label class="field">Stolica (wioska centralna) <select data-phub>' + E.villagesOf(s, 'player').sort((x, y) => x.name.localeCompare(y.name, 'pl')).map(v =>
-        '<option value="' + v.id + '"' + (v.id === g.hub ? ' selected' : '') + '>' + esc(v.name) + ' ' + xy(v.x, v.y) + ((v.buildings.market || 0) > 0 ? '' : ' – bez Targowiska') + '</option>').join('') + '</select></label>' +
-      '<p class="muted">Wioski z magazynem pełnym w ponad 80% oddają nadwyżkę (zostaje im 40%). Wysyłające wioski i stolica potrzebują Targowiska. Szczegóły: Przegląd → Konwoje.</p>' +
-      '<div class="summary"><div><span>Stan</span><b>' + (p && p.on ? 'włączony' : 'wyłączony') + '</b></div>' +
-      (p && p.on && p.next ? '<div><span>Następna tura bota</span><b>' + clock(p.next) + '</b></div>' : '') +
-      (ago !== null ? '<div class="wide"><span>Ostatnia tura (' + ago + ' min temu)</span><b>budowy: ' + p.last.built + ', wojsko: ' + p.last.recruited +
-        ', posiłki: ' + p.last.support + ', badania: ' + p.last.research + ', osadnicy: ' + (p.last.settled || 0) + (p.attack ? ', ataki: ' + (p.last.attacked || 0) : '') + '</b></div>' : '') +
-      (p && p.on && p.attack && p.warWhy ? '<div class="wide"><span>Podbój (' + Math.max(0, Math.round((s.now - p.warWhy.t) / 60000)) + ' min temu)</span><b>' + esc(p.warWhy.key === 'sent' ? p.warWhy.text : 'brak fali – ' + p.warWhy.text) + '</b></div>' : '') +
-      (p && p.on && p.farm && p.farmInfo ? '<div class="wide"><span>Grabież (' + Math.max(0, Math.round((s.now - p.farmInfo.t) / 60000)) + ' min temu)</span><b>' + esc(p.farmInfo.text) + '</b></div>' : '') +
-      (p ? '<div class="wide"><span>Łącznie od włączenia</span><b>budowy ' + (stat.built || 0) + ', wojsko ' + fmt(stat.recruited || 0) + ', wysłane posiłki ' + (stat.support || 0) +
-        ', zasilone surowce ' + fmt(stat.supplied || 0) + ', badania ' + (stat.research || 0) + ', monety ' + (stat.coins || 0) + ', nowe osady ' + (stat.settled || 0) + (p.farm || stat.farmed ? ', fale grabieży ' + (stat.farmed || 0) : '') + (p.attack || stat.attacked ? ', fale ataku ' + (stat.attacked || 0) + ', zwiady ' + (stat.spied || 0) + ', przejęte wioski ' + (stat.conquered || 0) : '') + '</b></div>' : '') + '</div>' + log +
-      '<div class="actions"><button class="btn ghost" data-act="close">Anuluj</button><button class="btn" data-act="pilot-save">Zapisz</button></div>';
+      'Przy włączonym Autopilocie ekran urządzenia nie będzie się wygaszał (jeśli przeglądarka na to pozwala).</p></details>';
+
+    const master = row('data-pon', g.on, 'wall', 'Autopilot włączony', 'Główny wyłącznik – ustawienia poniżej działają tylko, gdy jest włączony', 'opt-master');
+
+    const eco = sec('market', 'Gospodarka',
+      row('data-pbuild', g.build, 'hq', 'Rozbudowa budynków', 'We wszystkich wioskach') +
+      row('data-psup', g.supply, 'market', 'Zasilanie wiosek surowcami', 'Bogatsze wioski dopełniają magazyny wiosek, którym brakuje na budowę, do 80% (wymaga Targowiska)') +
+      row('data-ptech', g.tech, 'scroll', 'Technologia', 'Kupuje monety z nadwyżek i bada drzewko (wymaga Targowiska)') +
+      row('data-pconv', g.convoy, 'merchant', 'Nadwyżki do stolicy', 'Konwoje co 15 min. Wioski z magazynem pełnym w ponad 80% oddają nadwyżkę (zostaje im 40%); wysyłające wioski i stolica potrzebują Targowiska') +
+      fld('hq', 'Stolica', 'Wioska centralna dla konwojów', '<select data-phub>' + hubs + '</select>'));
+
+    const mil = sec('spear', 'Obrona i wojsko',
+      fld('barracks', 'Szkolenie wojska', '', '<select data-prec>' + opt('defense', g.recruit, 'Tylko obrona (Pikinierzy, Łucznicy, Tarczownicy)') +
+        opt('balanced', g.recruit, 'Obrona, a po osiągnięciu celu także armia ataku') + opt('off', g.recruit, 'Nie szkol wojska') + '</select>') +
+      fld('wall', 'Cel obrony wioski', '', '<select data-pdef>' + opt(25, g.defLevel, 'Niski') + opt(40, g.defLevel, 'Średni') + opt(60, g.defLevel, 'Wysoki') + opt(90, g.defLevel, 'Twierdza') +
+        ([25, 40, 60, 90].indexOf(Number(g.defLevel)) < 0 ? opt(g.defLevel, g.defLevel, 'Własny (' + g.defLevel + ')') : '') + '</select>') +
+      row('data-pdefend', g.defend, 'sword', 'Obrona atakowanych wiosek', 'Wysyła wojsko z innych wiosek; po ataku wraca') +
+      row('data-pgar', g.garrison, 'wall', 'Stałe garnizony', 'Wioski blisko wrogów mają więcej obrony – zaplecze przenosi tam nadwyżkę wojska'));
+
+    const exp = sec('settler', 'Ekspansja i wojna',
+      row('data-pset', g.settle, 'settler', 'Nowe wioski', 'Szkoli osadników i zakłada wioski w pobliżu (jeden osadnik naraz)') +
+      fld('map', 'Maks. liczba wiosek', 'Puste = bez limitu', '<input type="number" inputmode="numeric" min="1" max="200" placeholder="bez limitu" data-psmax value="' + nz(g.settleMax) + '">') +
+      row('data-patk', g.attack, 'noble', 'Podbój', 'Zajmuje wioski wrogich frakcji i wolne osady: szkoli Dowódców i Tarany, zwiadem sprawdza obronę, kilka wiosek uderza naraz; wolne osady zdobywa zwykłą armią. Wymaga szkolenia wojska; nie atakuje frakcji z paktem', 'opt-war') +
+      row('data-pfarm', g.farm, 'axe', 'Grabież', 'Armia ataku grabi wioski przeciwnika i wolne osady wokoło (po zwiadzie, bez Dowódców – wioski zostają na swoim miejscu). Wymaga szkolenia wojska i zwiadowców; nie grabi frakcji z paktem', 'opt-war'));
+
+    let stats = '';
+    if (p) {
+      const L = p.last;
+      stats = '<div class="pil-sec"><h3>' + ico('scroll') + 'Statystyki</h3>' +
+        (L ? '<p class="pil-cap">Ostatnia tura</p><div class="pil-tiles">' + tile('budowy', L.built) + tile('wojsko', fmt(L.recruited)) + tile('posiłki', L.support) + tile('badania', L.research) + tile('osadnicy', L.settled || 0) + (p.attack ? tile('ataki', L.attacked || 0) : '') + '</div>' : '') +
+        (on && p.attack && p.warWhy ? note('noble', 'Podbój', mins(p.warWhy.t), p.warWhy.key === 'sent' ? p.warWhy.text : 'brak fali – ' + p.warWhy.text) : '') +
+        (on && p.farm && p.farmInfo ? note('axe', 'Grabież', mins(p.farmInfo.t), p.farmInfo.text) : '') +
+        '<p class="pil-cap">Łącznie od włączenia</p><div class="pil-tiles tot">' +
+        tile('budowy', fmt(stat.built || 0)) + tile('wojsko', fmt(stat.recruited || 0)) + tile('posiłki', fmt(stat.support || 0)) + tile('zasilone surowce', fmt(stat.supplied || 0)) +
+        tile('badania', fmt(stat.research || 0)) + tile('monety', fmt(stat.coins || 0)) + tile('nowe osady', fmt(stat.settled || 0)) +
+        (p.farm || stat.farmed ? tile('fale grabieży', fmt(stat.farmed || 0)) : '') +
+        (p.attack || stat.attacked ? tile('fale ataku', fmt(stat.attacked || 0)) + tile('zwiady', fmt(stat.spied || 0)) + tile('przejęte wioski', fmt(stat.conquered || 0), 'gold') : '') +
+        '</div></div>';
+    }
+    const log = p && p.log && p.log.length ? '<div class="pil-sec"><h3>' + ico('scroll') + 'Ostatnie decyzje bota</h3><ul class="plog">' +
+      p.log.slice(-8).reverse().map(l => '<li><small>' + clock(l.t) + '</small><span>' + esc(l.text) + '</span></li>').join('') + '</ul></div>' : '';
+
+    return hero + master + eco + mil + exp + stats + log +
+      '<div class="actions pil-actions"><button class="btn ghost" data-act="close">Anuluj</button><button class="btn" data-act="pilot-save">Zapisz</button></div>';
   }
 
   function massModal() {
@@ -1609,8 +1641,7 @@
       '<div class="goal"><i style="width:' + Math.min(100, own / E.winVillages(s) * 100) + '%"></i></div>' + raceLeader(s) + '</section>' +
       '<section><h3>Technologia</h3><p class="muted">Drzewko badań płatne monetami: ulepszenia wojska, magazyny, kurs wymiany.</p>' +
       '<div class="actions left"><button class="btn" data-act="tech-open">' + ico('scroll') + 'Otwórz Technologię</button></div></section>' +
-      '<section><h3>Autopilot</h3><p class="muted">Bot buduje, szkoli wojsko, bada technologie i wysyła obronę do atakowanych wiosek, gdy Cię nie ma.' +
-        (s.pilot && s.pilot.on ? ' <b>Teraz włączony.</b>' : '') + '</p>' +
+      '<section><h3>Autopilot' + (s.pilot && s.pilot.on ? ' <span class="pil-state on sm"><i></i>działa</span>' : '') + '</h3><p class="muted">Bot buduje, szkoli wojsko, bada technologie i wysyła obronę do atakowanych wiosek, gdy Cię nie ma.</p>' +
       '<div class="actions left"><button class="btn" data-act="pilot-open">' + ico('wall') + 'Ustawienia Autopilota</button></div></section>' +
       '<section><h3>Dyplomacja</h3><p class="muted">Pakty o nieagresji z frakcjami, dary i oferty. Pakt chroni obie strony przed atakiem.' +
         (diploOffers(s) ? ' <b>Masz ' + diploOffers(s) + ' ofert do rozpatrzenia.</b>' : '') + '</p>' +
@@ -1724,7 +1755,7 @@
     else if (UI.modal.type === 'end') inner = endModal();
     else if (UI.modal.type === 'confirm') inner = '<h2>' + UI.modal.title + '</h2><p>' + UI.modal.text + '</p><div class="actions">' +
       '<button class="btn ghost" data-act="close">Anuluj</button><button class="btn danger" data-act="' + UI.modal.ok + '">' + UI.modal.okLabel + '</button></div>';
-    box.innerHTML = '<div class="dialog' + (UI.modal.type === 'report' ? ' chron' : UI.modal.type === 'attack' ? ' atk' : '') + '" role="dialog" aria-modal="true">' + inner + '</div>';
+    box.innerHTML = '<div class="dialog' + (UI.modal.type === 'report' ? ' chron' : UI.modal.type === 'attack' ? ' atk' : UI.modal.type === 'pilot' ? ' pil' : '') + '" role="dialog" aria-modal="true">' + inner + '</div>';
     box.hidden = false;
     document.body.classList.add('modal-open');
     fitModal();
