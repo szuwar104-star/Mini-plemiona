@@ -1099,6 +1099,13 @@
     const g = troopsDefaults(target); g.units = defenseUnits(); g.reserve = 90; return g;
   }
   function nz(v) { return (v === 0 || v === '0' || v === undefined || v === null) ? '' : esc(v); }
+  /* wspólne zatwierdzenie okna: planuje i od razu wysyła (jak przycisk „Wyślij wojsko”) */
+  function troopsSendNow() {
+    const g = UI.troops;
+    const r = G.action(s => E.sendTroops(s, E.planTroops(s, g.target, troopsArgs(g), s.now), s.now));
+    if (r.ok) { UI.troops = null; closeModal(); invalidate(); render(); }
+    else toast('bad', r.reason);
+  }
   function troopsArgs(g) { return { mode: g.mode, stay: g.stay, units: g.units, reservePct: g.reserve, capToRoom: g.capToRoom, off: g.off }; }
   function troopsModal() {
     const s = st(), g = UI.troops, own = E.villagesOf(s, 'player').sort((a, b) => a.name.localeCompare(b.name, 'pl'));
@@ -1112,7 +1119,7 @@
       '<label class="field">Rodzaj wysyłki <select data-tstay>' +
         '<option value="1"' + (g.stay ? ' selected' : '') + '>Przeniesienie na stałe (zajmuje farmę)</option>' +
         '<option value="0"' + (g.stay ? '' : ' selected') + '>Wsparcie (można odwołać)</option></select></label>' +
-      '<div class="gopts"><div class="field">Jednostki<span class="selbar"><button type="button" class="btn ghost" data-act="tunits-all" data-on="1">Zaznacz wszystkie</button><button type="button" class="btn ghost" data-act="tunits-all" data-on="0">Odznacz wszystkie</button><button type="button" class="btn ghost" data-act="tunits-def">Tylko obrona</button></span><span class="gres ugrid">' + E.UNITS.map(k => '<label class="chk"><input type="checkbox" data-tunit="' + k + '"' + (g.units[k] ? ' checked' : '') + '>' + ico(k) + C.UNITS[k].name + '</label>').join('') + '</span></div>' +
+      '<div class="gopts"><div class="field">Jednostki<span class="selbar"><button type="button" class="btn ghost" data-act="tunits-all" data-on="1">Zaznacz wszystkie</button><button type="button" class="btn ghost" data-act="tunits-all" data-on="0">Odznacz wszystkie</button><button type="button" class="btn ghost" data-act="troops-support" title="Tylko jednostki obronne, jako wsparcie; w wiosce wysyłającej zostaje domyślnie 90%">Wyślij wsparcie</button></span><span class="gres ugrid">' + E.UNITS.map(k => '<label class="chk"><input type="checkbox" data-tunit="' + k + '"' + (g.units[k] ? ' checked' : '') + '>' + ico(k) + C.UNITS[k].name + '</label>').join('') + '</span></div>' +
       '<label class="field">Zostaw w wiosce wysyłającej (% wojska)<input type="number" inputmode="numeric" min="0" max="100" step="5" placeholder="0" data-treserve value="' + nz(g.reserve) + '"></label></div>' +
       (g.stay ? '<label class="chk"><input type="checkbox" data-tcap' + (g.capToRoom ? ' checked' : '') + '>Nie wysyłaj więcej, niż mieści farma ' + (spread ? 'celów' : 'celu') + '</label>' : '') +
       '<div id="troopsPlan"></div>' +
@@ -2020,10 +2027,12 @@
       }
       case 'troops-open': UI.troops = troopsDefaults(UI.vid || (cur() && cur().id)); openModal('troops'); break;
       case 'defense-open': UI.troops = defenseDefaults(UI.vid || (cur() && cur().id)); openModal('troops'); break;
-      case 'tunits-def': {
-        UI.troops.units = defenseUnits();
-        document.querySelectorAll('[data-tunit]').forEach(i => { i.checked = !!UI.troops.units[i.dataset.tunit]; });
-        updateTroopsPlan();
+      case 'troops-support': {
+        /* tylko obrona + wsparcie (do odwołania) + domyślnie 90% zostaje w wiosce wysyłającej; od razu wysyła */
+        const g = UI.troops;
+        g.units = defenseUnits(); g.stay = false;
+        if (!(Number(g.reserve) > 0)) g.reserve = 90;
+        troopsSendNow();
         break;
       }
       case 'buildall-open': UI.buildall = buildAllDefaults(); openModal('buildall'); break;
@@ -2057,15 +2066,7 @@
         break;
       }
       case 'troops-mode': UI.troops.mode = b.dataset.m; renderModal(); break;
-      case 'troops-send': {
-        const g = UI.troops;
-        const r = G.action(s => E.sendTroops(s, E.planTroops(s, g.target, troopsArgs(g), s.now), s.now));
-        if (r.ok) {
-          UI.troops = null;
-          closeModal(); invalidate(); render();
-        } else toast('bad', r.reason);
-        break;
-      }
+      case 'troops-send': troopsSendNow(); break;
       case 'settle-open': UI.form = {}; openModal('settle', { x: Number(b.dataset.x), y: Number(b.dataset.y), from: UI.vid }); break;
       case 'fmax': {
         UI.form[b.dataset.k] = b.dataset.v;
