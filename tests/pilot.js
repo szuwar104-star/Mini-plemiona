@@ -452,5 +452,78 @@ function twoVillages() {
   ok(B.units.axe === 0 && B.units.spear === 50, 'obrońcy zostają w domu');
 }
 
+// 16. Podział wiosek na ofensywne i defensywne
+{
+  const s = E.newGame(T0, 31, 'normal', 'small');
+  Object.values(s.factions).forEach(f => { if (f.ai) f.nextThink = 1e15; });
+  const A = E.villagesOf(s, 'player')[0];
+  A.buildings.farm = 20; A.buildings.barracks = 5; A.buildings.storage = 15; A.buildings.hq = 15;
+  Object.keys(s.villages).forEach(id => { if (s.villages[id].owner !== 'player') delete s.villages[id]; });   // bez wrogów – sprawdzamy role i szkolenie
+  const vs = [A];
+  for (let i = 1; i < 8; i++) {
+    const v = JSON.parse(JSON.stringify(A));
+    Object.assign(v, { id: 'vs' + i, name: 'S' + i, x: A.x + (i % 4), y: A.y + 1 + Math.floor(i / 4), buildQueue: [], recruitQueue: [], support: {}, lastTick: s.now });
+    s.villages[v.id] = v; vs.push(v);
+  }
+  vs.forEach(v => { v.units = Object.assign(E.emptyUnits(), { scout: 3 }); v.res = { wood: 9000, clay: 9000, iron: 9000 }; });
+  vs[5].units.axe = 400;   // wioska z armią ataku trafia do ofensywnych
+  MP.Pilot.configure(s, { on: true, build: false, tech: false, recruit: 'balanced', split: true, splitRatio: 3, garrison: false }, s.now);
+  E.advance(s, s.now + 3 * HOUR);
+  const roles = s.pilot.roles || {};
+  const off = vs.filter(v => roles[v.id] === 'off'), def = vs.filter(v => roles[v.id] === 'def');
+  ok(off.length === 2 && def.length === 6, 'osiem wiosek dzieli się 2 ofensywne : 6 defensywnych (' + off.length + ' : ' + def.length + ')');
+  ok(roles[vs[5].id] === 'off', 'wioska z armią ataku jest ofensywna');
+  const defK = Object.keys(C.UNITS).filter(k => C.UNITS[k].role === 'def');
+  const attK = Object.keys(C.UNITS).filter(k => !C.UNITS[k].role && !C.UNITS[k].conquer && !C.UNITS[k].settler && !C.UNITS[k].scout);
+  const cnt = (v, ks) => ks.reduce((a, k) => a + (v.units[k] || 0) + v.recruitQueue.reduce((q, e) => q + (e.unit === k ? e.count - e.done : 0), 0), 0);
+  ok(off.every(v => cnt(v, defK) === 0) && off.every(v => cnt(v, attK) > 0), 'wioski ofensywne szkolą tylko jednostki ataku');
+  ok(def.every(v => cnt(v, attK) === 0) && def.every(v => cnt(v, defK) > 0), 'wioski defensywne szkolą tylko obronę');
+  // nowa wioska dopełnia podział, role istniejących się nie zmieniają
+  const before = JSON.stringify(roles);
+  MP.Pilot.configure(s, { splitRatio: 1 }, s.now);
+  E.advance(s, s.now + 2 * MIN);
+  const after = s.pilot.roles;
+  ok(Object.keys(before ? JSON.parse(before) : {}).every(id => JSON.parse(before)[id] !== 'off' || after[id] === 'off'), 'wioski ofensywne zachowują rolę po zmianie proporcji');
+  ok(vs.filter(v => after[v.id] === 'off').length === 4, 'proporcja 1 : 1 daje 4 wioski ofensywne');
+  MP.Pilot.configure(s, { split: false }, s.now);
+  E.advance(s, s.now + 2 * MIN);
+  ok(s.pilot.roles === null, 'wyłączenie podziału czyści role');
+}
+
+// 17. Podział: obrona idzie tylko z wiosek defensywnych, armia ataku z defensywnych wędruje do ofensywnej
+{
+  const s = E.newGame(T0, 31, 'normal', 'small');
+  Object.values(s.factions).forEach(f => { if (f.ai) f.nextThink = 1e15; });
+  const A = E.villagesOf(s, 'player')[0];
+  A.buildings.farm = 20; A.buildings.barracks = 5;
+  const foe0 = Object.values(s.villages).find(v => v.owner && v.owner !== 'player');
+  Object.keys(s.villages).forEach(id => { if (s.villages[id].owner !== 'player' && s.villages[id] !== foe0) delete s.villages[id]; });
+  const mk2 = (id, dx, dy) => {
+    const v = JSON.parse(JSON.stringify(A));
+    Object.assign(v, { id, name: id, x: A.x + dx, y: A.y + dy, buildQueue: [], recruitQueue: [], support: {}, lastTick: s.now });
+    s.villages[id] = v; return v;
+  };
+  const O = A, D1 = mk2('vD1', 1, 0), D2 = mk2('vD2', 0, 1), D3 = mk2('vD3', 2, 1);
+  [O, D1, D2, D3].forEach(v => { v.units = Object.assign(E.emptyUnits(), { scout: 3 }); });
+  O.units.axe = 500;
+  D1.units.spear = 200; D1.units.axe = 120;
+  D2.units.spear = 200; D2.units.noble = 1;
+  D3.units.spear = 200;
+  foe0.x = A.x + 7; foe0.y = A.y; foe0.units = Object.assign(E.emptyUnits(), { axe: 300 });
+  MP.Pilot.configure(s, { on: true, build: false, tech: false, recruit: 'balanced', split: true, splitRatio: 3, garrison: false, defLevel: 400 }, s.now);
+  E.advance(s, s.now + 1000);
+  ok(s.pilot.roles && s.pilot.roles[O.id] === 'off', 'wioska z armią ataku jest ofensywna');
+  E.advance(s, s.now + 20 * MIN);
+  ok(O.units.axe >= 620 && O.units.noble === 1, 'armia ataku i Dowódca z defensywnych przeniesione do ofensywnej (' + O.units.axe + ' Toporników)');
+  ok(D1.units.axe === 0 && D2.units.noble === 0 && D1.units.spear >= 200, 'defensywne oddały armię ataku, a obrońców zachowały');
+  // wróg atakuje ofensywną wioskę: posiłki idą tylko z defensywnych
+  const t0 = s.now;
+  const r = E.sendAttack(s, foe0.id, O.id, { axe: 60 }, t0);
+  ok(r.ok, 'wróg wysłał atak na wioskę ofensywną (' + (r.reason || '') + ')');
+  E.advance(s, t0 + 3000);
+  const sup = s.movements.filter(m => m.type === 'support' && m.owner === 'player' && m.to === O.id);
+  ok(sup.length >= 1 && sup.every(m => s.pilot.roles[m.from] === 'def'), 'posiłki dla wioski ofensywnej wysyłają wyłącznie wioski defensywne (' + sup.length + ')');
+}
+
 if (fails) { console.error('\nBłędy: ' + fails); process.exit(1); }
 console.log('\nWszystkie testy Autopilota przeszły.');

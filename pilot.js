@@ -15,6 +15,9 @@
       zbierane w najsilniejszej wiosce, duże atakują same. Cele: wioski frakcji (bez paktu) i wolne osady (te zdobywa
       zwykła armia). Uderzenie = pierwsza fala + kolejne z innych wiosek tuż po niej, by poparcie spadło do 0 za jednym razem.
    6. Grabież (opcja „farm”) – grabież wiosek wokoło, bez Dowódców.
+   7. Podział wiosek (opcja „split”) – wioski dzielą się na OFENSYWNE (tylko wojska ataku, z nich wychodzą wszystkie ataki
+      i grabieże) i DEFENSYWNE (tylko obrona; stąd idą posiłki i garnizony, w tym dla wiosek ofensywnych). Na jedną
+      ofensywną przypada splitRatio defensywnych. Armia ataku z wiosek defensywnych przechodzi na stałe do ofensywnych.
    Bot nie podgląda sił wroga bez zwiadu (tak jak Ty: „siła nieznana”). Wszystkie liczby: C.PILOT.
    ========================================================================= */
 (function (root) {
@@ -29,6 +32,9 @@
   const popRatio = (state, v) => E.popUsed(state, v) / Math.max(1, E.popCap(v));
   const incomingOn = (state, v) => state.movements.filter(m => m.type === 'attack' && m.owner !== 'player' && m.to === v.id);
   const isDef = k => C.UNITS[k].role === 'def';
+  // Podział wiosek: p.roles[id] = 'off' (ofensywna) | 'def' (defensywna); null, gdy podział wyłączony albo bot nie prowadzi działań ofensywnych.
+  const splitOn = p => !!p.split && (p.recruit === 'balanced' || !!p.attack || !!p.farm);
+  const roleOf = (p, v) => (p.roles && p.roles[v.id]) || null;
   // Wioska przygraniczna: w zasięgu ataku leży wioska innej frakcji (z paktem o nieagresji nie liczy się).
   function exposed(state, v, t) {
     return Object.values(state.villages).some(o => o.owner && o.owner !== 'player' && E.dist(o, v) <= P().garrisonRange &&
@@ -38,6 +44,33 @@
   function note(state, p, t, text) {
     p.log.push({ t, text });
     if (p.log.length > P().logMax) p.log.splice(0, p.log.length - P().logMax);
+  }
+
+  /* ---------- 0. podział wiosek na ofensywne i defensywne ---------- */
+  // Role są stałe: raz przypisana wioska ją zachowuje. Przybywa ofensywnych tylko wtedy, gdy ich liczba spada poniżej
+  // 1 na (splitRatio + 1) wiosek (np. nowe wioski). Na ofensywną trafiają najpierw wioski z największą armią ataku,
+  // a przy remisie te najbliżej wrogów (stamtąd łatwiej dosięgnąć celów).
+  function assignRoles(state, p, vs) {
+    if (!splitOn(p)) { p.roles = null; return; }
+    const roles = p.roles || {};
+    const have = {};
+    vs.forEach(v => { have[v.id] = true; });
+    Object.keys(roles).forEach(id => { if (!have[id]) delete roles[id]; });
+    const ratio = Math.max(1, Math.floor(p.splitRatio) || P().split.ratio);
+    const want = vs.length < 2 ? 0 : Math.max(1, Math.round(vs.length / (ratio + 1)));
+    let off = vs.filter(v => roles[v.id] === 'off').length;
+    if (off < want) {
+      const foes = Object.values(state.villages).filter(o => o.owner && o.owner !== 'player');
+      const near = v => foes.reduce((m, o) => Math.min(m, E.dist(o, v)), 999);
+      const cands = vs.filter(v => roles[v.id] !== 'off').map(v => ({ v, A: attPower(state, v), d: near(v) }))
+        .sort((a, b) => (b.A - a.A) || (a.d - b.d));
+      for (const c of cands) {
+        if (off >= want) break;
+        roles[c.v.id] = 'off'; off++;
+      }
+    }
+    vs.forEach(v => { if (!roles[v.id]) roles[v.id] = 'def'; });
+    p.roles = roles;
   }
 
   /* ---------- 1. obrona ---------- */
@@ -61,7 +94,7 @@
       const goal = E.points(v) * p.defLevel * P().supportGoal;
       let have = E.villageDefense(v, null, ups);
       state.movements.forEach(m => { if (m.type === 'support' && m.owner === 'player' && m.to === v.id) have += E.defensePower(m.units, ups); });
-      const helpers = vs.filter(h => h.id !== v.id && !incomingOn(state, h).length).sort((a, b) => E.dist(a, v) - E.dist(b, v));
+      const helpers = vs.filter(h => h.id !== v.id && roleOf(p, h) !== 'off' && !incomingOn(state, h).length).sort((a, b) => E.dist(a, v) - E.dist(b, v));
       let sentFrom = 0, sentUnits = 0;
       for (const h of helpers) {
         if (have >= goal) break;
@@ -95,9 +128,9 @@
     p.garrisonAt = t + P().garrisonEveryMin * 60000;
     const ups = E.upgradesOf(state, 'player');
     const front = [], rear = [];
-    vs.forEach(v => { (exposed(state, v, t) ? front : rear).push(v); });
+    vs.forEach(v => { if (exposed(state, v, t)) front.push(v); else if (roleOf(p, v) !== 'off') rear.push(v); });   // ofensywne z zaplecza nie oddają obrony – jej nie szkolą
     if (!front.length || !rear.length) return;
-    const need = v => E.points(v) * p.defLevel * P().garrisonGoal;
+    const need = v => E.points(v) * p.defLevel * P().garrisonGoal * (roleOf(p, v) === 'off' ? P().split.offGarrison : 1);
     front.sort((a, b) => (E.villageDefense(a, null, ups) / Math.max(1, need(a))) - (E.villageDefense(b, null, ups) / Math.max(1, need(b))));
     for (const f of front) {
       let have = E.villageDefense(f, null, ups);
@@ -253,8 +286,11 @@
     const border = p.garrison !== false && exposed(state, v, t);
     const target = E.points(v) * p.defLevel * (threatened ? 1.5 : 1) * (border ? P().garrisonGoal : 1);
     const needDef = E.villageDefense(v, null, ups) < target;
+    const split = roleOf(p, v);
     let role;
-    if (needDef) role = 'def';
+    if (split === 'off') role = 'att';                       // wioska ofensywna: tylko jednostki ataku (obronę dostarczają defensywne)
+    else if (needDef) role = 'def';
+    else if (split === 'def') { if (full) role = 'def'; else return; }   // defensywna: nigdy jednostek ataku
     else if (p.recruit === 'balanced' || p.attack || p.farm) role = 'att';
     else if (full) role = 'def';            // pełny magazyn: nadwyżka idzie na dodatkową obronę, nic się nie marnuje
     else return;
@@ -511,7 +547,7 @@
     if (vs.reduce((s2, v) => s2 + attPower(state, v), 0) < W.minPower) return null;
     const U = C.UNITS.noble, ups = E.upgradesOf(state, 'player');
     const cands = vs.filter(v => !threatened[v.id] && v.buildings.barracks >= U.barracks && v.recruitQueue.length < E.queueMax(v, 'recruit') &&
-      E.villageDefense(v, null, ups) >= E.points(v) * p.defLevel * P().settleDefMin && !E.RES.some(r => U.cost[r] > E.storageCap(v)))
+      (p.roles ? roleOf(p, v) === 'off' : E.villageDefense(v, null, ups) >= E.points(v) * p.defLevel * P().settleDefMin) && !E.RES.some(r => U.cost[r] > E.storageCap(v)))
       .map(v => ({ v, ready: Math.min.apply(null, E.RES.map(r => v.res[r] / U.cost[r])) })).sort((a, b) => b.ready - a.ready);
     if (!cands.length) return null;
     const best = cands[0].v, ri = E.recruitInfo(state, best, 'noble');
@@ -546,6 +582,9 @@
 
   // Wioska może być bazą armii ataku, gdy ma własną obronę (cel jak dla wioski przygranicznej) i pełne poparcie.
   function canHost(state, p, v) {
+    const r = roleOf(p, v);
+    if (r === 'def') return false;                                         // z wiosek defensywnych nic nie wychodzi na wroga
+    if (r === 'off') return v.loyalty >= C.LOYALTY.max;                    // ofensywna nie ma obrony – chronią ją posiłki i garnizon z defensywnych
     return v.loyalty >= C.LOYALTY.max &&
       E.villageDefense(v, null, E.upgradesOf(state, 'player')) >= E.points(v) * p.defLevel * P().garrisonGoal * 0.8;
   }
@@ -560,6 +599,23 @@
     // baza armii: tylko wioska z własną obroną i pełnym poparciem – inaczej zostałaby bez obrońców
     const hosts = free.filter(v => canHost(state, p, v));
     if (!hosts.length) return;
+    if (p.roles) {
+      // podział wiosek: cała armia ataku (i Dowódcy) z wiosek defensywnych idzie na stałe do najbliższej wioski ofensywnej
+      const room = {};
+      hosts.forEach(h => { room[h.id] = E.supportRoom(state, h) - Math.ceil(E.popCap(h) * W.farmReserve); });
+      free.forEach(v => {
+        if (hosts.indexOf(v) >= 0) return;
+        const u = attUnits(v); u.noble = v.units.noble || 0;
+        if (E.sumUnits(u) < W.gatherMin && !u.noble) return;
+        const host = hosts.filter(h => room[h.id] >= 20).sort((a, b) => E.dist(a, v) - E.dist(b, v))[0];
+        if (!host) return;
+        const pop = E.unitsPop(u);
+        if (pop > room[host.id]) { const sc = room[host.id] / pop; Object.keys(u).forEach(k => { u[k] = Math.floor(u[k] * sc); }); }
+        if (E.sumUnits(u) < 1) return;
+        if (E.sendSupport(state, v.id, host.id, u, t, 'stay').ok) room[host.id] -= E.unitsPop(u);
+      });
+      return;
+    }
     const front = hosts.slice().sort((a, b) => attPower(state, b) - attPower(state, a))[0];
     let room = E.supportRoom(state, front) - Math.ceil(E.popCap(front) * W.farmReserve);
     free.forEach(v => {
@@ -782,6 +838,7 @@
     const acts = { built: 0, recruited: 0, support: 0, research: 0, coins: 0, recalled: 0, settled: 0, garrisoned: 0, supplied: 0, attacked: 0, spied: 0, conquered: 0, farmed: 0 };
     const threatened = {};
 
+    assignRoles(state, p, vs);
     defend(state, p, vs, t, acts, threatened);
     garrison(state, p, vs, t, acts, threatened);
     const reserves = {};
@@ -807,6 +864,7 @@
     shield(state, p, vs, t, threatened, acts);
     if (p.tech) manageTech(state, p, vs, t, acts);
     if (p.attack) warStep(state, p, vs, t, threatened, acts);
+    if (p.roles && !p.attack) gather(state, p, vs, t, threatened);      // przy podboju zbiórkę robi warStep
     if (p.farm) farmStep(state, p, vs, t, threatened, acts);
     recall(state, p, t, acts);
 
@@ -828,6 +886,8 @@
     if (cfg.settle !== undefined) o.settle = !!cfg.settle;
     if (cfg.attack !== undefined) o.attack = !!cfg.attack;
     if (cfg.farm !== undefined) o.farm = !!cfg.farm;
+    if (cfg.split !== undefined) o.split = !!cfg.split;
+    if (cfg.splitRatio !== undefined) { const n = Math.floor(Number(cfg.splitRatio)); if (n >= 1 && n <= 10) o.splitRatio = n; }
     if (cfg.settleMax !== undefined) { const n = Math.floor(Number(cfg.settleMax)); o.settleMax = n >= 1 && n <= 200 ? n : 0; }
     if (cfg.hub !== undefined) o.hub = cfg.hub || null;
     if (cfg.defLevel !== undefined) { const n = Number(cfg.defLevel); if (n >= 5 && n <= 400) o.defLevel = Math.round(n); }
@@ -837,7 +897,7 @@
     const old = state.pilot || {};
     const p = normalize(cfg || {}, old);
     p.log = old.log || []; p.stats = old.stats || {}; p.seen = old.seen || {}; p.threat = old.threat || {};
-    p.deployed = old.deployed || {}; p.last = old.last || null; p.garrisonAt = old.garrisonAt || 0;
+    p.deployed = old.deployed || {}; p.roles = old.roles || null; p.last = old.last || null; p.garrisonAt = old.garrisonAt || 0;
     p.next = p.on ? t + 1000 : null;
     p.settleRetry = 0;                       // zmiana ustawień = szukaj wolnych pól od razu
     // Konwoje do stolicy: bot włącza wbudowane Konwoje (nadwyżki z wiosek > 80% magazynu wracają do wioski centralnej).
