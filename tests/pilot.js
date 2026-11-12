@@ -72,6 +72,21 @@ function twoVillages() {
   ok(B.units.spear > 100 - Math.floor(100 * C.PILOT.supportShare) + 10, 'jednostki wróciły do wioski macierzystej (' + B.units.spear + ')');
 }
 
+// 3b. Atakowana wioska wywozi surowce kupcami do bezpiecznej wioski
+{
+  const { s, A, B } = twoVillages();
+  MP.Pilot.configure(s, { on: true, build: false, recruit: 'off', tech: false, defLevel: 400 }, s.now);
+  A.buildings.market = 5; B.buildings.market = 5;
+  A.res = { wood: 3000, clay: 3000, iron: 3000 }; B.res = { wood: 0, clay: 0, iron: 0 };
+  const ai = Object.values(s.villages).find(v => v.owner && v.owner !== 'player');
+  ai.x = A.x + 6; ai.y = A.y; ai.units = E.emptyUnits(); ai.units.axe = 300;
+  E.sendAttack(s, ai.id, A.id, { axe: 60 }, s.now);
+  E.advance(s, s.now + 2000);
+  const tr = s.movements.filter(m => m.type === 'transport' && m.from === A.id);
+  ok(tr.length >= 1 && tr.every(m => m.to !== A.id), 'atakowana wioska wywozi surowce kupcami (' + tr.length + ' transportów)');
+  ok(A.res.wood < 3000, 'surowce opuściły atakowaną wioskę (' + Math.round(A.res.wood) + ')');
+}
+
 // 4. Wyłączona obrona nie wysyła posiłków
 {
   const { s, A } = twoVillages();

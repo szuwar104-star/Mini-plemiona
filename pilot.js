@@ -288,6 +288,40 @@
     if (best && E.queueRecruit(state, v, best.k, best.n, t).ok !== false) acts.recruited += best.n;
   }
 
+  /* ---------- 3b. atakowane wioski: wydać albo wywieźć surowce ---------- */
+  // Wioska, na którą idzie atak, najpierw szkoli obrońców (recruitVillage), potem resztę surowców przeznacza na budowę
+  // (koszt zablokowany w kolejce – nie do zrabowania), a to, co zostało, wywozi kupcami do najbliższej bezpiecznej wioski.
+  function shield(state, p, vs, t, threatened, acts) {
+    p.shieldAt = p.shieldAt || {};
+    const safe = vs.filter(v => !threatened[v.id] && !incomingOn(state, v).length);
+    vs.forEach(v => {
+      if (!threatened[v.id] || (p.shieldAt[v.id] && t < p.shieldAt[v.id])) return;
+      p.shieldAt[v.id] = t + 60000;
+      E.tickVillage(state, v, t);
+      if (p.build) buildVillage(state, v, p, t, acts);
+      if (E.merchantsTotal(v) < 1) return;
+      const dest = safe.slice().sort((a, b) => E.dist(a, v) - E.dist(b, v));
+      let sent = 0, to = null;
+      for (const d of dest) {
+        const free = E.merchantsFree(state, v);
+        if (free < 1) break;
+        const inc = E.incomingRes(state, d.id), send = {};
+        let total = 0;
+        E.RES.forEach(r => { send[r] = Math.max(0, Math.min(Math.floor(v.res[r]), Math.floor(E.storageCap(d) - d.res[r] - inc[r]))); total += send[r]; });
+        if (total < 1) continue;
+        const cap = E.merchantCap();
+        if (Math.ceil(total / cap) > free) {
+          let left = free * cap;
+          E.RES.forEach(r => { send[r] = Math.min(send[r], left); left -= send[r]; });
+          total = send.wood + send.clay + send.iron;
+          if (total < 1) continue;
+        }
+        if (E.sendTransport(state, v.id, d.id, send, t).ok) { sent += total; to = to || d; }
+      }
+      if (sent) { acts.supplied += sent; note(state, p, t, 'Atak na ' + v.name + ': wywieziono ' + sent + ' surowców do ' + to.name); }
+    });
+  }
+
   /* ---------- 4. technologia ---------- */
   function techAllowed(node, p) {
     if (node.branch !== 'war') return true;
@@ -648,6 +682,7 @@
       }
     }
     if (p.recruit !== 'off') vs.forEach(v => recruitVillage(state, v, p, t, reserves[v.id], !!threatened[v.id], acts));
+    shield(state, p, vs, t, threatened, acts);
     if (p.tech) manageTech(state, p, vs, t, acts);
     if (p.attack) warStep(state, p, vs, t, threatened, acts);
     recall(state, p, t, acts);
