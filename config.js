@@ -309,6 +309,7 @@
         gatherRange: 14,         // z jakiej odległości wioski przenoszą armię do najsilniejszej wioski
         gatherEveryMin: 5,       // jak często bot zbiera armię
         gatherMin: 5,            // mniejszych oddziałów nie przenosi
+        farmReserve: 0.35,       // tyle farmy wioski zbiórki zostaje wolne na szkolenie obrońców (armia ataku nie zapycha jej do pełna)
         retryMin: 90             // po tylu minutach od przegranej fali bot zapomina o karze za ten cel
       },
       buildWeights: { hq: 1, wood: 1.1, clay: 1.1, iron: 1.1, farm: 1, barracks: 0.8, market: 0.5, wall: 0.7 },
