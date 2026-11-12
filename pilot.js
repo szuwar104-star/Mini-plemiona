@@ -507,6 +507,12 @@
     Object.keys(p.ops).forEach(id => { if (t - p.ops[id].t > 3 * 3600000) delete p.ops[id]; });
   }
 
+  // Wioska może być bazą armii ataku, gdy ma własną obronę (cel jak dla wioski przygranicznej) i pełne poparcie.
+  function canHost(state, p, v) {
+    return v.loyalty >= C.LOYALTY.max &&
+      E.villageDefense(v, null, E.upgradesOf(state, 'player')) >= E.points(v) * p.defLevel * P().garrisonGoal * 0.8;
+  }
+
   // Armia ataku (i Dowódcy) z zaplecza wędruje na stałe do najsilniejszej wioski – rozproszona nie zdobędzie obsadzonej wioski.
   function gather(state, p, vs, t, threatened) {
     const W = P().war;
@@ -514,8 +520,11 @@
     p.gatherAt = t + W.gatherEveryMin * 60000;
     const free = vs.filter(v => !threatened[v.id] && !incomingOn(state, v).length);
     if (free.length < 2) return;
-    const front = free.slice().sort((a, b) => attPower(state, b) - attPower(state, a))[0];
-    let room = E.supportRoom(state, front);
+    // baza armii: tylko wioska z własną obroną i pełnym poparciem – inaczej zostałaby bez obrońców
+    const hosts = free.filter(v => canHost(state, p, v));
+    if (!hosts.length) return;
+    const front = hosts.slice().sort((a, b) => attPower(state, b) - attPower(state, a))[0];
+    let room = E.supportRoom(state, front) - Math.ceil(E.popCap(front) * W.farmReserve);
     free.forEach(v => {
       if (v.id === front.id || room < 20 || E.dist(v, front) > W.gatherRange) return;
       const u = attUnits(v); u.noble = v.units.noble || 0;
@@ -544,7 +553,7 @@
     if (!foes.length) return warWhy(state, p, t, 'foes', foesAll.length ? 'wszystkie frakcje (' + foesAll.length + ' wiosek) objęte paktem o nieagresji – wypowiedz pakt w Dyplomacji' : 'brak wrogich wiosek na mapie');
     const out = state.movements.filter(m => m.type === 'attack' && m.owner === 'player');
     const busy = new Set(out.map(m => m.to));
-    const free = vs.filter(v => !threatened[v.id] && !incomingOn(state, v).length);
+    const free = vs.filter(v => !threatened[v.id] && !incomingOn(state, v).length && canHost(state, p, v));
     const sources = free.map(v => ({ v, A: attPower(state, v) })).filter(s2 => s2.A >= W.minPower).sort((a, b) => b.A - a.A);
     if (!sources.length) {
       const top = free.reduce((m, v) => Math.max(m, attPower(state, v)), 0);
