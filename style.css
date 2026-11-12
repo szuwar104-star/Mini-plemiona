@@ -976,6 +976,10 @@ html, body { max-width: 100%; overflow-x: clip; }
 .opt-field .opt-txt { flex: 1 1 9rem; }
 .opt-field select, .opt-field input[type=number] { flex: 1 1 12rem; min-width: 0; width: 100%; max-width: 100%; }
 .opt-field input[type=number] { flex: 0 0 8.5rem; width: 8.5rem; text-align: right; }
+/* suwak częstotliwości pracy Autopilota */
+.pil-range { display: flex; align-items: center; gap: .7rem; flex: 1 1 100%; }
+.pil-range input[type=range] { flex: 1 1 auto; min-width: 0; accent-color: var(--accent, #b8892b); }
+.pil-range output { flex: 0 0 3.6rem; text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
 @media (max-width: 520px) {
   .pil-hero { flex-wrap: wrap; }
   .pil-state { margin-left: 3.8rem; }

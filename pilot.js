@@ -2,7 +2,7 @@
    Mini Plemiona – AUTOPILOT (bot rozwijający Twoje wioski)
    Działa w centralnym procesorze zdarzeń (zdarzenie 'pilot'), więc – tak jak AI –
    nadrabia czas także wstecznie, gdy gra była zamknięta lub uśpiona.
-   Co robi w każdej turze (C.PILOT.tickSec sekund czasu gry):
+   Co robi w każdej turze (co p.tickSec sekund czasu gry, domyślnie C.PILOT.tickSec):
    1. Obrona – nowy atak na Twoją wioskę = natychmiastowa tura: posiłki z innych wiosek
       (tylko jednostki obronne, tylko takie, które zdążą przed atakiem); po ataku wracają.
       Wioski przygraniczne (wróg w zasięgu ataku) dostają stały garnizon: wyższy cel szkolenia obrony
@@ -833,10 +833,15 @@
   }
 
   /* ---------- tura bota ---------- */
+  // Odstęp między turami: ustawienie gracza (suwak), a gdy go brak (stare zapisy) – wartość z konfiguracji.
+  function tickMs(p) {
+    const n = Number(p && p.tickSec);
+    return (n >= 5 && n <= 600 ? n : P().tickSec) * 1000;
+  }
   function run(state, t) {
     const p = state.pilot;
     if (!p || !p.on) return;
-    p.next = t + P().tickSec * 1000;
+    p.next = t + tickMs(p);
     const vs = own(state);
     if (!vs.length) return;
     vs.forEach(v => E.tickVillage(state, v, t));
@@ -894,6 +899,7 @@
     if (cfg.split !== undefined) o.split = !!cfg.split;
     if (cfg.splitRatio !== undefined) { const n = Math.floor(Number(cfg.splitRatio)); if (n >= 1 && n <= 10) o.splitRatio = n; }
     if (cfg.settleMax !== undefined) { const n = Math.floor(Number(cfg.settleMax)); o.settleMax = n >= 1 && n <= 200 ? n : 0; }
+    if (cfg.tickSec !== undefined) { const n = Math.round(Number(cfg.tickSec)); if (n >= 5 && n <= 600) o.tickSec = n; }
     if (cfg.hub !== undefined) o.hub = cfg.hub || null;
     if (cfg.defLevel !== undefined) { const n = Number(cfg.defLevel); if (n >= 5 && n <= 400) o.defLevel = Math.round(n); }
     return o;

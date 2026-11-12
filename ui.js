@@ -1304,7 +1304,7 @@
     const s = st(), p = s.pilot || {}, D = C.PILOT.defaults;
     return { on: p.on !== undefined ? p.on : true, build: p.build !== undefined ? p.build : D.build, recruit: p.recruit || D.recruit,
       tech: p.tech !== undefined ? p.tech : D.tech, defend: p.defend !== undefined ? p.defend : D.defend, garrison: p.garrison !== undefined ? p.garrison : D.garrison, supply: p.supply !== undefined ? p.supply : D.supply, defLevel: p.defLevel || D.defLevel,
-      settle: !!p.settle, settleMax: p.settleMax || 0, split: !!p.split, splitRatio: p.splitRatio || D.splitRatio, attack: !!p.attack, farm: !!p.farm, convoy: !!p.convoy, hub: p.hub || (s.auto && s.auto.hub) || (autoDefaults().hub) };
+      tickSec: p.tickSec || C.PILOT.tickSec, settle: !!p.settle, settleMax: p.settleMax || 0, split: !!p.split, splitRatio: p.splitRatio || D.splitRatio, attack: !!p.attack, farm: !!p.farm, convoy: !!p.convoy, hub: p.hub || (s.auto && s.auto.hub) || (autoDefaults().hub) };
   }
   function pilotModal() {
     const s = st(), g = UI.pilot, p = s.pilot;
@@ -1334,6 +1334,11 @@
       'Przy włączonym Autopilocie ekran urządzenia nie będzie się wygaszał (jeśli przeglądarka na to pozwala).</p></details>';
 
     const master = row('data-pon', g.on, 'wall', 'Autopilot włączony', 'Główny wyłącznik – ustawienia poniżej działają tylko, gdy jest włączony', 'opt-master');
+
+    const steps = C.PILOT.tickSteps, tIdx = Math.max(0, steps.indexOf(Number(g.tickSec)) >= 0 ? steps.indexOf(Number(g.tickSec)) : steps.indexOf(C.PILOT.tickSec));
+    const pace = sec('scroll', 'Tempo pracy',
+      fld('scroll', 'Częstotliwość pracy', 'Co ile bot sprawdza wioski. Częściej = szybsza reakcja i mniej bezczynności, ale większe obciążenie procesora i baterii. Atak na wioskę bot wykrywa od razu, niezależnie od tego ustawienia. Po zamknięciu gry bot nadrabia wszystkie tury w tym samym rytmie.',
+        '<span class="pil-range"><input type="range" min="0" max="' + (steps.length - 1) + '" step="1" value="' + tIdx + '" data-ptick><output data-ptickout>' + steps[tIdx] + ' s</output></span>'));
 
     const eco = sec('market', 'Gospodarka',
       row('data-pbuild', g.build, 'hq', 'Rozbudowa budynków', 'We wszystkich wioskach') +
@@ -1379,7 +1384,7 @@
     const log = p && p.log && p.log.length ? '<div class="pil-sec"><h3>' + ico('scroll') + 'Ostatnie decyzje bota</h3><ul class="plog">' +
       p.log.slice(-8).reverse().map(l => '<li><small>' + clock(l.t) + '</small><span>' + esc(l.text) + '</span></li>').join('') + '</ul></div>' : '';
 
-    return hero + master + eco + mil + exp + stats + log +
+    return hero + master + pace + eco + mil + exp + stats + log +
       '<div class="actions pil-actions"><button class="btn ghost" data-act="close">Anuluj</button><button class="btn" data-act="pilot-save">Zapisz</button></div>';
   }
 
@@ -2411,6 +2416,10 @@
     if (t.dataset.rin) UI.recruit[t.dataset.rin] = t.value;
     if (t.dataset.ain) { UI.atk[t.dataset.ain] = t.value; updateAttackSummary(); }
     if (t.dataset.fin) { UI.form[t.dataset.fin] = t.value; updateFormSummary(); }
+    if (t.hasAttribute && t.hasAttribute('data-ptick')) {
+      const sec = C.PILOT.tickSteps[Number(t.value)] || C.PILOT.tickSec; UI.pilot.tickSec = sec;
+      const out = t.parentNode.querySelector('[data-ptickout]'); if (out) out.textContent = sec + ' s';
+    }
     if (t.hasAttribute && t.hasAttribute('data-mcount')) { UI.mass.count = t.value; updateMassPlan(); }
     if (t.hasAttribute && t.hasAttribute('data-treserve')) { UI.troops.reserve = Math.max(0, Math.min(100, Number(t.value) || 0)); updateTroopsPlan(); }
     if (t.hasAttribute && t.hasAttribute('data-greserve')) { UI.gather.reserve = Math.max(0, Math.min(100, Number(t.value) || 0)); updateGatherPlan(); }

@@ -589,5 +589,23 @@ function twoVillages() {
   ok(defV.every(v => E.popUsed(s, v) / E.popCap(v) >= C.PILOT.split.defPopFill - 0.02 || v.res.wood < 200 || v.res.clay < 200 || v.res.iron < 200), 'wioski defensywne zapełniają farmę do 90% (' + defV.map(v => (E.popUsed(s, v) / E.popCap(v)).toFixed(2)).join(', ') + ')');
 }
 
+// 9. Częstotliwość pracy (suwak) i nadrabianie po zamknięciu gry: 2 h i 8 h = ten sam stan co ciągła gra
+{
+  const runs = (sec, span) => { const s = mk(11); MP.Pilot.configure(s, { on: true, tickSec: sec }, T0); let n = 0; const p = MP.Pilot.run; MP.Pilot.run = (st, t) => { n++; return p(st, t); }; E.advance(s, T0 + span); MP.Pilot.run = p; return n; };
+  const r30 = runs(30, HOUR), r120 = runs(120, HOUR);
+  ok(r30 > r120 * 3 && r30 >= 110, 'suwak: 30 s daje ~4x więcej tur niż 120 s (' + r30 + ' vs ' + r120 + ' na godzinę)');
+  const s0 = mk(11); MP.Pilot.configure(s0, { on: true, tickSec: 3 }, T0); ok(s0.pilot.tickSec === 60, 'zła wartość suwaka (3 s) jest ignorowana, zostaje 60 s');
+  const s1 = mk(11); MP.Pilot.configure(s1, { on: true, tickSec: 90 }, T0); MP.Pilot.configure(s1, { build: false }, T0); ok(s1.pilot.tickSec === 90, 'zmiana innych ustawień nie resetuje suwaka');
+  const old = mk(11); MP.Pilot.configure(old, { on: true }, T0); delete old.pilot.tickSec; E.advance(old, T0 + 10 * MIN); ok(old.pilot.stats.built >= 1, 'stary zapis bez tickSec działa (domyślnie 60 s)');
+  for (const [sec, span, label] of [[60, 2 * HOUR, '2 h'], [60, 8 * HOUR, '8 h'], [30, 8 * HOUR, '8 h przy 30 s'], [120, 8 * HOUR, '8 h przy 120 s']]) {
+    const a = mk(5); MP.Pilot.configure(a, { on: true, tickSec: sec, recruit: 'balanced', settle: true, supply: true, convoy: false }, T0);
+    const b = mk(5); MP.Pilot.configure(b, { on: true, tickSec: sec, recruit: 'balanced', settle: true, supply: true, convoy: false }, T0);
+    const t0 = Date.now(); E.advance(a, T0 + span); const ms = Date.now() - t0;
+    for (let t = T0 + MIN; t <= T0 + span; t += MIN) E.advance(b, t);
+    ok(JSON.stringify({ v: a.villages, st: a.pilot.stats }) === JSON.stringify({ v: b.villages, st: b.pilot.stats }), 'skok o ' + label + ' = ciągła gra (nadrobienie trwa ' + ms + ' ms, wiosek: ' + E.villagesOf(a, 'player').length + ')');
+    ok(a.pilot.on && a.pilot.stats.built > 20, 'po ' + label + ' bot nadal włączony i zbudował ' + a.pilot.stats.built + ' budynków');
+  }
+}
+
 if (fails) { console.error('\nBłędy: ' + fails); process.exit(1); }
 console.log('\nWszystkie testy Autopilota przeszły.');
