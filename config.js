@@ -428,8 +428,8 @@
       growth: { everyHours: 3, perStep: 1, ceilingShare: 0.5, ceilingShareRace: 1, zoneFadeHours: 24 },
       // Presja na gracza (DIFFICULTY.*.aiPressure): po startMin minut bez ataku AI na gracza (licząc od końca ochrony) rośnie liniowo
       // przez rampMin minut do pełnej. Przy pełnej: wymagana przewaga nad graczem spada do ratioFloor (część zwykłej), próg siły wyprawy
-      // o powerCut, częstość prób rośnie o chanceBoost, a waga gracza jako celu o biasBoost, zasięg ataku na gracza rośnie o rangeBoost (×2), a od połowy presji wioska może wysłać o jedną wyprawę więcej. Każdy atak na gracza zeruje presję.
-      pressure: { startMin: 20, rampMin: 60, ratioFloor: 0.4, powerCut: 0.5, chanceBoost: 0.6, biasBoost: 1.5, rangeBoost: 1 },
+      // o powerCut, częstość prób rośnie o chanceBoost, a waga gracza jako celu o biasBoost, zasięg ataku na gracza rośnie o rangeBoost (×2), a od połowy presji wioska może wysłać o jedną wyprawę więcej. Presja liczona jest osobno dla każdej frakcji: jej własny atak na gracza zeruje ją tylko jej (inne frakcje nie dostają „zerowania”). Zasięg ataku na gracza rośnie przy pełnej presji co najmniej do rangeMapShare boku mapy.
+      pressure: { startMin: 20, rampMin: 60, ratioFloor: 0.4, powerCut: 0.5, chanceBoost: 0.6, biasBoost: 1.5, rangeBoost: 1, rangeMapShare: 0.5 },
       // Taktyka wspólna dla wszystkich frakcji (ai.js)
       tactics: {
         buildQueue: 3,           // ile budów AI trzyma w kolejce
