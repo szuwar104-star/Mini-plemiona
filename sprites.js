@@ -179,19 +179,6 @@
     c.dot(x + 2.5, y + 1.2, '#ffffff', 2);
   }
 
-  // popiersie postaci: bark, szyja, głowa z oczami (światło z lewej góry); reszta dorysowywana przez ikonę
-  function bust(c, o) {
-    c.paint(S.poly([[3, 31], [4.6, 23], [9, 19.4], [23, 19.4], [27.4, 23], [29, 31]]), o.tunic, 'v', { bev: 0.8 });
-    if (o.mail) c.paint(S.ell(16, 21, 8, 3.2), o.mail, 'v', { bev: 0 });
-    if (o.collar) c.paint(S.ell(16, 21, 10.4, 3.6), o.collar, 'v', { bev: 0.4 });
-    c.flat(S.rect(13.4, 16.6, 5.2, 4.6), '#c98f66');
-    c.paint(S.ell(16, 12.4, 6.2, 6.8), o.skin || COL.skin, 'r', { bev: 0 });
-    c.flat(S.ell(13.2, 13, 0.95, 1.25), '#1d130c'); c.flat(S.ell(18.8, 13, 0.95, 1.25), '#1d130c');
-    c.dot(12.8, 12.2, '#ffffff', 0.7); c.dot(18.4, 12.2, '#ffffff', 0.7);
-    c.flat(S.ell(16, 14.9, 1, 0.7), '#d8946a');
-    c.flat(S.ell(16, 17.3, 1.7, 0.5), '#a9603f');
-  }
-
   const DRAW = {
     wood(c) {
       [[7.6, 24.4], [16, 24.4], [24.4, 24.4], [11.8, 17.1], [20.2, 17.1], [16, 9.8]].forEach(p => logEnd(c, p[0], p[1], 4.35));
@@ -256,86 +243,67 @@
       c.paint(S.poly([[22.5, 14], [27.5, 14], [27.5, 22], [25, 20.2], [22.5, 22]]), COL.red, 'v', { bev: 0.5 });
     },
     spear(c) {
-      // pikinier: stożkowy hełm, kolczuga, okrągła tarcza i włócznia z proporcem
-      c.shadow(16, 30.8, 12, 1);
-      c.paint(S.line(25.6, 4, 25.6, 31, 1.9), '#8d5a2b', 'h', { bev: 0.4 });
-      c.paint(S.poly([[25.6, 0.6], [28.4, 6], [25.6, 8], [22.8, 6]]), COL.steel, 'h', { bev: 0.6 });
-      c.paint(S.poly([[26.5, 8.4], [31.4, 9.6], [29.8, 11.8], [31.4, 14], [26.5, 13.2]]), COL.red, 'v', { bev: 0.5 });
-      bust(c, { tunic: '#4f78b8', mail: '#9aa7b8' });
-      c.paint(S.poly([[9.6, 12.4], [10, 7], [13, 3.6], [16, 2.2], [19, 3.6], [22, 7], [22.4, 12.4], [19.8, 10], [12.2, 10]]), COL.steel, 'd', { bev: 0.7 });
-      c.paint(S.rect(15.2, 9.6, 1.7, 5.4), '#8c9db2', 'h', { bev: 0 });
-      c.paint(S.circle(16, 2.4, 1.3), COL.gold, 'r', { bev: 0 });
-      c.flat(S.rect(10, 9.8, 12, 1), '#6b7c90');
-      c.paint(S.circle(9.2, 25.4, 6.8), '#b4c2d2', 'd', { bev: 0.7 });
-      c.paint(S.circle(9.2, 25.4, 5.3), '#b8432b', 'd', { bev: 0 });
-      c.flat(S.rect(8.4, 20.4, 1.7, 10), '#f0dca0'); c.flat(S.rect(4.2, 24.6, 10, 1.7), '#f0dca0');
-      c.paint(S.circle(9.2, 25.4, 2), COL.gold, 'r', { bev: 0 });
+      c.shadow(16, 30.4, 6, 1);
+      c.paint(S.line(16, 10, 16, 30, 2.4), COL.brown, 'h', { bev: 0.5 });
+      c.paint(S.poly([[16, 0.8], [20.5, 8.4], [16, 11.4], [11.5, 8.4]]), COL.steel, 'h', { bev: 0.7 });
+      c.flat(S.rect(16, 2.8, 0.6, 6), '#e8eef5');
+      c.flat(S.rect(13.4, 11, 5.2, 1.5), COL.gold);
+      c.paint(S.poly([[17.2, 13], [27, 14.4], [24.4, 17.4], [27, 20.6], [17.2, 20]]), COL.red, 'v', { bev: 0.6 });
     },
     axe(c) {
-      // topornik: rogaty hełm, ruda broda, wielki topór
-      c.shadow(16, 30.8, 12, 1);
-      bust(c, { tunic: '#7a4a2c', collar: '#e4d8bc' });
-      c.paint(S.poly([[9.6, 12.4], [10.4, 6.8], [13.4, 3.8], [18.6, 3.8], [21.6, 6.8], [22.4, 12.4], [19.6, 9.6], [12.4, 9.6]]), '#8393a8', 'd', { bev: 0.7 });
-      c.paint(S.poly([[10.6, 7.6], [5.6, 6.4], [2.6, 1.4], [7.2, 3.8], [11.8, 5.4]]), '#f1e6c8', 'h', { bev: 0.5 });
-      c.paint(S.poly([[21.4, 7.6], [26.4, 6.4], [29.4, 1.4], [24.8, 3.8], [20.2, 5.4]]), '#f1e6c8', 'h', { bev: 0.5 });
-      c.paint(S.poly([[9.8, 14], [10.4, 20], [16, 23.6], [21.6, 20], [22.2, 14], [19.4, 17], [12.6, 17]]), '#c8641f', 'v', { bev: 0.5 });
-      c.flat(S.line(11.6, 10.4, 14.8, 12, 1.1), '#2a160a'); c.flat(S.line(20.4, 10.4, 17.2, 12, 1.1), '#2a160a');
-      c.paint(S.line(5.5, 31, 25.5, 8.6, 2.6), '#8d5a2b', 'h', { bev: 0.4 });
-      c.paint(S.poly([[22.4, 3.6], [28, 1.6], [31.4, 7.4], [30.4, 15], [25.4, 16.6], [24.4, 11]]), COL.steel, 'd', { bev: 0.8 });
-      c.flat(S.poly([[25.4, 4.4], [28, 3.4], [29.6, 7.2], [27.4, 7]]), '#f4f8fc');
-      c.paint(S.rect(21.4, 8.4, 3.6, 4.4), COL.steelD, 'h', { bev: 0.4 });
+      c.shadow(16.5, 30.4, 6, 1);
+      c.paint(S.line(17, 6, 17, 30, 2.8), COL.brown, 'h', { bev: 0.5 });
+      c.paint(S.poly([[17, 4.5], [10, 3], [4, 6.5], [3, 13], [6.5, 18.5], [17, 17]]), COL.steel, 'd', { bev: 0.8 });
+      c.paint(S.poly([[17, 5.5], [21.5, 6.5], [21.5, 15.5], [17, 16.5]]), COL.steelD, 'h', { bev: 0.5 });
+      c.flat(S.poly([[5.6, 8], [10, 5.4], [10, 6.8], [6.4, 9.4]]), '#f4f8fc');
+      c.flat(S.rect(15.6, 18, 2.8, 1.4), COL.gold); c.flat(S.rect(15.6, 25, 2.8, 1.2), '#5c341b');
     },
     noble(c) {
-      // dowódca podboju: król w koronie, z białą brodą, w purpurze i gronostajach
-      c.shadow(16, 30.8, 12, 1);
-      bust(c, { tunic: '#6e3f93', collar: '#f6f3ea', hair: '#d8d4cc' });
-      c.paint(S.poly([[9.4, 14], [10.2, 21.4], [16, 26], [21.8, 21.4], [22.6, 14], [19.4, 17.6], [12.6, 17.6]]), '#f3f0e8', 'v', { bev: 0.5 });
-      c.paint(S.ell(16, 16.2, 3.8, 1.3), '#ffffff', 'v', { bev: 0 });
-      c.paint(S.poly([[9.6, 8.6], [8.8, 2.4], [12.8, 5.6], [16, 1.2], [19.2, 5.6], [23.2, 2.4], [22.4, 8.6]]), COL.gold, 'd', { bev: 0.7 });
-      c.paint(S.rect(9.6, 7.2, 12.8, 2.6), '#cf9a28', 'v', { bev: 0.5 });
-      c.paint(S.circle(16, 8.5, 1.3), COL.red, 'r', { bev: 0 }); c.paint(S.circle(12, 8.5, 0.9), '#4f8ce0', 'r', { bev: 0 }); c.paint(S.circle(20, 8.5, 0.9), '#5cc07a', 'r', { bev: 0 });
-      [[8.8, 2], [16, 0.8], [23.2, 2]].forEach(p => c.paint(S.circle(p[0], p[1], 1.1), '#f4f0e4', 'r', { bev: 0 }));
-      for (let i = 0; i < 4; i++) c.dot(9.6 + i * 3.6, 22.4 + (i % 2) * 2.4, '#2a1c10', 1);
+      c.shadow(16, 29.4, 12, 1.2);
+      c.paint(S.poly([[4, 25], [2.6, 9], [9.6, 15], [16, 4], [22.4, 15], [29.4, 9], [28, 25]]), COL.gold, 'd', { bev: 0.8 });
+      c.paint(S.rect(4, 21.6, 24, 6.2), '#cf9a28', 'v', { bev: 0.7 });
+      c.flat(S.rect(4, 24, 24, 0.6), '#8c5f14');
+      c.paint(S.circle(16, 17.4, 2.3), COL.red, 'r', { bev: 0 });
+      c.paint(S.circle(9, 24.6, 1.5), '#4f8ce0', 'r', { bev: 0 }); c.paint(S.circle(23, 24.6, 1.5), '#4f8ce0', 'r', { bev: 0 });
+      c.paint(S.circle(16, 24.6, 1.5), '#5cc07a', 'r', { bev: 0 });
+      [[2.6, 8], [16, 3], [29.4, 8]].forEach(p => c.paint(S.circle(p[0], p[1], 1.9), '#f4f0e4', 'r', { bev: 0 }));
     },
     archer(c) {
-      // łucznik: zielony kaptur z piórem, kołczan na plecach, łuk
-      c.shadow(16, 30.8, 12, 1);
-      const pts = []; for (let i = 0; i <= 16; i++) { const t = i / 16; pts.push([25.2 + 4.4 * Math.sin(Math.PI * t), 3 + 25 * t]); }
-      for (let i = 0; i < pts.length - 1; i++) c.paint(S.line(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], 2.4), '#9a6430', 'h', { bev: 0.3, dith: 0.2 });
-      c.flat(S.line(25.2, 3.2, 25.2, 27.8, 0.7), '#efe6c8');
-      c.paint(S.poly([[3.4, 12.4], [6.4, 11], [11.4, 22.4], [8.4, 24.2]]), '#6b4325', 'h', { bev: 0.5 });
-      [[5.2, 9.4], [7.6, 8.6], [4, 11]].forEach(p => { c.flat(S.line(p[0], p[1], p[0] + 1.6, p[1] + 3.8, 0.8), '#e2cfa0'); c.flat(S.poly([[p[0] - 1, p[1] + 0.2], [p[0] + 0.7, p[1] - 1.8], [p[0] + 1.4, p[1] + 0.6]]), COL.red); });
-      bust(c, { tunic: '#5f8f3c', mail: '#7a4a22' });
-      c.paint(S.line(11, 20, 24, 31, 2), '#6b4325', 'v', { bev: 0 });
-      c.paint(S.poly([[9.2, 13.6], [9.6, 6.4], [12.8, 2.4], [16, 1.6], [19.2, 2.4], [22.4, 6.4], [22.8, 13.6], [20.4, 11.6], [19.4, 8.8], [12.6, 8.8], [11.6, 11.6]]), '#4f8c34', 'd', { bev: 0.7 });
-      c.paint(S.poly([[19.4, 3.6], [24, 0.8], [27.6, 1.6], [24.6, 4.4], [21.4, 6]]), COL.red, 'd', { bev: 0.4 });
+      c.shadow(16, 30.4, 10, 1, 0.3);
+      // łuk napięty: ramiona wygięte w prawo
+      const pts = []; for (let i = 0; i <= 18; i++) { const t = i / 18; pts.push([13 + 9.5 * Math.sin(Math.PI * t), 2.2 + 27.6 * t]); }
+      for (let i = 0; i < pts.length - 1; i++) c.paint(S.line(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], 3.4), '#9a6430', 'h', { bev: 0.5, dith: 0.2 });
+      c.paint(S.line(22.4, 12.8, 22.4, 19.2, 4.2), '#4a2a14', 'v', { bev: 0.4 });              // chwyt
+      // cięciwa naciągnięta do nałożonej strzały
+      c.flat(S.line(13.2, 2.8, 6.6, 16, 0.9), '#f2ead0'); c.flat(S.line(6.6, 16, 13.2, 29.2, 0.9), '#f2ead0');
+      // strzała
+      c.paint(S.line(6.6, 16, 28.4, 16, 1.7), '#e2cfa0', 'v', { bev: 0 });
+      c.paint(S.poly([[27.6, 12.8], [31.4, 16], [27.6, 19.2]]), COL.steel, 'h', { bev: 0.4 });
+      c.flat(S.poly([[6.4, 16], [4.4, 12.4], [9.4, 13.2], [11, 16]]), COL.red);
+      c.flat(S.poly([[6.4, 16], [4.4, 19.6], [9.4, 18.8], [11, 16]]), '#e8e0cc');
     },
     guard(c) {
-      // tarczownik: pełny hełm z pióropuszem i ogromna tarcza
-      c.shadow(16, 30.8, 12, 1);
-      c.paint(S.poly([[3, 31], [4.6, 22], [9, 19], [23, 19], [27.4, 22], [29, 31]]), '#6b7c90', 'v', { bev: 0.7 });
-      c.paint(S.poly([[9.4, 14.6], [9.4, 6], [12.4, 2.6], [16, 1.8], [19.6, 2.6], [22.6, 6], [22.6, 14.6], [20.6, 17], [11.4, 17]]), '#b4c2d2', 'h', { bev: 0.7 });
-      c.flat(S.rect(10.8, 8.6, 10.4, 1.7), '#1d130c'); c.flat(S.rect(15.2, 10.6, 1.6, 5), '#1d130c');
-      for (let i = 0; i < 3; i++) c.dot(12 + i * 0.1, 12 + i * 1.6, '#3a2a1c', 0.9);
-      c.paint(S.poly([[12.6, 2.4], [14.4, -0.4], [17.6, -0.4], [19.4, 2.4], [16, 4.6]]), COL.red, 'd', { bev: 0.4 });
-      c.paint(S.poly([[3.4, 17.4], [21.6, 17.4], [21.6, 25.4], [12.5, 31.4], [3.4, 25.4]]), '#cdd8e4', 'd', { bev: 0.8 });
-      c.paint(S.poly([[5.4, 19.2], [19.6, 19.2], [19.6, 24.6], [12.5, 29.2], [5.4, 24.6]]), '#3f6cc4', 'd', { bev: 0.5 });
-      c.paint(S.poly([[12.5, 19.2], [19.6, 19.2], [19.6, 24.6], [12.5, 29.2]]), '#f3ecd8', 'd', { bev: 0 });
-      c.paint(S.rect(11.7, 19.2, 1.7, 10), COL.gold, 'h', { bev: 0 });
-      c.paint(S.circle(12.5, 22.6, 2), COL.gold, 'r', { bev: 0 });
+      c.shadow(16, 30.4, 9, 1);
+      const shape = [[4.5, 3.4], [27.5, 3.4], [27.5, 15.2], [16, 29.6], [4.5, 15.2]];
+      c.paint(S.poly(shape), COL.steel, 'd', { bev: 0.8 });
+      c.paint(S.poly([[7, 5.8], [25, 5.8], [25, 14.6], [16, 26.4], [7, 14.6]]), COL.blue, 'd', { bev: 0.6 });
+      c.paint(S.poly([[16, 5.8], [25, 5.8], [25, 14.6], [16, 26.4]]), '#c23a2b', 'd', { bev: 0 });
+      c.paint(S.rect(14.4, 7, 3.2, 17), COL.gold, 'h', { bev: 0.4 });
+      c.paint(S.rect(8, 11.2, 16, 3.2), COL.gold, 'v', { bev: 0.4 });
+      c.paint(S.circle(16, 12.8, 2.4), '#f4e2a0', 'r', { bev: 0 });
     },
     settler(c) {
-      // osadnik: słomkowy kapelusz, zielona tunika, łopata
-      c.shadow(16, 30.8, 12, 1);
-      c.paint(S.line(4.6, 31, 4.6, 6, 1.9), '#8d5a2b', 'h', { bev: 0.4 });
-      c.paint(S.poly([[1.8, 7], [7.4, 7], [6.8, 1.8], [4.6, 0.6], [2.4, 1.8]]), COL.steel, 'h', { bev: 0.6 });
-      bust(c, { tunic: '#6f9a3c', collar: '#c8a16a' });
-      c.paint(S.line(10.4, 20, 8.4, 31, 2.2), '#6b4325', 'h', { bev: 0 }); c.paint(S.line(21.6, 20, 23.6, 31, 2.2), '#6b4325', 'h', { bev: 0 });
-      c.paint(S.circle(25.2, 21, 4.4), '#b98a52', 'r', { bev: 0 });
-      c.flat(S.line(23, 17.4, 27.4, 17, 1.2), COL.red);
-      c.paint(S.ell(16, 8.4, 13, 3.2), '#e2c374', 'v', { bev: 0.5 });
-      c.paint(S.ell(16, 5.6, 6.8, 4.6), '#edd58a', 'r', { bev: 0 });
-      c.paint(S.rect(9.6, 6.6, 12.8, 1.8), '#8a4a2a', 'v', { bev: 0 });
+      c.shadow(16, 30.4, 14, 1.2);
+      c.paint(S.rect(3.5, 17.6, 25, 7.2), '#8d5a2b', 'v', { bev: 0.6 });
+      c.paint(S.poly([[4, 18], [6, 10], [11, 5.4], [18.4, 4.2], [24.6, 8], [27.6, 14.8], [27.6, 18]]), COL.cream, 'd', { bev: 0.7 });
+      [10.5, 16, 21.5].forEach(x => c.flat(S.line(x, 18, x, 6.2 + Math.abs(x - 16) * 0.5, 0.6), '#bda878'));
+      c.flat(S.rect(4, 17.2, 24, 1.1), '#b8433a');
+      c.paint(S.line(0.8, 24.6, 4.2, 22.4, 1.6), COL.woodD, 'h', { bev: 0 });
+      [[9.4, 26.4], [23, 26.4]].forEach(p => {
+        c.paint(S.circle(p[0], p[1], 4.4), COL.woodD, 'r', { bev: 0.4 });
+        c.flat(S.circle(p[0], p[1], 2.6), '#b98a4a'); c.flat(S.circle(p[0], p[1], 0.9), '#3a2a1c');
+        c.flat(S.rect(p[0] - 0.3, p[1] - 3, 0.6, 6), '#74461f'); c.flat(S.rect(p[0] - 3, p[1] - 0.3, 6, 0.6), '#74461f');
+      });
     },
     light(c, o) {
       // lekka kawaleria: koń w galopie z rycerzem i kopią z proporcem (widok z boku)
