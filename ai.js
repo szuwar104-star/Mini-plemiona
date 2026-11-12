@@ -254,7 +254,10 @@
     }
     const A = E.attackPower(send, E.upgradesOf(state, v.owner));
     // armia zbiera się do sensownej wielkości (rośnie z rozbudową wioski) – zamiast wysyłać garstki co turę
-    if (A < P.minPower + E.points(v) * T().powerPerPoint) return;
+    // Próg rośnie z czasem gry, więc wyprawy są coraz większe (a nie stałe garstki, które co chwilę giną lub wykrwawiają wroga).
+    const hoursPlayed = Math.max(0, (t - state.created) / 3600000);
+    const growth = Math.min(T().waveGrowthMax, 1 + hoursPlayed * T().waveGrowthPerHour);
+    if (A < (P.minPower + E.points(v) * T().powerPerPoint) * growth) return;
 
     const D = E.diff(state);
     const minutes = (t - state.created) / 60000;
