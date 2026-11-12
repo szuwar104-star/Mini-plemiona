@@ -239,7 +239,10 @@
       for (let y = Math.max(0, v.y - R); y <= Math.min(N - 1, v.y + R); y++) {
         for (let x = Math.max(0, v.x - R); x <= Math.min(N - 1, v.x + R); x++) {
           const d = E.dist(v, { x, y });
-          if (d < 1.5 || d > R || E.settleCheck(state, x, y)) continue;
+          if (d < 1.5 || d > R) continue;
+          const tile = E.tileAt(state, x, y);
+          if (tile.village || tile.terrain !== 'plain') continue;                       // to samo, co E.settleCheck, ale tanio
+          if (near.some(o => E.dist(o, { x, y }) < C.SETTLE.minDistance)) continue;
           if (state.movements.some(m => m.type === 'settle' && m.x === x && m.y === y)) continue;
           if (near.some(o => o.owner && o.owner !== 'player' && E.dist(o, { x, y }) < foe)) continue;   // wolne osady (bez właściciela) nie przeszkadzają
           const crowd = near.filter(o => o.owner && o.owner !== 'player' && E.dist(o, { x, y }) < 4).length;
@@ -274,12 +277,17 @@
   // Wysyła gotowych osadników, a gdy żadnego nie ma w grze – zleca kolejnego. Zwraca { id, cost }: wioska, która odkłada surowce na osadnika.
   function settleStep(state, p, vs, t, threatened, acts) {
     const cap = p.settleMax > 0 ? p.settleMax : Infinity;      // puste = bez limitu (gra toczy się dalej także po osiągnięciu celu)
+    if (p.settleRetry && t < p.settleRetry) return null;       // niedawno nie było wolnych pól – nie skanuj mapy co minutę
     let memo = {};
     const spotOf = v => (v.id in memo ? memo[v.id] : (memo[v.id] = findSpot(state, v)));
     for (const v of vs) {
       while (v.units.settler >= 1) {
         const spot = findSpotFor(state, v, vs, spotOf);
-        if (!spot || !E.sendSettler(state, v.id, spot.x, spot.y, t).ok) { settleWhy(state, p, t, 'osadnik w ' + v.name + ' czeka – brak wolnego pola do zasiedlenia'); break; }
+        if (!spot || !E.sendSettler(state, v.id, spot.x, spot.y, t).ok) {
+          settleWhy(state, p, t, 'osadnik w ' + v.name + ' czeka – brak wolnego pola do zasiedlenia');
+          p.settleRetry = t + P().settleRetryMin * 60000;
+          break;
+        }
         memo = {};                                   // zajęte pole zmienia obraz wolnych miejsc
         acts.settled++;
         note(state, p, t, 'Osadnik z ' + v.name + ' wyrusza na ' + spot.x + ':' + spot.y);
@@ -288,9 +296,9 @@
     if (vs.length + settlersTotal(state, vs) >= cap) { settleWhy(state, p, t, 'osiągnięty limit wiosek (' + cap + ')'); return null; }
     if (settlersTotal(state, vs) > 0) return null;
     const U = C.UNITS.settler, ups = E.upgradesOf(state, 'player');
-    let best = null, eligible = 0;
     const why = {};                                           // powód odrzucenia -> liczba wiosek (do statusu w oknie Autopilota)
     const no = (k) => { why[k] = (why[k] || 0) + 1; };
+    const cands = [];
     vs.forEach(v => {
       if (threatened[v.id]) return no('atakowane');
       if (v.buildings.hq < U.hq) return no('Ratusz poniżej ' + U.hq);
@@ -298,13 +306,15 @@
       if (E.villageDefense(v, null, ups) < E.points(v) * p.defLevel * P().settleDefMin) return no('za słaba obrona');
       if (v.recruitQueue.length >= E.queueMax(v, 'recruit')) return no('pełna kolejka wojska');
       if (E.RES.some(r => U.cost[r] > E.storageCap(v))) return no('za mały magazyn');
-      eligible++;
-      if (!findSpotFor(state, v, vs, spotOf)) return;      // wolne pole musi być osiągalne z TEJ wioski (a nie tylko z najbogatszej)
-      const ready = Math.min.apply(null, E.RES.map(r => v.res[r] / U.cost[r]));
-      if (!best || ready > best.ready) best = { v, ready };
+      cands.push({ v, ready: Math.min.apply(null, E.RES.map(r => v.res[r] / U.cost[r])) });
     });
+    // najbardziej „gotowa” wioska, z której osiągalne jest wolne pole (nie tylko najbogatsza)
+    cands.sort((x, y) => y.ready - x.ready);
+    let best = null;
+    for (const c of cands) { if (findSpotFor(state, c.v, vs, spotOf)) { best = c; break; } }
     if (!best) {
-      settleWhy(state, p, t, eligible ? 'brak wolnego pola na równinie w zasięgu wiosek (poza polami zbyt blisko cudzych wiosek)'
+      if (cands.length) p.settleRetry = t + P().settleRetryMin * 60000;
+      settleWhy(state, p, t, cands.length ? 'brak wolnego pola na równinie w zasięgu wiosek (poza polami zbyt blisko cudzych wiosek); ponowne szukanie za ' + P().settleRetryMin + ' min'
         : 'żadna wioska nie spełnia warunków: ' + Object.keys(why).map(k => k + ' ×' + why[k]).join(', '));
       return null;
     }
@@ -370,6 +380,7 @@
     p.log = old.log || []; p.stats = old.stats || {}; p.seen = old.seen || {}; p.threat = old.threat || {};
     p.deployed = old.deployed || {}; p.last = old.last || null;
     p.next = p.on ? t + 1000 : null;
+    p.settleRetry = 0;                       // zmiana ustawień = szukaj wolnych pól od razu
     // Konwoje do stolicy: bot włącza wbudowane Konwoje (nadwyżki z wiosek > 80% magazynu wracają do wioski centralnej).
     const a = state.auto || {};
     if (p.on && p.convoy) {
