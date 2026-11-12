@@ -16,6 +16,7 @@
    5. Ataki – jedna lub dwie wyprawy naraz (osobowość), cele wybierane
       według siły obrony, odległości, łupu i poparcia oraz dyplomacji
       (pakt = brak ataku, zemsta za ataki, polowanie na lidera; diplomacy.js).
+   6. Zmasowane uderzenia – wojsko ze wszystkich wiosek w zasięgu celu idzie jedną falą (5–10+ tys. żołnierzy), dochodzi jednocześnie (massStrike).
    Wojny AI z AI są rzadkie i duże (C.AI.versus): osobny próg siły, większa wymagana
    przewaga, przerwa między atakami tej samej pary frakcji i limit równoczesnych
    wypraw – dzięki temu armie rosną, zamiast wykrwawiać się w ciągłych potyczkach.
@@ -295,6 +296,7 @@
     let room = E.supportRoom(state, front);
     for (const o of vs) {
       if (o.id === front.id || room < 20 || E.dist(o, front) > T().gatherRange || incomingOn(state, o).length) continue;
+      if (state.aiPending && state.aiPending.some(x => x.from === o.id)) continue;   // oddział czeka na zmasowane uderzenie
       if (state.movements.some(m => m.from === o.id && m.owner === fid && m.type === 'attack')) continue;
       const u = E.emptyUnits();
       Object.keys(C.UNITS).forEach(k => { const U = C.UNITS[k]; if (U.role !== 'def' && !U.conquer && !U.settler && !U.scout) u[k] = o.units[k]; });
@@ -346,6 +348,7 @@
     const out = state.movements.filter(m => m.from === v.id && m.type === 'attack' && m.owner === v.owner).length;
     if (out >= (P.waves || 1) + (press >= 0.5 ? 1 : 0)) return; // pod presją jedna wyprawa więcej
     if (incomingOn(state, v).length) return; // nie wysyła wojska, gdy samo jest atakowane
+    if (state.aiPending && state.aiPending.some(x => x.from === v.id)) return; // jego oddział czeka na zmasowane uderzenie
     // obrońców zostawia tyle, żeby dom nie został pusty
     const send = E.emptyUnits();
     const target0 = homeDefTarget(v, P);
@@ -431,6 +434,117 @@
     }
   }
 
+  /* ---------- 5b. zmasowane uderzenia: wojsko ze wszystkich wiosek w jednej fali ---------- */
+  // Pojedyncza wioska wysyła tylko to, co ma w domu, więc wyprawy były garstkami (setki–kilka tysięcy) i nie ruszały dobrze bronionych wiosek.
+  // Tu frakcja liczy siłę wszystkich wiosek w zasięgu celu i posyła je naraz: najdalsze wychodzą od razu, bliższe z opóźnieniem (state.aiPending),
+  // tak by całe uderzenie dotarło jednocześnie.
+  const massCfg = () => C.AI.mass;
+
+  // Co dana wioska może dołożyć do uderzenia: cały atak, a z jednostek obronnych defShare (ale nigdy tyle, by dom został bez obrony).
+  function massContribution(state, v, P, ups) {
+    if (incomingOn(state, v).length) return null;
+    const M = massCfg(), send = E.emptyUnits(), left = E.emptyUnits();
+    Object.keys(C.UNITS).forEach(k => {
+      const U = C.UNITS[k];
+      if (U.conquer || U.settler || U.scout) return;
+      send[k] = U.role === 'def' ? Math.floor(v.units[k] * Math.min(M.defShare, 1 - P.keepHome)) : v.units[k];
+    });
+    Object.keys(C.UNITS).forEach(k => { left[k] = v.units[k] - send[k]; });
+    if (E.defenseFrom(left, v.buildings.wall, ups) < homeDefTarget(v, P) * 0.4) Object.keys(C.UNITS).forEach(k => { if (C.UNITS[k].role === 'def') send[k] = 0; });
+    const n = E.sumUnits(send);
+    return n < 1 ? null : { v, send, n, A: E.attackPower(send, ups) };
+  }
+
+  function massStrike(state, fid, vs, P, t, press, playerAll) {
+    const M = massCfg();
+    if (!M || vs.length < 2) return;
+    state.aiMass = state.aiMass || {};
+    const last = state.aiMass[fid];
+    if (last && t - last < M.everyMin * 60000) return;
+    if (E.rand(state) >= M.chance) return;
+    const D = E.diff(state);
+    const grace = (t - state.created) / 60000 < D.graceMinutes;
+    const pend = new Set((state.aiPending || []).map(x => x.from));
+    const ups = E.upgradesOf(state, fid);
+    const mine = [];
+    for (const v of vs) {
+      if (pend.has(v.id) || state.movements.some(m => m.type === 'attack' && m.from === v.id && m.owner === fid)) continue;
+      const c = massContribution(state, v, P, ups);
+      if (c) mine.push(c);
+    }
+    if (mine.length < 2) return;
+    const busy = new Set(state.movements.filter(m => m.type === 'attack' && m.owner === fid).map(m => m.to));
+    (state.aiPending || []).forEach(x => { if (x.fid === fid) busy.add(x.to); });
+    const allowVs = E.rand(state) < M.versusShare;
+    const cap = villageCap(state, P, t);
+    let best = null;
+    for (const id in state.villages) {
+      const target = state.villages[id];
+      if (target.owner === fid || target.owner === null || busy.has(id)) continue;
+      const toPlayer = target.owner === 'player';
+      if (toPlayer ? grace : !allowVs) continue;
+      if (toPlayer && state.lastHit && t - (state.lastHit[id] || -1e15) < D.hitCooldownMin * 60000) continue;
+      const dw = MP.Diplomacy ? MP.Diplomacy.targetWeight(state, fid, target.owner, t) : 1;
+      if (dw <= 0) continue;
+      if (!toPlayer && !aiWarReady(state, fid, target.owner, t, dw)) continue;
+      const pool = mine.filter(c => E.dist(c.v, target) <= M.range).sort((a, b) => E.dist(a.v, target) - E.dist(b.v, target));
+      if (pool.length < 2) continue;
+      E.tickVillage(state, target, t);
+      const rams = pool.reduce((n, c) => n + E.ramCount(c.send), 0);
+      const Dv = E.villageDefense(target, Math.max(0, target.buildings.wall - Math.floor(rams / C.RAM.fightPerLevel)), E.upgradesOf(state, target.owner));
+      const need = Dv * M.ratio * (toPlayer ? D.aiCaution * (1 - press * (1 - C.AI.pressure.ratioFloor)) : C.AI.versus.ratioMult);
+      // dokłada wioski od najbliższej, aż siła i liczebność wystarczą (z zapasem overkill), maks. maxVillages
+      const use = []; let A = 0, n = 0;
+      for (const c of pool) {
+        if (use.length >= M.maxVillages) break;
+        use.push(c); A += c.A; n += c.n;
+        if (A >= need * M.overkill && n >= M.minUnits) break;
+      }
+      if (A < need || n < M.minUnits) continue;
+      let w = dw / (1 + E.dist(use[0].v, target));
+      w *= 1 + Math.min(2, (target.res.wood + target.res.clay + target.res.iron) / T().lootScale);
+      w *= 1 + Math.min(1, A / Math.max(1, Dv) / 6);
+      if (toPlayer) w *= P.playerBias * D.playerBias * (1 + press * C.AI.pressure.biasBoost);
+      else w *= C.AI.versus.weightMult;
+      if (!best || w > best.w) best = { target, use, w, toPlayer };
+    }
+    if (!best) return;
+    const target = best.target;
+    // Dowódca podboju idzie z ostatnią falą (po wybiciu obrony), o ile frakcja może jeszcze mieć wioski
+    const noblers = P.nobles && vs.length < cap ? best.use.filter(c => c.v.units.noble > 0) : [];
+    const noble = noblers.length ? noblers[noblers.length - 1] : null;
+    if (noble) noble.send.noble = 1;
+    const times = best.use.map(c => E.travelTime(c.v, target, c.send));
+    const slow = Math.max.apply(null, times);
+    state.aiPending = state.aiPending || [];
+    let sent = 0;
+    best.use.forEach((c, i) => {
+      const delay = slow - times[i] + (c === noble ? M.spreadSec * 1000 : 0);
+      if (delay < C.AI.thinkInterval * 1000 / 2) { if (E.sendAttack(state, c.v.id, target.id, c.send, t, 'attack').ok) sent++; }
+      else { state.aiPending.push({ fid, from: c.v.id, to: target.id, units: c.send, at: t + delay }); sent++; }
+    });
+    if (!sent) return;
+    state.aiMass[fid] = t;
+    state.aiWar = state.aiWar || {};
+    state.aiWar[fid + '>' + target.owner] = t;
+  }
+
+  // Opóźnione oddziały zmasowanych uderzeń: wysyłane, gdy nadejdzie ich czas, tak by dotarły razem z resztą.
+  function massPending(state, fid, t) {
+    const list = state.aiPending;
+    if (!list || !list.length) return;
+    state.aiPending = list.filter(x => {
+      if (x.fid !== fid) return true;
+      if (t < x.at) return true;
+      const v = state.villages[x.from], o = state.villages[x.to];
+      if (!v || !o || v.owner !== fid || o.owner === fid || t > x.at + 5 * 60000) return false;
+      const u = E.emptyUnits();
+      Object.keys(x.units).forEach(k => { u[k] = Math.min(x.units[k], v.units[k] || 0); });
+      if (E.sumUnits(u) >= 1) E.sendAttack(state, v.id, o.id, u, t, 'attack');
+      return false;
+    });
+  }
+
   /* ---------- 0. ulepszenia jednostek (odpowiednik Technologii gracza) ---------- */
   // Poziom rośnie sam z czasem gry: po C.AI.tech.startAfterMin minutach co minutesPerLevel / DIFFICULTY.aiTech.
   // Ulubione jednostki frakcji (waga ≥ 1) dostają pełny poziom, pozostałe o 2 niższy. Nigdy nie maleje.
@@ -452,6 +566,7 @@
     const f = state.factions[fid];
     const P = C.AI.personalities[f.personality];
     aiTech(state, f, P, t);
+    massPending(state, fid, t);
     if (MP.Diplomacy) MP.Diplomacy.tick(state, t);
     const vs = E.villagesOf(state, fid);
     for (const v of vs) {
@@ -465,6 +580,7 @@
     gatherArmy(state, fid, vs, P, t);
     const playerAll = E.villagesOf(state, 'player');
     const press = pressureOf(state, t, fid);
+    massStrike(state, fid, vs, P, t, press, playerAll);
     for (const v of vs) {
       if (P.settle) trySettle(state, v, t);
       trySpy(state, v, P, t);

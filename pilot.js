@@ -615,6 +615,9 @@
   }
 
   // Wioska może być bazą armii ataku, gdy ma własną obronę (cel jak dla wioski przygranicznej) i pełne poparcie.
+  // Wioska z oddziałem czekającym na wspólne uderzenie (p.pending) nie oddaje go na nic innego: zbiórka, grabież i kolejne fale go omijają.
+  const held = (p, v) => !!(p.pending && p.pending.some(x => x.from === v.id));
+
   function canHost(state, p, v) {
     const r = roleOf(p, v);
     if (r === 'def') return false;                                         // z wiosek defensywnych nic nie wychodzi na wroga
@@ -628,7 +631,7 @@
     const W = P().war;
     if (p.gatherAt && t < p.gatherAt) return;
     p.gatherAt = t + W.gatherEveryMin * 60000;
-    const free = vs.filter(v => !threatened[v.id] && !incomingOn(state, v).length);
+    const free = vs.filter(v => !threatened[v.id] && !incomingOn(state, v).length && !held(p, v));
     if (free.length < 2) return;
     // baza armii: tylko wioska z własną obroną i pełnym poparciem – inaczej zostałaby bez obrońców
     const hosts = free.filter(v => canHost(state, p, v));
@@ -701,7 +704,7 @@
     const out = state.movements.filter(m => m.type === 'attack' && m.owner === 'player');
     const busy = new Set(out.map(m => m.to));
     p.pending.forEach(x => busy.add(x.to));
-    const free = vs.filter(v => !threatened[v.id] && !incomingOn(state, v).length && canHost(state, p, v));
+    const free = vs.filter(v => !threatened[v.id] && !incomingOn(state, v).length && !held(p, v) && canHost(state, p, v));
     const sources = free.map(v => ({ v, A: attPower(state, v) })).filter(s2 => s2.A >= W.minPower).sort((a, b) => b.A - a.A);
     if (!sources.length) {
       const top = free.reduce((m, v) => Math.max(m, attPower(state, v)), 0);
@@ -710,6 +713,13 @@
     const nobles = noblesTotal(state, vs);
     const dg = { inRange: 0, noIntel: 0, noble: 0, weak: 0, ratio: 0, A: 0, need: 0 };
     const cands = [];
+    // Zmasowane uderzenia (ustawienie massMin): armie ataku ze wszystkich wiosek w zasięgu celu idą jedną falą, dochodząc naraz.
+    const massMin = p.massMin == null ? P().defaults.massMin : p.massMin;
+    const pools = {};
+    const poolOf = o => pools[o.id] || (pools[o.id] = (() => {
+      const list = sources.filter(s2 => E.dist(s2.v, o) <= W.range).sort((a, b) => E.dist(a.v, o) - E.dist(b.v, o));
+      return { list, A: list.reduce((x, s2) => x + s2.A, 0), n: list.reduce((x, s2) => x + E.sumUnits(attUnits(s2.v)), 0), noble: list.some(s2 => s2.v.units.noble > 0) };
+    })());
     let spies = 0;
     for (const src of sources) {
       const v = src.v;
@@ -728,7 +738,7 @@
           if (E.sendSpy(state, sc.id, o.id, spyN(W, sc), t).ok) { p.spied[o.id] = t; acts.spied++; spies++; }
           return;
         }
-        if (!neutral && !v.units.noble) { dg.noble++; return; }
+        if (!neutral && !v.units.noble && !(massMin > 0 && poolOf(o).noble)) { dg.noble++; return; }
         const send = attUnits(v);
         const regen = neutral ? C.NEUTRAL.loyaltyRegenPerMin : C.LOYALTY.regenPerMin;
         const loy = Math.min(C.LOYALTY.max, intel.loyalty + (t - intel.time) / 60000 * regen);
@@ -736,10 +746,12 @@
         const wall = intel.buildings ? intel.buildings.wall : W.wallGuess;
         const wallEff = Math.max(0, wall - Math.floor(E.ramCount(send) / C.RAM.fightPerLevel));
         const need = estDef(state, o, intel, wallEff, t, W) * W.ratio * (1 + W.failPenalty * ((p.fail[o.id] || { n: 0 }).n));
-        if (src.A < need) { dg.weak++; if (src.A / need > dg.ratio) { dg.ratio = src.A / need; dg.A = src.A; dg.need = need; } return; }
+        const pool = massMin > 0 ? poolOf(o) : null;
+        const mass = !!pool && pool.n >= massMin && pool.A >= need;     // wystarczy armia ze wszystkich wiosek w zasięgu
+        if (src.A < need && !mass) { dg.weak++; if (src.A / need > dg.ratio) { dg.ratio = src.A / need; dg.A = src.A; dg.need = need; } return; }
         // dobijanie rozpoczętego podboju najpierw, potem blisko i z dużą przewagą; wolne osady (tanie) trochę chętniej
-        const w = (1 + (C.LOYALTY.max - loy) / 25) / (1 + d) * (1 + Math.min(1, src.A / need / 4)) * (neutral ? 1.3 : 1);
-        cands.push({ src, o, w, need, loy, neutral });
+        const w = (1 + (C.LOYALTY.max - loy) / 25) / (1 + d) * (1 + Math.min(1, (mass ? pool.A : src.A) / need / 4)) * (neutral ? 1.3 : 1);
+        cands.push({ src, o, w, need, loy, neutral, mass });
       });
     }
     if (!cands.length) {
@@ -759,18 +771,58 @@
     for (const c of cands) {
       if (sent >= W.wavesPerTurn || waves >= W.maxWaves) break;
       if (usedSrc.has(c.src.v.id) || usedTgt.has(c.o.id)) continue;
-      const v = c.src.v, o = c.o;
-      // tylu żołnierzy, ile trzeba (reszta zostaje na grabież/obronę); Tarany idą wszystkie, żeby mur liczył się jak w szacunku
-      const f = Math.min(1, Math.max(0.3, c.need * W.sendMargin / c.src.A)), send = E.emptyUnits(), full = attUnits(v);
-      Object.keys(full).forEach(k => { send[k] = C.UNITS[k].wallPower ? full[k] : Math.min(full[k], Math.ceil(full[k] * f)); });
-      if (!c.neutral) send.noble = 1;
-      send.scout = Math.max(0, Math.min(W.waveScouts, (v.units.scout || 0) - 1));
-      const r = E.sendAttack(state, v.id, o.id, send, t, 'attack');
-      if (!r.ok) continue;
-      usedSrc.add(v.id); usedTgt.add(o.id); waves++; sent++;
+      const o = c.o;
+      let v = c.src.v, r = null, massItems = null;
+      if (c.mass) {
+        // wioski od najbliższej, aż siła ≥ massOverkill × minimum i żołnierzy ≥ massMin (maks. massHosts); Dowódca z wioski, która go ma
+        const use = []; let A = 0, n = 0;
+        for (const s2 of poolOf(o).list) {
+          if (usedSrc.has(s2.v.id)) continue;
+          if (use.length >= W.massHosts) break;
+          use.push(s2); A += s2.A; n += E.sumUnits(attUnits(s2.v));
+          if (A >= c.need * W.massOverkill && n >= massMin) break;
+        }
+        if (!c.neutral && !use.some(s2 => s2.v.units.noble > 0)) {
+          const nb = poolOf(o).list.find(s2 => s2.v.units.noble > 0 && !usedSrc.has(s2.v.id));
+          if (nb) { use.push(nb); A += nb.A; n += E.sumUnits(attUnits(nb.v)); }
+        }
+        if (A >= c.need && n >= massMin && (c.neutral || use.some(s2 => s2.v.units.noble > 0))) {
+          massItems = use.map(s2 => { const u = attUnits(s2.v); return { s2, u, tt: E.travelTime(s2.v, o, u, 'player') }; }).sort((a, b) => b.tt - a.tt);
+        } else if (c.src.A < c.need) continue;
+      }
+      if (massItems) {
+        // najdalsza wioska rusza od razu, pozostałe tak, by dotarły tuż po niej (jedno wspólne uderzenie)
+        const nobleItem = c.neutral ? null : massItems.slice().reverse().find(it => it.s2.v.units.noble > 0);
+        const first = massItems[0];
+        v = first.s2.v;
+        const send = Object.assign(E.emptyUnits(), first.u);
+        if (first === nobleItem) send.noble = 1;
+        send.scout = Math.max(0, Math.min(W.waveScouts, (v.units.scout || 0) - 1));
+        r = E.sendAttack(state, v.id, o.id, send, t, 'attack');
+        if (!r.ok) continue;
+        massItems.slice(1).forEach(it => {
+          const u = Object.assign(E.emptyUnits(), it.u);
+          if (it === nobleItem) u.noble = 1;
+          p.pending.push({ to: o.id, from: it.s2.v.id, units: u, at: r.movement.arrive - it.tt + W.trainGapSec * 1000, t0: t });
+        });
+        massItems.forEach(it => usedSrc.add(it.s2.v.id));
+        waves += massItems.length;
+        const total = massItems.reduce((x, it) => x + E.sumUnits(it.u), 0);
+        p.warWhy = { t, key: 'sent', text: 'zmasowane uderzenie na ' + o.name + ': ' + massItems.length + ' wiosek, ' + total + ' żołnierzy' };
+      } else {
+        // tylu żołnierzy, ile trzeba (reszta zostaje na grabież/obronę); Tarany idą wszystkie, żeby mur liczył się jak w szacunku
+        const f = Math.min(1, Math.max(0.3, c.need * W.sendMargin / c.src.A)), send = E.emptyUnits(), full = attUnits(v);
+        Object.keys(full).forEach(k => { send[k] = C.UNITS[k].wallPower ? full[k] : Math.min(full[k], Math.ceil(full[k] * f)); });
+        if (!c.neutral) send.noble = 1;
+        send.scout = Math.max(0, Math.min(W.waveScouts, (v.units.scout || 0) - 1));
+        r = E.sendAttack(state, v.id, o.id, send, t, 'attack');
+        if (!r.ok) continue;
+        usedSrc.add(v.id); waves++;
+        p.warWhy = { t, key: 'sent', text: 'fala wysłana na ' + o.name };
+      }
+      usedTgt.add(o.id); sent++;
       p.ops[o.id] = { t, from: v.id };
       acts.attacked++;
-      p.warWhy = { t, key: 'sent', text: 'fala wysłana na ' + o.name };
       // ciąg uderzeń: kolejne fale z innych wiosek (z Dowódcami / zwykłą armią) dochodzą tuż po pierwszej – poparcie nie zdąży się odnowić
       const hits = Math.ceil(c.loy / (c.neutral ? 42 : 30));
       let extra = Math.min(hits - 1, W.trainMax), planned = 0;
@@ -786,7 +838,7 @@
         p.pending.push({ to: o.id, from: s2.v.id, units: e, at, t0: t });
         usedSrc.add(s2.v.id); waves++; planned++;
       }
-      note(state, p, t, (c.neutral ? 'Podbój wolnej osady ' : 'Atak na ') + o.name + ' (' + o.x + ':' + o.y + ') z ' + v.name + (c.neutral ? '' : ' z Dowódcą podboju') + (planned ? ' + ' + planned + ' kolejne fale' : ''));
+      note(state, p, t, (massItems ? 'Zmasowane uderzenie (' + massItems.length + ' wiosek) na ' : c.neutral ? 'Podbój wolnej osady ' : 'Atak na ') + o.name + ' (' + o.x + ':' + o.y + ') z ' + v.name + (c.neutral ? '' : ' z Dowódcą podboju') + (planned ? ' + ' + planned + ' kolejne fale' : ''));
     }
   }
 
@@ -812,7 +864,7 @@
       !(o.owner && foeBlocked(state, o, t)));
     const out = state.movements.filter(m => m.type === 'attack' && m.owner === 'player' && !p.ops[m.to]);
     const busy = new Set(state.movements.filter(m => m.type === 'attack' && m.owner === 'player').map(m => m.to));
-    const hosts = vs.filter(v => !threatened[v.id] && !incomingOn(state, v).length && canHost(state, p, v))
+    const hosts = vs.filter(v => !threatened[v.id] && !incomingOn(state, v).length && !held(p, v) && canHost(state, p, v))
       .map(v => ({ v, u: farmUnits(v) })).map(s2 => Object.assign(s2, { A: E.attackPower(s2.u, E.upgradesOf(state, 'player')) }))
       .filter(s2 => s2.A >= F.minPower);
     const dg = { inRange: 0, spy: 0, weak: 0, poor: 0, sent: 0 };
@@ -911,6 +963,8 @@
     if (p.roles && !p.attack) gather(state, p, vs, t, threatened);      // przy podboju zbiórkę robi warStep
     if (p.farm) farmStep(state, p, vs, t, threatened, acts);
     recall(state, p, t, acts);
+    // Opóźnione fale uderzenia (dochodzą razem z pierwszą) wysyła bot we właściwej sekundzie, nie dopiero w następnej turze
+    if (p.pending && p.pending.length) p.next = Math.min(p.next, Math.max(t + 1000, Math.min.apply(null, p.pending.map(x => x.at))));
 
     ['built', 'recruited', 'support', 'research', 'coins', 'recalled', 'settled', 'garrisoned', 'supplied', 'attacked', 'spied', 'conquered', 'farmed'].forEach(k => { p.stats[k] = (p.stats[k] || 0) + acts[k]; });
     p.last = { t, built: acts.built, recruited: acts.recruited, support: acts.support, research: acts.research, settled: acts.settled, supplied: acts.supplied, attacked: acts.attacked, conquered: acts.conquered };
@@ -932,6 +986,7 @@
     if (cfg.farm !== undefined) o.farm = !!cfg.farm;
     if (cfg.wonder !== undefined) o.wonder = !!cfg.wonder;
     if (cfg.split !== undefined) o.split = !!cfg.split;
+    if (cfg.massMin !== undefined) { const n = Math.floor(Number(cfg.massMin)); o.massMin = n >= 1000 && n <= 200000 ? n : 0; }
     if (cfg.splitRatio !== undefined) { const n = Math.floor(Number(cfg.splitRatio)); if (n >= 1 && n <= 10) o.splitRatio = n; }
     if (cfg.settleMax !== undefined) { const n = Math.floor(Number(cfg.settleMax)); o.settleMax = n >= 1 && n <= 200 ? n : 0; }
     if (cfg.tickSec !== undefined) { const n = Math.round(Number(cfg.tickSec)); if (n >= 5 && n <= 600) o.tickSec = n; }

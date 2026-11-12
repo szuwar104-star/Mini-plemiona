@@ -331,7 +331,7 @@
     },
     // Autopilot (pilot.js): bot rozwijający Twoje wioski. Czasy w sekundach/minutach CZASU GRY.
     PILOT: {
-      defaults: { on: false, build: true, recruit: 'defense', tech: true, defend: true, garrison: true, supply: true, defLevel: 40, convoy: false, hub: null, settle: false, settleMax: 0, attack: false, farm: false, split: false, splitRatio: 3, wonder: false, tickSec: 60 },
+      defaults: { on: false, build: true, recruit: 'defense', tech: true, defend: true, garrison: true, supply: true, defLevel: 40, convoy: false, hub: null, settle: false, settleMax: 0, attack: false, farm: false, split: false, splitRatio: 3, wonder: false, tickSec: 60, massMin: 10000 },
       tickSec: 60,               // domyślnie co ile sekund bot sprawdza wioski (gracz zmienia to suwakiem w ustawieniach)
       tickSteps: [15, 30, 60, 90, 120, 180], // dozwolone wartości suwaka „Częstotliwość pracy”
       alertDelaySec: 1,          // po wykryciu nowego ataku bot działa po tylu sekundach
@@ -389,7 +389,9 @@
         spyPerTurn: 12,          // maks. zwiadów wysłanych w jednej turze
         intelMaxMin: 40,         // zwiad starszy niż tyle minut jest nieaktualny
         wallGuess: 8,            // zakładany mur, gdy nie ma raportu o budynkach
-        maxWaves: 12,            // maks. liczba fal naraz w drodze (z kolejnymi falami ciągów)
+        maxWaves: 30,            // maks. liczba fal naraz w drodze (z kolejnymi falami ciągów i zmasowanych uderzeń)
+        massOverkill: 3,         // zmasowane uderzenie (ustawienie massMin): dokłada wioski, aż siła wyniesie tyle × wymagane minimum (i massMin żołnierzy)
+        massHosts: 12,           // maks. wiosek biorących udział w jednym zmasowanym uderzeniu
         wavesPerTurn: 3,         // maks. nowych uderzeń (celów) w jednej turze
         trainMax: 3,             // ile dodatkowych fal (z innych wiosek) dokłada do uderzenia, by poparcie spadło do 0 za jednym razem
         escort: 0.25,            // jaka część armii ataku wioski idzie w fali kolejnej (z Dowódcą) – wybita obrona już nie stawia oporu
@@ -600,6 +602,12 @@
       // (minuty gry) między atakami tej samej frakcji na tę samą frakcję (po zemście/dla lidera × revengeCooldown); maxConcurrent – ile
       // wypraw na frakcje AI frakcja może mieć w drodze naraz; playerSpacingMin – min. odstęp (minuty gry) między wyprawami jednej frakcji na gracza (żeby duże armie nie robiły ciągłego szturmu).
       versus: { powerMult: 2.5, ratioMult: 1.6, weightMult: 0.3, cooldownMin: 120, revengeCooldown: 0.5, maxConcurrent: 1, playerSpacingMin: 30 },
+      // Zmasowane uderzenia AI (ai.js, massStrike): co everyMin minut (czasu gry) frakcja z szansą chance na turę zbiera wojsko ze WSZYSTKICH swoich wiosek
+      // w promieniu range pól od celu i posyła je jednym uderzeniem, tak by wszystkie oddziały dotarły naraz (spreadSec – rozrzut dojścia). Uderzenie wymaga
+      // co najmniej minUnits żołnierzy i przewagi ratio nad obroną celu; po drodze dokłada wioski, aż siła wyniesie overkill × wymagane minimum (i minUnits),
+      // maks. maxVillages wiosek. defShare – jaka część jednostek obronnych każdej wioski idzie (reszta zostaje w domu; bez Dowódcy z tej wioski).
+      // versusShare – ile uderzeń wolno mierzyć we frakcje AI zamiast w gracza (reszta tylko w gracza; wojny AI z AI nadal rzadkie dzięki versus).
+      mass: { everyMin: 8, chance: 0.5, minUnits: 10000, range: 18, ratio: 1.2, overkill: 3, maxVillages: 14, defShare: 0.7, versusShare: 0.1, spreadSec: 20 },
       // Handel AI (opcja gry state.aiTrade, ai.js): frakcja wymienia w Targowisku nadwyżki na surowiec, którego brakuje do budowy
       // albo do partii ulubionej jednostki – tylko wtedy, gdy wymiana całkiem pokrywa niedobór. Kurs i udźwig kupców bazowe (bez badań gracza).
       // cooldownMin: przerwa między wymianami w jednej wiosce; keepShare: część magazynu, której AI nie oddaje; batch: wielkość partii jednostek.

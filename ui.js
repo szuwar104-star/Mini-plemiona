@@ -1509,7 +1509,7 @@
     const s = st(), p = s.pilot || {}, D = C.PILOT.defaults;
     return { on: p.on !== undefined ? p.on : true, build: p.build !== undefined ? p.build : D.build, recruit: p.recruit || D.recruit,
       tech: p.tech !== undefined ? p.tech : D.tech, defend: p.defend !== undefined ? p.defend : D.defend, garrison: p.garrison !== undefined ? p.garrison : D.garrison, supply: p.supply !== undefined ? p.supply : D.supply, defLevel: p.defLevel || D.defLevel,
-      tickSec: p.tickSec || C.PILOT.tickSec, settle: !!p.settle, settleMax: p.settleMax || 0, split: !!p.split, splitRatio: p.splitRatio || D.splitRatio, attack: !!p.attack, farm: !!p.farm, wonder: !!p.wonder, convoy: !!p.convoy, hub: p.hub || (s.auto && s.auto.hub) || (autoDefaults().hub) };
+      tickSec: p.tickSec || C.PILOT.tickSec, settle: !!p.settle, settleMax: p.settleMax || 0, massMin: p.massMin == null ? D.massMin : p.massMin, split: !!p.split, splitRatio: p.splitRatio || D.splitRatio, attack: !!p.attack, farm: !!p.farm, wonder: !!p.wonder, convoy: !!p.convoy, hub: p.hub || (s.auto && s.auto.hub) || (autoDefaults().hub) };
   }
   function pilotModal() {
     const s = st(), g = UI.pilot, p = s.pilot;
@@ -1571,6 +1571,9 @@
       row('data-pset', g.settle, 'settler', 'Nowe wioski', 'Szkoli osadników i zakłada wioski w pobliżu (jeden osadnik naraz)') +
       fld('map', 'Maks. liczba wiosek', 'Puste = bez limitu', '<input type="number" inputmode="numeric" min="1" max="200" placeholder="bez limitu" data-psmax value="' + nz(g.settleMax) + '">') +
       row('data-patk', g.attack, 'noble', 'Podbój', 'Zajmuje wioski wrogich frakcji i wolne osady: szkoli Dowódców i Tarany, zwiadem sprawdza obronę, kilka wiosek uderza naraz; wolne osady zdobywa zwykłą armią. Wymaga szkolenia wojska; nie atakuje frakcji z paktem', 'opt-war') +
+      fld('axe', 'Wielkość uderzeń', 'Podboju: armie ze wszystkich wiosek w zasięgu celu idą jedną falą i dochodzą naraz. Gdy razem nie dają tylu żołnierzy, bot atakuje jak dotąd (jedną wioską, tylu żołnierzami, ilu trzeba)', '<select data-pmass>' +
+        [[0, 'Zwykłe (jedna wioska, tylu żołnierzy, ilu trzeba)'], [5000, 'Duże – od 5 000 żołnierzy'], [10000, 'Ogromne – od 10 000 żołnierzy'], [20000, 'Gigantyczne – od 20 000 żołnierzy']].map(a => opt(a[0], Number(g.massMin), a[1])).join('') +
+        ([0, 5000, 10000, 20000].indexOf(Number(g.massMin)) < 0 ? opt(g.massMin, Number(g.massMin), 'Własne (od ' + g.massMin + ')') : '') + '</select>') +
       row('data-pfarm', g.farm, 'axe', 'Grabież', 'Armia ataku grabi wioski przeciwnika i wolne osady wokoło (po zwiadzie, bez Dowódców – wioski zostają na swoim miejscu). Wymaga szkolenia wojska i zwiadowców; nie grabi frakcji z paktem', 'opt-war'));
 
     let stats = '';
@@ -2734,6 +2737,7 @@
     else if (t.hasAttribute && t.hasAttribute('data-pdefend')) { UI.pilot.defend = t.checked; }
     else if (t.hasAttribute && t.hasAttribute('data-pgar')) { UI.pilot.garrison = t.checked; }
     else if (t.hasAttribute && t.hasAttribute('data-psplit')) { UI.pilot.split = t.checked; renderModal(); }
+    else if (t.hasAttribute && t.hasAttribute('data-pmass')) { UI.pilot.massMin = Number(t.value); }
     else if (t.hasAttribute && t.hasAttribute('data-psplitn')) { UI.pilot.splitRatio = Number(t.value); }
     else if (t.hasAttribute && t.hasAttribute('data-psup')) { UI.pilot.supply = t.checked; }
     else if (t.hasAttribute && t.hasAttribute('data-pset')) { UI.pilot.settle = t.checked; }
