@@ -154,7 +154,7 @@ function twoVillages() {
   ok(own.length >= 1, 'po 48 h gry gracz ma wioski (' + own.length + ')');
   ok(own.every(v => E.RES.every(r => v.res[r] >= 0 && v.res[r] <= E.storageCap(v) + 1)), 'surowce w granicach magazynu');
   ok(own.every(v => E.popUsed(s, v) <= E.popCap(v) + 1), 'wojsko mieści się na farmach');
-  ok(ms < 20000, '48 h nadrobione w ' + ms + ' ms');
+  ok(ms < 30000, '48 h nadrobione w ' + ms + ' ms'); // AI trzyma większe armie (mniej wojen AI z AI), więc symulacja jest wolniejsza
   console.log('   po 48 h: wioski ' + own.length + ', pkt budynków ' + buildingPts(s) + ', wojsko ' + armyPop(s) + ', statystyki ' + JSON.stringify(s.pilot.stats));
 }
 

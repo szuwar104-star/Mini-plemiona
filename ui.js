@@ -740,6 +740,12 @@
   /* ---------- ekran: RAPORTY ---------- */
   function reportTitle(s, r) {
     if (r.kind === 'news') {
+      if (r.diplo) {
+        const A = esc(E.ownerName(s, r.attacker)), B = r.defender ? esc(E.ownerName(s, r.defender)) : '';
+        return r.diplo === 'alliance' ? A + ' i ' + B + ' zawierają sojusz' : r.diplo === 'join' ? A + ' dołącza do sojuszu' :
+          r.diplo === 'leave' ? A + ' opuszcza sojusz' : r.diplo === 'betray' ? A + ' zdradza sojuszników' :
+          r.diplo === 'war' ? A + ' wypowiada wojnę frakcji ' + B : 'Rozejm: ' + A + ' i ' + B + ' kończą wojnę';
+      }
       if (r.eliminated) return esc(E.ownerName(s, r.eliminated)) + ' traci ostatnią wioskę i znika z mapy';
       if (r.settled) return esc(E.ownerName(s, r.attacker)) + ' zakłada osadę ' + esc(r.toName) + ' ' + xy(r.toX, r.toY);
       return esc(E.ownerName(s, r.attacker)) + ' zdobywa ' + esc(r.toName) + ' ' + xy(r.toX, r.toY);
@@ -763,6 +769,7 @@
   // Wygląd kroniki: pieczęć z werdyktem (tylko prezentacja, dane bez zmian).
   function reportVerdict(r) {
     const tone = reportTone(r);
+    if (r.kind === 'news' && r.diplo) return { cls: 'news', label: { alliance: 'Sojusz', join: 'Sojusz', leave: 'Rozpad sojuszu', betray: 'Zdrada', war: 'Wojna', peace: 'Rozejm' }[r.diplo] || 'Dyplomacja', sub: 'Kronika świata' };
     if (r.kind === 'news') return { cls: 'news', label: r.settled ? 'Nowa osada' : r.eliminated ? 'Upadek frakcji' : 'Podbój', sub: 'Kronika świata' };
     if (r.kind === 'spy') return { cls: tone + ' spy', label: r.success ? 'Zwiad udany' : 'Zwiad przepadł', sub: 'Raport zwiadu' };
     if (r.kind === 'spydef') return { cls: tone + ' spy', label: r.success ? 'Wróg przejrzał wioskę' : 'Szpiedzy zatrzymani', sub: 'Wrogi zwiad' };
@@ -813,7 +820,7 @@
     } else {
       html += '<ul class="rlist">' + list.map(r =>
         '<li><button class="ritem ' + reportTone(r) + ' k-' + r.kind + (r.conquered ? ' conq' : '') + (r.read ? '' : ' unread') + '" data-act="report" data-id="' + r.id + '">' +
-        ico(r.kind === 'news' ? (r.settled ? 'settler' : 'noble') : r.kind === 'attack' ? (r.raid ? 'merchant' : 'sword') : r.kind === 'spy' || r.kind === 'spydef' ? 'scout' : 'barracks') +
+        ico(r.kind === 'news' ? (r.diplo ? 'scroll' : r.settled ? 'settler' : 'noble') : r.kind === 'attack' ? (r.raid ? 'merchant' : 'sword') : r.kind === 'spy' || r.kind === 'spydef' ? 'scout' : 'barracks') +
         '<span class="rtitle">' + reportTitle(s, r) + '</span><span class="rtime">' + dayClock(r.time) + '</span></button></li>').join('') + '</ul>';
     }
     el.innerHTML = html + '</section>';
@@ -853,6 +860,13 @@
         '<p>Wysłano ' + r.sent + ' zwiadowców, zginęło ' + r.lost + '.</p>';
       if (r.kind === 'spy') html += r.success ? intelHtml(r.intel) : '<p class="muted">Obrońca miał więcej zwiadowców. Wyślij liczniejszy oddział zwiadu.</p>';
       else html += '<p>' + (r.success ? 'Wróg zobaczył Twoje wojsko i surowce. Więcej zwiadowców w wiosce lepiej ją chroni.' : 'Twoi zwiadowcy nie dopuścili wroga do wioski.') + '</p>';
+    } else if (r.kind === 'news' && r.diplo) {
+      const names = (r.members || [r.attacker, r.defender]).filter(Boolean).map(m => flag(s, m)).join(', ');
+      html += '<p>' + (r.diplo === 'war' ? 'Frakcja ' + flag(s, r.attacker) + ' wypowiedziała wojnę frakcji ' + flag(s, r.defender) + '. Wojna trwa ograniczony czas i kończy się rozejmem.'
+        : r.diplo === 'peace' ? 'Frakcje ' + flag(s, r.attacker) + ' i ' + flag(s, r.defender) + ' zawarły rozejm i przez dłuższy czas nie będą ze sobą walczyć.'
+        : r.diplo === 'leave' ? 'Frakcja ' + flag(s, r.attacker) + ' odeszła z sojuszu (np. dlatego, że zbliża się do zwycięstwa).'
+        : r.diplo === 'betray' ? 'Frakcja ' + flag(s, r.attacker) + ' złamała sojusz i odeszła. Dawni sojusznicy jej nie ufają.'
+        : 'Sojusz tworzą: ' + names + '. Sojusznicy nie atakują się nawzajem, a wspólnie są trudniejsi do pokonania.') + '</p>';
     } else if (r.kind === 'news') {
       html += '<p>' + (r.settled ? 'Na pustej równinie ' + xy(r.toX, r.toY) + ' powstała nowa wioska frakcji ' + flag(s, r.attacker) + '.' : r.eliminated ? 'Frakcja ' + esc(E.ownerName(s, r.eliminated)) + ' została wyeliminowana z gry.'
         : 'Wioska ' + esc(r.toName) + ' ' + xy(r.toX, r.toY) + ' należy teraz do frakcji ' + flag(s, r.attacker) + '.') + '</p>';
@@ -1567,6 +1581,19 @@
   /* ---------- dyplomacja ---------- */
   const DIP = () => MP.Diplomacy;
   function diploOffers(s) { const d = s.diplo; return d ? d.offers.filter(o => o.expires > s.now && s.factions[o.from] && s.factions[o.from].alive).length : 0; }
+  // Sojusze i wojny między frakcjami AI (tylko podgląd).
+  function diploBlocs(s, d, t) {
+    const als = d.alliances.filter(al => al.members.length >= 2);
+    const wars = d.wars.filter(w => w.end > t && !w.joined);
+    let h = '<section><h3>Sojusze i wojny AI</h3>';
+    h += als.length ? '<ul class="dp-list">' + als.map(al => '<li class="dp-card"><div class="dp-top"><span>' + al.members.map(m => flag(s, m)).join(' + ') +
+      '</span><span class="dp-ok">sojusz</span></div></li>').join('') + '</ul>' : '<p class="muted">Żadne frakcje nie zawarły jeszcze sojuszu.</p>';
+    if (wars.length) {
+      h += '<ul class="dp-list">' + wars.map(w => '<li class="dp-card"><div class="dp-top"><span>' + flag(s, w.a) + ' ⚔ ' + flag(s, w.b) +
+        '</span><span class="dp-warn">wojna: jeszcze <span class="timer" data-end="' + w.end + '"></span></span></div></li>').join('') + '</ul>';
+    } else h += '<p class="muted">Frakcje AI są teraz w pokoju.</p>';
+    return h + '<p class="muted seg-note">Przychylne sobie frakcje AI łączą się w sojusze (2–4 członków): sojusznicy nie atakują się nawzajem. Wojna między frakcjami AI zdarza się rzadko, trwa kilka godzin lub kilka bitew i kończy się rozejmem, więc armie nie wykrwawiają się w ciągłych walkach. Nikt nie wypowie wojny blokowi silniejszemu od siebie.</p></section>';
+  }
   function diploModal() {
     const s = st(), D = DIP(), d = D.ensure(s), cfg = C.DIPLO, t = s.now;
     const v0 = cur();
@@ -1591,6 +1618,7 @@
       const a = D.assess(s, f.id, 'player', t);
       const others = D.pactsOf(s, f.id, t).map(p => D.partnerOf(p, f.id)).filter(x => x !== 'player');
       const leader = D.isLeader(s, f.id, t);
+      const allies = D.blocOf(s, f.id).filter(x => x !== f.id);
       let status, btns = '';
       if (pact) {
         status = pact.breakAt != null
@@ -1611,11 +1639,12 @@
       return '<li class="dp-card"><div class="dp-top"><span>' + flag(s, f.id) + ' <small class="muted">' + C.AI.personalities[f.personality].label + ', ' + E.villagesOf(s, f.id).length + ' wiosek</small>' +
         (leader ? ' <span class="dp-warn">lider</span>' : '') + '</span><span>' + D.attitudeLabel(att) + ' <small class="muted">' + (att > 0 ? '+' : '') + att + '</small></span></div>' +
         '<span class="dp-meter"><i style="left:' + ((att + 100) / 2) + '%"></i></span>' +
-        '<div class="dp-line">' + status + (others.length ? '<small class="muted"> · w pakcie z: ' + others.map(o => esc(E.ownerName(s, o))).join(', ') + '</small>' : '') + '</div>' +
+        '<div class="dp-line">' + status + (others.length ? '<small class="muted"> · w pakcie z: ' + others.map(o => esc(E.ownerName(s, o))).join(', ') + '</small>' : '') +
+        (allies.length ? '<small class="muted"> · w sojuszu z: ' + allies.map(o => esc(E.ownerName(s, o))).join(', ') + '</small>' : '') + '</div>' +
         (hint ? '<p class="muted dp-hint">' + hint + '</p>' : '') +
         '<div class="actions left">' + btns + '</div>' +
         (gv ? '<div class="dp-gift"><small class="muted">Dar z aktywnej wioski:</small> ' + gv + '</div>' : '') + '</li>';
-    }).join('') + '</ul></section>' +
+    }).join('') + '</ul></section>' + diploBlocs(s, d, t) +
       '<p class="muted seg-note">Nastawienie rośnie, gdy nikogo nie atakujesz, i spada po atakach na daną frakcję (najmocniej po podboju). Frakcja z ' +
       Math.ceil(E.winVillages(s) * cfg.leaderShare) + ' wioskami jest „liderem”: nikt nie zawiera z nią paktu i wszyscy chętniej ją atakują.</p>' +
       '<div class="actions"><button class="btn" data-act="close">Wróć do gry</button></div>';

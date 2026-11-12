@@ -440,7 +440,29 @@
       signBonus: 8,              // wzrost nastawienia po podpisaniu paktu
       giftPerRes: 600,           // tyle surowców daje +1 do nastawienia
       giftMax: 20, giftCoolMin: 20, // maks. wzrost z jednego daru i przerwa między darami dla tej samej frakcji
-      leaderShare: 0.6           // frakcja z tą częścią celu zwycięstwa jest „liderem”: nikt nie zawiera z nią paktu, wszyscy chętniej ją atakują
+      leaderShare: 0.6,          // frakcja z tą częścią celu zwycięstwa jest „liderem”: nikt nie zawiera z nią paktu, wszyscy chętniej ją atakują
+      // Sojusze AI (diplomacy.js): kilka frakcji tworzy blok, w którym nikt nikogo nie atakuje (mocniejsze niż pakt, bez terminu).
+      // Wojsko sojuszników nie przechodzi między ich wioskami, ale blok jest silniejszy i odstrasza napastników.
+      alliance: {
+        minAttitude: 15,         // oba kierunki nastawienia muszą mieć co najmniej tyle, żeby frakcje stworzyły albo rozszerzyły sojusz
+        maxMembers: 4,           // sufit liczby członków; faktyczny limit to ok. 1/3 frakcji AI na świecie (min. 2)
+        range: 12,               // sojusznicy muszą mieć wioski w tej odległości (pola)
+        joinBonus: 6,            // wzrost wzajemnego nastawienia po utworzeniu/rozszerzeniu sojuszu
+        betrayMult: 0.25,        // zdrada sojusznika: ułamek szansy `betray` osobowości na minutę
+        leaveGraceMin: 180,      // po wyjściu z sojuszu byli sojusznicy nie wypowiedzą sobie wojny przez tyle minut
+        leavePenalty: 25         // spadek nastawienia byłych sojuszników do zdrajcy
+      },
+      // Wojny AI z AI toczą się tylko po wypowiedzeniu (albo przeciw „liderowi”) i są ograniczone: czas, liczba bitew, potem rozejm.
+      war: {
+        durationMin: 180,        // tyle minut trwa wojna, jeśli wcześniej nie skończy jej zmęczenie bitwami
+        maxBattles: 6,           // po tylu bitwach między dwiema stronami wojna kończy się rozejmem
+        maxWars: 1,              // ile wojen frakcja sama wypowiada naraz (sojusznicy dołączają dodatkowo)
+        range: 10,               // wojnę wypowiada tylko komuś, czyja wioska leży w tej odległości
+        strengthRatio: 1,        // nie wypowiada wojny blokowi silniejszemu od własnego (razy ten mnożnik)
+        joinChance: 0.5,         // szansa, że sojusznik agresora dołączy do wojny (obrońca zawsze ma wsparcie sojuszników)
+        peaceMin: 600,           // po wojnie ta sama para nie wypowiada sobie kolejnej przez tyle minut
+        truceAttitude: 0         // po rozejmie nastawienie obu stron podnosi się co najmniej do tej wartości
+      }
     },
 
     // Nowa wioska założona przez Osadnika
@@ -624,8 +646,9 @@
           label: 'agresywna',
           // dyplomacja: baseline/cap = zakres nastawienia; warm/heal = tempo na godzinę; minAttitude = próg zgody na pakt;
           // repLimit = ile zerwanych paktów u proponującego go zniechęca; offerChance = szansa na minutę na własną propozycję;
-          // betray = szansa na minutę na zdradę słabszego partnera; revenge = skala zemsty; leaderBias = zapał do atakowania lidera
-          diplo: { baseline: -10, cap: 25, warm: 1.5, heal: 3, minAttitude: 5, repLimit: 3, offerChance: 0.004, betray: 0.006, revenge: 30, leaderBias: 0.5 },
+          // betray = szansa na minutę na zdradę słabszego partnera; revenge = skala zemsty; leaderBias = zapał do atakowania lidera;
+          // allyChance = szansa na minutę na zawarcie/rozszerzenie sojuszu; warChance = szansa na minutę na wypowiedzenie wojny innej frakcji AI
+          diplo: { baseline: -10, cap: 25, warm: 1.5, heal: 3, minAttitude: 5, repLimit: 3, offerChance: 0.004, betray: 0.006, revenge: 30, leaderBias: 0.5, allyChance: 0.002, warChance: 0.004 },
           buildWeights: { hq: 1, wood: 1, clay: 1, iron: 1.2, farm: 1.2, barracks: 1.5, market: 0.4, wall: 0.6 },
           unitWeights: { spear: 1, axe: 4, scout: 0.3, light: 3, ram: 0.5, archer: 0.5, guard: 0.4, heavy: 0.2 },
           recruitShare: 0.9, attackChance: 0.6, attackRatio: 1.3, keepHome: 0.2,
@@ -637,8 +660,9 @@
           label: 'gospodarcza',
           // dyplomacja: baseline/cap = zakres nastawienia; warm/heal = tempo na godzinę; minAttitude = próg zgody na pakt;
           // repLimit = ile zerwanych paktów u proponującego go zniechęca; offerChance = szansa na minutę na własną propozycję;
-          // betray = szansa na minutę na zdradę słabszego partnera; revenge = skala zemsty; leaderBias = zapał do atakowania lidera
-          diplo: { baseline: 10, cap: 60, warm: 3, heal: 5, minAttitude: -5, repLimit: 2, offerChance: 0.02, betray: 0, revenge: 60, leaderBias: 1 },
+          // betray = szansa na minutę na zdradę słabszego partnera; revenge = skala zemsty; leaderBias = zapał do atakowania lidera;
+          // allyChance = szansa na minutę na zawarcie/rozszerzenie sojuszu; warChance = szansa na minutę na wypowiedzenie wojny innej frakcji AI
+          diplo: { baseline: 10, cap: 60, warm: 3, heal: 5, minAttitude: -5, repLimit: 2, offerChance: 0.02, betray: 0, revenge: 60, leaderBias: 1, allyChance: 0.01, warChance: 0.0004 },
           buildWeights: { hq: 1.3, wood: 1.5, clay: 1.5, iron: 1.4, farm: 1, barracks: 0.7, market: 0.6, wall: 0.8 },
           unitWeights: { spear: 2, axe: 1, scout: 0.2, light: 1, ram: 0.1, archer: 2, guard: 1.5, heavy: 1 },
           recruitShare: 0.65, attackChance: 0.25, attackRatio: 2.0, keepHome: 0.5,
@@ -650,8 +674,9 @@
           label: 'obronna',
           // dyplomacja: baseline/cap = zakres nastawienia; warm/heal = tempo na godzinę; minAttitude = próg zgody na pakt;
           // repLimit = ile zerwanych paktów u proponującego go zniechęca; offerChance = szansa na minutę na własną propozycję;
-          // betray = szansa na minutę na zdradę słabszego partnera; revenge = skala zemsty; leaderBias = zapał do atakowania lidera
-          diplo: { baseline: 5, cap: 60, warm: 2.5, heal: 4, minAttitude: 0, repLimit: 2, offerChance: 0.015, betray: 0, revenge: 50, leaderBias: 0.8 },
+          // betray = szansa na minutę na zdradę słabszego partnera; revenge = skala zemsty; leaderBias = zapał do atakowania lidera;
+          // allyChance = szansa na minutę na zawarcie/rozszerzenie sojuszu; warChance = szansa na minutę na wypowiedzenie wojny innej frakcji AI
+          diplo: { baseline: 5, cap: 60, warm: 2.5, heal: 4, minAttitude: 0, repLimit: 2, offerChance: 0.015, betray: 0, revenge: 50, leaderBias: 0.8, allyChance: 0.008, warChance: 0 },
           buildWeights: { hq: 1.2, wood: 1.2, clay: 1.2, iron: 1, farm: 1.4, barracks: 1, market: 0.4, wall: 1.4 },
           unitWeights: { spear: 5, axe: 1, scout: 0.5, light: 0.5, ram: 0, archer: 4, guard: 5, heavy: 3 },
           recruitShare: 0.75, attackChance: 0.2, attackRatio: 2.5, keepHome: 0.8,
@@ -663,8 +688,9 @@
           label: 'ekspansywna',
           // dyplomacja: baseline/cap = zakres nastawienia; warm/heal = tempo na godzinę; minAttitude = próg zgody na pakt;
           // repLimit = ile zerwanych paktów u proponującego go zniechęca; offerChance = szansa na minutę na własną propozycję;
-          // betray = szansa na minutę na zdradę słabszego partnera; revenge = skala zemsty; leaderBias = zapał do atakowania lidera
-          diplo: { baseline: -5, cap: 40, warm: 2, heal: 3, minAttitude: 10, repLimit: 3, offerChance: 0.006, betray: 0.004, revenge: 35, leaderBias: 0.7 },
+          // betray = szansa na minutę na zdradę słabszego partnera; revenge = skala zemsty; leaderBias = zapał do atakowania lidera;
+          // allyChance = szansa na minutę na zawarcie/rozszerzenie sojuszu; warChance = szansa na minutę na wypowiedzenie wojny innej frakcji AI
+          diplo: { baseline: -5, cap: 40, warm: 2, heal: 3, minAttitude: 10, repLimit: 3, offerChance: 0.006, betray: 0.004, revenge: 35, leaderBias: 0.7, allyChance: 0.004, warChance: 0.003 },
           buildWeights: { hq: 1.2, wood: 1.1, clay: 1.1, iron: 1.1, farm: 1.2, barracks: 1.3, market: 0.4, wall: 0.6 },
           unitWeights: { spear: 1, axe: 3, scout: 0.3, light: 2, ram: 0.3, archer: 0.5, guard: 0.4, heavy: 0.2 },
           recruitShare: 0.85, attackChance: 0.5, attackRatio: 1.5, keepHome: 0.3,

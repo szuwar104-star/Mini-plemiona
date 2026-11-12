@@ -224,6 +224,7 @@ const att = (s, me, enemy, n) => { me.units = Object.assign(E.emptyUnits(), { ax
 /* ---------- AI zrywa pakt z liderem ---------- */
 {
   const { s, fid } = setup(12);
+  s.race = true; // frakcja AI bywa liderem tylko w trybie Wyścig
   const ids = Object.keys(s.factions).filter(id => id !== 'player' && id !== fid);
   const other = ids[0];
   const d = D.ensure(s); d.last = 1;
@@ -261,6 +262,158 @@ const att = (s, me, enemy, n) => { me.units = Object.assign(E.emptyUnits(), { ax
   d.pacts.forEach(p => { if (p.breakAt == null || p.breakAt > s.now) { cnt[p.a] = (cnt[p.a] || 0) + 1; cnt[p.b] = (cnt[p.b] || 0) + 1; } });
   ok(Object.values(cnt).every(n => n <= C.DIPLO.maxPacts), 'żadna frakcja nie przekracza limitu paktów');
   ok(Object.values(d.rel).every(v => v >= -100 && v <= 100), 'nastawienie mieści się w zakresie -100…100');
+}
+
+/* ---------- sojusze AI ---------- */
+const aiIds = s => Object.keys(s.factions).filter(id => s.factions[id].ai);
+const minDist = (s, a, b) => { let m = Infinity; E.villagesOf(s, a).forEach(x => E.villagesOf(s, b).forEach(y => { m = Math.min(m, E.dist(x, y)); })); return m; };
+{
+  const s = E.newGame(0, 7, 'normal', 'medium');
+  const [a, b, c] = aiIds(s);
+  const al = D.formAlliance(s, a, b, 0);
+  ok(al.members.length === 2 && D.allied(s, a, b) && D.allied(s, b, a), 'sojusz łączy dwie frakcje w obie strony');
+  ok(D.blocked(s, a, b, 0) && !D.blocked(s, a, c, 0), 'sojusznicy nie mogą się atakować, reszta bez zmian');
+  ok(D.targetWeight(s, a, b, 0) === 0, 'AI nie wybiera sojusznika na cel');
+  const va = E.villagesOf(s, a)[0], vb = E.villagesOf(s, b)[0];
+  va.units = Object.assign(E.emptyUnits(), { axe: 50 });
+  const r = E.sendAttack(s, va.id, vb.id, { axe: 50 }, 0);
+  ok(!r.ok, 'silnik blokuje atak na sojusznika: ' + r.reason);
+  D.formAlliance(s, c, a, 1);
+  ok(D.allianceOf(s, c) === D.allianceOf(s, a) && D.blocOf(s, a).length === 3, 'trzecia frakcja dołącza do istniejącego sojuszu');
+  ok(D.maxMembers(s) === 3, 'limit członków na świecie Średnim (8 frakcji AI) to 3');
+  ok(!D.allied(s, a, 'player') && !D.allianceOf(s, 'player'), 'gracz nie należy do sojuszy AI');
+}
+{
+  // pakt między przyszłymi sojusznikami znika (zwalnia limit paktów)
+  const s = E.newGame(0, 8, 'normal', 'medium');
+  const [a, b] = aiIds(s);
+  D.signPact(s, a, b, 0);
+  ok(D.pactsOf(s, a, 0).length === 1, 'pakt AI–AI podpisany');
+  D.formAlliance(s, a, b, 1);
+  ok(D.pactsOf(s, a, 1).length === 0, 'sojusz zastępuje pakt między członkami');
+}
+{
+  // tick sam zawiera sojusz między przychylnymi sobie sąsiadami
+  const s = E.newGame(0, 9, 'normal', 'medium');
+  const a = aiIds(s).find(id => C.AI.personalities[s.factions[id].personality].diplo.allyChance >= 0.008);
+  const b = aiIds(s).filter(id => id !== a).sort((x, y) => minDist(s, a, x) - minDist(s, a, y))[0];
+  ok(minDist(s, a, b) <= C.DIPLO.alliance.range, 'najbliższy sąsiad leży w zasięgu sojuszu (' + minDist(s, a, b).toFixed(1) + ')');
+  D.adjust(s, a, b, 80); D.adjust(s, b, a, 80);
+  const d = D.ensure(s); d.last = 1;
+  for (let m = 2; m < 3000 && !D.allianceOf(s, a); m++) D.tick(s, m * MIN);
+  ok(!!D.allianceOf(s, a), 'przychylne frakcje same zawierają sojusz');
+  ok(s.reports.some(r => r.diplo === 'alliance' || r.diplo === 'join'), 'Kronika zapisuje powstanie sojuszu');
+  ok(s.reports.filter(r => r.diplo).every(r => r.read === true), 'wpisy dyplomatyczne w Kronice są przeczytane (bez plakietki)');
+  ok(D.ensure(s).alliances.every(al => al.members.length <= D.maxMembers(s)), 'sojusze nie przekraczają limitu członków');
+}
+{
+  // frakcja, która była w wojnie z członkiem, nie wstąpi do jego sojuszu; wrogie nastawienie też blokuje
+  const s = E.newGame(0, 10, 'normal', 'medium');
+  const [a, b, c] = aiIds(s);
+  D.formAlliance(s, a, b, 0);
+  D.declareWar(s, c, a, 1);
+  ok(!!D.warBetween(s, c, a, 2) && !!D.warBetween(s, c, b, 2), 'wojna z członkiem sojuszu obejmuje też jego sojusznika (obrona wspólna)');
+}
+{
+  // lider odpada z sojuszu (tryb Wyścig); zdrada psuje reputację i nastawienie
+  const s = E.newGame(0, 11, 'normal', 'medium');
+  s.race = true;
+  const [a, b] = aiIds(s);
+  D.formAlliance(s, a, b, 0);
+  const need = Math.ceil(E.winVillages(s) * C.DIPLO.leaderShare);
+  const free = Object.values(s.villages).filter(v => v.owner === null);
+  for (let i = E.villagesOf(s, a).length; i < need; i++) free.pop().owner = a;
+  const d = D.ensure(s); d.last = 1;
+  D.tick(s, 2 * MIN);
+  ok(!D.allied(s, a, b) && D.ensure(s).alliances.length === 0, 'lider odchodzi z sojuszu, a sojusz z jednego członka się rozwiązuje');
+  ok(!(d.rep[a] > 0), 'odejście lidera nie psuje reputacji');
+  const s2 = E.newGame(0, 11, 'normal', 'medium');
+  const [x, y] = aiIds(s2);
+  D.formAlliance(s2, x, y, 0);
+  const before = D.attitude(s2, y, x);
+  D.leaveAlliance(s2, x, 10 * MIN, 'betray');
+  ok(D.attitude(s2, y, x) < before && D.ensure(s2).rep[x] >= 1, 'zdrada sojuszu obniża nastawienie i daje punkt nieufności');
+  ok((D.ensure(s2).peace[x < y ? x + '|' + y : y + '|' + x] || 0) > 10 * MIN, 'po zdradzie jest okres karencji bez wojny');
+}
+{
+  // poza trybem Wyścig AI nie jest liderem (gracz nadal bywa)
+  const s = E.newGame(0, 12, 'normal', 'medium');
+  const need = Math.ceil(E.winVillages(s) * C.DIPLO.leaderShare);
+  const [a] = aiIds(s);
+  const free = Object.values(s.villages).filter(v => v.owner === null);
+  for (let i = E.villagesOf(s, a).length; i < need; i++) free.pop().owner = a;
+  ok(!D.isLeader(s, a, 0), 'poza Wyścigiem AI z dużą liczbą wiosek nie jest liderem');
+  s.race = true;
+  D.ensure(s).last = 1;
+  ok(D.isLeader(s, a, 61 * MIN), 'w trybie Wyścig ta sama frakcja jest liderem');
+  s.race = false;
+  for (let i = E.villagesOf(s, 'player').length; i < need; i++) free.pop().owner = 'player';
+  ok(D.isLeader(s, 'player', 130 * MIN), 'gracz może być liderem w każdym trybie');
+}
+
+/* ---------- wojny AI z AI: wypowiedzenie, zmęczenie, rozejm ---------- */
+{
+  const s = E.newGame(0, 13, 'normal', 'medium');
+  const [a, b] = aiIds(s);
+  ok(D.targetWeight(s, a, b, 0) === 0, 'bez wojny AI nie atakuje innej AI (pokój)');
+  const w = D.declareWar(s, a, b, 0);
+  ok(!!w && D.targetWeight(s, a, b, MIN) > 0 && D.targetWeight(s, b, a, MIN) > 0, 'po wypowiedzeniu obie strony mogą się atakować');
+  ok(!D.assess(s, b, a, MIN).ok && D.assess(s, b, a, MIN).code === 'war', 'w czasie wojny pakt jest niemożliwy');
+  for (let i = 0; i < C.DIPLO.war.maxBattles; i++) D.onBattle(s, a, b, true, false, (i + 1) * MIN);
+  ok(!D.warBetween(s, a, b, 10 * MIN), 'po ' + C.DIPLO.war.maxBattles + ' bitwach wojna kończy się rozejmem');
+  ok(D.targetWeight(s, a, b, 10 * MIN) === 0, 'po rozejmie znów panuje pokój');
+  ok(D.attitude(s, a, b) >= C.DIPLO.war.truceAttitude, 'rozejm podnosi nastawienie do progu');
+  ok(s.reports.some(r => r.diplo === 'peace') && s.reports.some(r => r.diplo === 'war'), 'Kronika zapisuje wojnę i rozejm');
+  const d = D.ensure(s);
+  const k = a < b ? a + '|' + b : b + '|' + a;
+  ok(d.peace[k] > 10 * MIN, 'po wojnie jest okres bez kolejnej wojny tej pary');
+  // wojna wygasa też z czasem
+  const w2 = D.declareWar(s, b, a, 20 * MIN);
+  d.last = 21 * MIN; d.peace = {};
+  D.tick(s, 21 * MIN + C.DIPLO.war.durationMin * MIN + 2 * MIN);
+  ok(!D.warBetween(s, b, a, 21 * MIN + C.DIPLO.war.durationMin * MIN + 2 * MIN) && !d.wars.includes(w2), 'wojna wygasa po czasie');
+}
+{
+  // lider w trybie Wyścig jest celem bez wypowiedzenia wojny; gracz jako cel nie zależy od wojen
+  const s = E.newGame(0, 14, 'normal', 'medium');
+  s.race = true;
+  const [a, b] = aiIds(s);
+  const need = Math.ceil(E.winVillages(s) * C.DIPLO.leaderShare);
+  const free = Object.values(s.villages).filter(v => v.owner === null);
+  for (let i = E.villagesOf(s, b).length; i < need; i++) free.pop().owner = b;
+  s.diplo = null; D.ensure(s).last = 1;
+  D.tick(s, 2 * MIN);
+  ok(D.targetWeight(s, a, b, 2 * MIN) > 0, 'lider (Wyścig) jest celem bez wojny');
+  ok(D.targetWeight(s, a, 'player', 2 * MIN) > 0, 'gracz pozostaje celem niezależnie od wojen AI');
+}
+
+/* ---------- stary zapis bez sojuszy i wojen ---------- */
+{
+  const s = E.newGame(0, 15, 'normal');
+  const d = D.ensure(s);
+  delete d.alliances; delete d.wars; delete d.peace;
+  const d2 = D.ensure(s);
+  ok(Array.isArray(d2.alliances) && Array.isArray(d2.wars) && d2.peace && typeof d2.peace === 'object', 'ensure uzupełnia sojusze, wojny i pokój w starym zapisie');
+  E.advance(s, 3 * H);
+  ok(true, 'stary zapis działa dalej (3 h)');
+}
+
+/* ---------- symulacja: AI z AI nie wyniszczają się (Średnia, 48 h) ---------- */
+{
+  const s = E.newGame(0, 21, 'hard', 'medium');
+  let battles = 0;
+  const orig = D.onBattle;
+  D.onBattle = function (st, att, def) { if (att !== 'player' && def !== null && def !== 'player') battles++; return orig.apply(this, arguments); };
+  E.advance(s, 48 * H);
+  D.onBattle = orig;
+  const d = s.diplo;
+  console.log('   bitwy AI–AI w 48 h: ' + battles + ', sojusze: ' + d.alliances.map(a => a.members.length).join('+') + ', aktywne wojny: ' + d.wars.length);
+  ok(battles < 400, 'frakcje AI toczą ze sobą mało bitew (' + battles + ' < 400; bez sojuszy i wojen było ich ponad 1000)');
+  ok(d.alliances.length >= 1, 'po 48 h istnieje przynajmniej jeden sojusz AI');
+  ok(d.alliances.every(al => al.members.length >= 2 && al.members.length <= D.maxMembers(s) && al.members.every(m => s.factions[m].alive)), 'sojusze są spójne (2…limit członków, żywi członkowie)');
+  const seen = {};
+  ok(d.alliances.every(al => al.members.every(m => !seen[m] && (seen[m] = 1))), 'frakcja należy najwyżej do jednego sojuszu');
+  ok(d.wars.every(w => w.a !== w.b && !D.allied(s, w.a, w.b)), 'sojusznicy nigdy nie są ze sobą w stanie wojny');
 }
 
 if (fails) { console.error('\nBłędy: ' + fails); process.exit(1); }
