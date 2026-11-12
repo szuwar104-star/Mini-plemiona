@@ -270,7 +270,12 @@
     // Próg rośnie z czasem gry, więc wyprawy są coraz większe (a nie stałe garstki, które co chwilę giną lub wykrwawiają wroga).
     const hoursPlayed = Math.max(0, (t - state.created) / 3600000);
     const growth = Math.min(T().waveGrowthMax, 1 + hoursPlayed * T().waveGrowthPerHour);
-    if (A < (P.minPower + E.points(v) * T().powerPerPoint) * growth * (1 - press * C.AI.pressure.powerCut)) return;
+    // Duży próg dotyczy wypraw na graczy i frakcje. Wolne osady mają słabą obronę (rośnie wolno), więc przy ich zajmowaniu
+    // liczy się obrona celu (A ≥ Dv × attackRatio niżej) i tylko niewielki próg minimalny – inaczej im dłuższa gra,
+    // tym bardziej rośnie wymagana armia i AI przestaje zajmować puste wioski.
+    const fullNeed = (P.minPower + E.points(v) * T().powerPerPoint) * growth * (1 - press * C.AI.pressure.powerCut);
+    const freeNeed = P.minPower * (T().freeMinShare || 0.5);
+    if (A < freeNeed) return;
 
     const D = E.diff(state);
     const minutes = (t - state.created) / 60000;
@@ -302,6 +307,7 @@
       E.tickVillage(state, target, t);
       const wall = Math.max(0, target.buildings.wall - Math.floor(E.ramCount(send) / C.RAM.fightPerLevel));
       const Dv = E.villageDefense(target, wall, E.upgradesOf(state, target.owner));
+      if (!(target.owner === null && !raid) && A < fullNeed) continue; // pełny próg: gracz, frakcje i grabież
       if (A < Dv * P.attackRatio * (target.owner === 'player' ? D.aiCaution * (1 - press * (1 - C.AI.pressure.ratioFloor)) : 1)) continue;
       let w = dw / (1 + d);
       w *= 1 + Math.min(2, (target.res.wood + target.res.clay + target.res.iron) / T().lootScale); // łup
