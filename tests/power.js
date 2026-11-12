@@ -17,7 +17,7 @@ ok(p.total === p.buildings + p.army, 'razem = budynki + wojsko');
 const before = p.total;
 s.movements.push({ id: 'mt1', type: 'attack', owner: 'player', from: v.id, to: 'x', units: Object.assign(E.emptyUnits(), { light: 10 }), arrive: 1e9 });
 p = E.accountPower(s, 'player');
-ok(p.units === 22 && p.attack === 120 + 1300, 'oddział w marszu liczy się (atak ' + p.attack + ')');
+ok(p.units === 22 && p.attack === 120 + 10 * C.UNITS.light.att, 'oddział w marszu liczy się (atak ' + p.attack + ')');
 ok(p.total > before, 'moc rośnie po dodaniu wojska w marszu');
 s.movements.pop();
 
