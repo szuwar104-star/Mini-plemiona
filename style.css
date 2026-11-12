@@ -385,11 +385,11 @@ table.units { width: 100%; border-collapse: collapse; font-size: .92rem; }
 .rcost .cost { margin: 0; }
 .rcost .muted { font-size: .82rem; font-weight: 700; }
 .rform { display: grid; grid-template-columns: minmax(4.5rem, 1fr) auto auto; gap: .4rem; margin-top: .6rem; }
-input[type=number], select {
+input[type=number], input[type=text], select {
   min-height: 40px; padding: .35rem .7rem; background: var(--bg); color: var(--text);
   border: 1px solid var(--line-2); border-radius: var(--r-sm); min-width: 0; font-weight: 700;
 }
-input[type=number]:focus { border-color: var(--gold); outline: none; box-shadow: 0 0 0 3px rgba(232, 182, 76, .2); }
+input[type=number]:focus, input[type=text]:focus { border-color: var(--gold); outline: none; box-shadow: 0 0 0 3px rgba(232, 182, 76, .2); }
 input:disabled { opacity: .4; }
 
 /* ---------- ekran wojska ---------- */

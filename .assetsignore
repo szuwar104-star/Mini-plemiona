@@ -1,0 +1,12 @@
+.git
+.gitignore
+.assetsignore
+wrangler.jsonc
+worker.mjs
+README.md
+serve.js
+start.bat
+start.sh
+tests
+tools
+node_modules
