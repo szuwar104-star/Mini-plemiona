@@ -159,5 +159,33 @@ function twoVillages() {
   ok(!s.auto.on, 'wyłączenie konwojów w bocie wyłącza Konwoje');
 }
 
+// 10. Osadnicy: bot zakłada nowe wioski w pobliżu
+{
+  const s = mk(9);
+  Object.values(s.factions).forEach(f => { if (f.ai) f.nextThink = 1e15; });
+  const v = E.villagesOf(s, 'player')[0];
+  v.buildings.hq = 8; v.buildings.barracks = 3; v.buildings.farm = 12; v.buildings.storage = 12;
+  const cap = E.storageCap(v); v.res = { wood: cap, clay: cap, iron: cap }; v.units.spear = 2000;
+  MP.Pilot.configure(s, { on: true, build: false, recruit: 'off', tech: false, settle: true, settleMax: 3 }, s.now);
+  E.advance(s, s.now + 3 * MIN);
+  ok(v.recruitQueue.some(e => e.unit === 'settler') || v.units.settler > 0 || s.movements.some(m => m.type === 'settle'), 'bot zlecił szkolenie osadnika');
+  E.advance(s, s.now + 25 * MIN);
+  let own = E.villagesOf(s, 'player');
+  ok(own.length >= 2, 'założono nową wioskę (' + own.length + ')');
+  const nv = own.find(o => o.id !== v.id);
+  ok(!nv || E.dist(nv, v) <= 8, 'nowa wioska blisko macierzystej (' + (nv ? E.dist(nv, v).toFixed(1) : '-') + ' pól)');
+  ok(s.pilot.stats.settled >= 1, 'statystyka osadników rośnie');
+  // limit wiosek
+  const w = E.villagesOf(s, 'player'); w.forEach(x => { const c = E.storageCap(x); x.res = { wood: c, clay: c, iron: c }; x.buildings.hq = 8; x.buildings.barracks = 3; x.buildings.farm = 12; x.buildings.storage = 12; x.units.spear = 2000; });
+  E.advance(s, s.now + 3 * HOUR);
+  ok(E.villagesOf(s, 'player').length <= 3, 'limit settleMax=3 respektowany (' + E.villagesOf(s, 'player').length + ')');
+  // wyłączone = brak osadników
+  const s2 = mk(9); Object.values(s2.factions).forEach(f => { if (f.ai) f.nextThink = 1e15; });
+  const v2 = E.villagesOf(s2, 'player')[0]; v2.buildings.hq = 8; v2.buildings.barracks = 3; v2.buildings.farm = 12; v2.buildings.storage = 12;
+  const c2 = E.storageCap(v2); v2.res = { wood: c2, clay: c2, iron: c2 }; v2.units.spear = 2000;
+  MP.Pilot.configure(s2, { on: true, build: false, recruit: 'off', tech: false }, s2.now); E.advance(s2, s2.now + HOUR);
+  ok(E.villagesOf(s2, 'player').length === 1 && v2.units.settler === 0, 'bez opcji osadnicy nie powstają');
+}
+
 if (fails) { console.error('\nBłędy: ' + fails); process.exit(1); }
 console.log('\nWszystkie testy Autopilota przeszły.');
