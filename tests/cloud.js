@@ -16,8 +16,8 @@ const ok = (c, msg) => { if (!c) { fails++; console.error('BŁĄD: ' + msg); } e
   // atrapa localStorage i fetch (trafia prosto do workera)
   const store = {};
   global.localStorage = { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } };
-  let down = false;
-  global.fetch = async (path, init) => { if (down) throw new TypeError('offline'); return worker.handle(new Request('https://gra.test' + path, init), env); };
+  let down = false, curEnv = env;
+  global.fetch = async (path, init) => { if (down) throw new TypeError('offline'); return worker.handle(new Request('https://gra.test' + path, init), curEnv); };
   const C = MP.Cloud;
 
   const T0 = 1700000000000;
@@ -81,6 +81,63 @@ const ok = (c, msg) => { if (!c) { fails++; console.error('BŁĄD: ' + msg); } e
   ok(res.status === 503, 'brak KV: 503');
   res = await worker.handle(new Request('https://gra.test/api/save/' + code, { method: 'DELETE' }), env);
   ok(res.status === 405, 'inne metody: 405');
+
+  // ---------- autozapis co minutę ----------
+  const A = C.auto;
+  ok(A.INTERVAL === 60000, 'autozapis działa co 60 s');
+  Object.keys(store).forEach(k => delete store[k]);
+  const T1 = 1800000000000;
+  let t = await A.tick(s, true, T1);
+  ok(t.skipped === 'off', 'bez kodu autozapis nic nie robi');
+  C.setCode(C.newCode(), 0);
+  ok(A.enabled(), 'autozapis jest domyślnie włączony');
+  t = await A.tick(s, false, T1);
+  ok(t.ok && A.status().state === 'ok' && A.status().lastAt === t.savedAt, 'pierwszy tick wysyła zapis nawet bez zmian');
+  t = await A.tick(s, false, T1 + 60000);
+  ok(t.skipped === 'unchanged', 'bez zmian od ostatniego wysłania – pomija');
+  t = await A.tick(s, true, T1 + 120000);
+  ok(t.ok, 'po zmianie wysyła kolejny zapis');
+  const [q1, q2] = await Promise.all([C.push(s), C.push(s)]);
+  ok(q1.ok && q2.ok, 'dwa wysłania naraz idą po kolei i oba przechodzą (bez fałszywego konfliktu)');
+  A.setEnabled(false);
+  ok(!A.enabled() && (await A.tick(s, true, T1 + 180000)).skipped === 'off', 'wyłączony autozapis nie wysyła');
+  const savedCode = C.code();
+  C.setCode(savedCode, 0);
+  ok(!A.enabled(), 'wybór „wyłączony” przeżywa ponowne ustawienie kodu');
+  A.setEnabled(true);
+  ok(A.enabled(), 'autozapis można włączyć z powrotem');
+
+  // konflikt: drugie urządzenie wysłało nowszą wersję
+  C.markSynced(0);
+  t = await A.tick(s, true, T1 + 240000);
+  ok(t.conflict === true && A.status().state === 'conflict', 'nowsza wersja z innego urządzenia: autozapis staje na konflikcie');
+  const before = mem.get([...mem.keys()].pop()).metadata.savedAt;
+  t = await A.tick(s, true, T1 + 300000);
+  ok(t.skipped === 'conflict' && mem.get([...mem.keys()].pop()).metadata.savedAt === before, 'w konflikcie autozapis nie nadpisuje chmury');
+  r = await C.push(s, { force: true });
+  ok(r.ok && A.status().state === 'idle', 'ręczne wymuszenie rozwiązuje konflikt');
+  t = await A.tick(s, true, T1 + 360000);
+  ok(t.ok, 'po rozwiązaniu konfliktu autozapis rusza dalej');
+
+  // błędy sieci: ponawianie z narastającą przerwą
+  down = true;
+  t = await A.tick(s, true, T1 + 420000);
+  ok(t.error && t.fails === 1 && A.status().state === 'error', 'brak sieci: błąd, bez wyjątku');
+  t = await A.tick(s, true, T1 + 480000);
+  ok(t.error && t.fails === 2, 'kolejna próba po minucie');
+  t = await A.tick(s, true, T1 + 480000 + 60000);
+  ok(t.skipped === 'wait', 'po dwóch błędach przerwa 2 min');
+  down = false;
+  t = await A.tick(s, true, T1 + 480000 + 130000);
+  ok(t.ok && A.status().fails === 0, 'po powrocie sieci wysyła i zeruje błędy');
+
+  // serwer bez synchronizacji (brak KV) – bez nękania
+  curEnv = {};
+  t = await A.tick(s, true, T1 + 900000);
+  ok(t.unsupported && A.status().state === 'unsupported', 'brak KV na serwerze: autozapis się wyłącza');
+  t = await A.tick(s, true, T1 + 960000);
+  ok(t.skipped === 'unsupported', 'i nie ponawia prób');
+  curEnv = env;
 
   if (fails) { console.error(fails + ' błędów'); process.exit(1); }
   console.log('Wszystko OK');

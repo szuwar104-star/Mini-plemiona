@@ -1522,12 +1522,26 @@
     } else {
       h += '<p class="muted">Kod synchronizacji (wpisz go na drugim urządzeniu, nie pokazuj nikomu): <b style="font-family:monospace;user-select:all">' + esc(code) + '</b></p>' +
         '<p class="muted">Przejście na inne urządzenie: tu „Wyślij do chmury i wstrzymaj”, tam „Pobierz z chmury”, potem wznów grę.</p>' +
+        autoSyncNote(C2) +
         '<div class="actions left"><button class="btn"' + dis + ' data-act="sync-push-pause">Wyślij do chmury i wstrzymaj</button>' +
         '<button class="btn ghost"' + dis + ' data-act="sync-push">Wyślij do chmury</button>' +
         '<button class="btn ghost"' + dis + ' data-act="sync-pull">Pobierz z chmury</button>' +
+        '<button class="btn ghost"' + dis + ' data-act="sync-auto">' + (C2.auto.enabled() ? 'Wyłącz autozapis' : 'Włącz autozapis') + '</button>' +
         '<button class="btn ghost"' + dis + ' data-act="sync-off">Odłącz kod</button></div>';
     }
     return h + status + '</section>';
+  }
+  // Linia o autozapisie do chmury (co minutę) z ostatnim stanem.
+  function autoSyncNote(C2) {
+    if (!C2.auto.enabled()) return '<p class="muted">Autozapis do chmury co minutę: <b>wyłączony</b>.</p>';
+    const a = C2.auto.status();
+    let note = '';
+    if (a.state === 'ok') note = ' Ostatni: ' + new Date(a.lastAt).toLocaleTimeString('pl-PL') + '.';
+    else if (a.state === 'conflict') note = ' <b>Wstrzymany:</b> w chmurze jest nowszy zapis z innego urządzenia. Użyj „Pobierz z chmury” albo „Wyślij do chmury”.';
+    else if (a.state === 'error') note = ' Błąd: ' + esc(a.msg) + ' Ponawiam.';
+    else if (a.state === 'unsupported') note = ' ' + esc(a.msg);
+    else note = ' Pierwsze wysłanie za chwilę.';
+    return '<p class="muted" role="status">Autozapis do chmury co minutę: <b>włączony</b>.' + note + '</p>';
   }
   async function syncRun(fn) {
     const sy = UI.sync || (UI.sync = {});
@@ -2282,6 +2296,7 @@
       case 'sync-push-pause': syncRun(() => syncPush(true)); break;
       case 'sync-push': syncRun(() => syncPush(false)); break;
       case 'sync-pull': syncRun(syncPull); break;
+      case 'sync-auto': MP.Cloud.auto.setEnabled(!MP.Cloud.auto.enabled()); renderModal(); break;
       case 'sync-off':
         if (window.confirm('Odłączyć kod synchronizacji na tym urządzeniu? Zapis w chmurze zostanie, a kod będzie trzeba wpisać ponownie.')) {
           MP.Cloud.clear(); UI.sync = {}; renderModal();

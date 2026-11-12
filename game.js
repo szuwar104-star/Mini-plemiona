@@ -75,6 +75,7 @@
 
       setInterval(() => this.tick(false), 1000);
       setInterval(() => this.save(), 5000);
+      setInterval(() => this.cloudAuto(), MP.Cloud.auto.INTERVAL);
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') { this.tick(true); MP.DB.saveSync(this.state); this.save(); }
         else { this.tick(false); this.keepAwake(true); }
@@ -125,6 +126,24 @@
       } finally {
         this.saving = false;
         if (this.pendingSave) { this.pendingSave = false; this.save(); }
+      }
+    },
+
+    // Autozapis do chmury (raz na minutę, tylko gdy jest kod synchronizacji i stan się zmienił).
+    async cloudAuto() {
+      const C2 = MP.Cloud;
+      if (!C2 || !this.state) return;
+      const sy = UI().sync;
+      if (sy && sy.busy) return; // trwa ręczne wysyłanie lub pobieranie
+      const was = !!this.dirty;
+      this.dirty = false;
+      let r;
+      try { r = await C2.auto.tick(this.state, was); } catch (e) { r = { error: e }; }
+      if (was && !r.ok) this.dirty = true; // nie zgub zmiany, gdy wysłanie się nie udało
+      if (r.conflict) {
+        UI().toast('bad', 'Autozapis do chmury wstrzymany: w chmurze jest nowszy zapis z innego urządzenia. W Menu → Synchronizacja wybierz „Pobierz z chmury” albo „Wyślij do chmury”.');
+      } else if (r.error && r.fails === 3) {
+        UI().toast('bad', 'Autozapis do chmury nie działa: ' + r.error.message + ' Gra zapisuje się lokalnie i ponawia próby.');
       }
     },
 
