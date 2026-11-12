@@ -1224,7 +1224,8 @@
   function pilotDefaults() {
     const s = st(), p = s.pilot || {}, D = C.PILOT.defaults;
     return { on: p.on !== undefined ? p.on : true, build: p.build !== undefined ? p.build : D.build, recruit: p.recruit || D.recruit,
-      tech: p.tech !== undefined ? p.tech : D.tech, defend: p.defend !== undefined ? p.defend : D.defend, defLevel: p.defLevel || D.defLevel };
+      tech: p.tech !== undefined ? p.tech : D.tech, defend: p.defend !== undefined ? p.defend : D.defend, defLevel: p.defLevel || D.defLevel,
+      convoy: !!p.convoy, hub: p.hub || (s.auto && s.auto.hub) || (autoDefaults().hub) };
   }
   function pilotModal() {
     const s = st(), g = UI.pilot, p = s.pilot;
@@ -1244,6 +1245,10 @@
         ([25, 40, 60, 90].indexOf(Number(g.defLevel)) < 0 ? opt(g.defLevel, g.defLevel, 'Własny (' + g.defLevel + ')') : '') + '</select></label>' +
       '<label class="chk"><input type="checkbox" data-pdefend' + (g.defend ? ' checked' : '') + '>Wysyłaj obronę z innych wiosek do atakowanych (po ataku wraca)</label>' +
       '<label class="chk"><input type="checkbox" data-ptech' + (g.tech ? ' checked' : '') + '>Kupuj monety z nadwyżek surowców i badaj Technologię (wymaga Targowiska)</label>' +
+      '<label class="chk"><input type="checkbox" data-pconv' + (g.convoy ? ' checked' : '') + '>Wysyłaj nadwyżki surowców do stolicy (Konwoje co 15 min)</label>' +
+      '<label class="field">Stolica (wioska centralna) <select data-phub>' + E.villagesOf(s, 'player').sort((x, y) => x.name.localeCompare(y.name, 'pl')).map(v =>
+        '<option value="' + v.id + '"' + (v.id === g.hub ? ' selected' : '') + '>' + esc(v.name) + ' ' + xy(v.x, v.y) + ((v.buildings.market || 0) > 0 ? '' : ' – bez Targowiska') + '</option>').join('') + '</select></label>' +
+      '<p class="muted">Wioski z magazynem pełnym w ponad 80% oddają nadwyżkę (zostaje im 40%). Wysyłające wioski i stolica potrzebują Targowiska. Szczegóły: Przegląd → Konwoje.</p>' +
       '<div class="summary"><div><span>Stan</span><b>' + (p && p.on ? 'włączony' : 'wyłączony') + '</b></div>' +
       (p && p.on && p.next ? '<div><span>Następna tura bota</span><b>' + clock(p.next) + '</b></div>' : '') +
       (ago !== null ? '<div class="wide"><span>Ostatnia tura (' + ago + ' min temu)</span><b>budowy: ' + p.last.built + ', wojsko: ' + p.last.recruited +
@@ -2289,6 +2294,8 @@
     else if (t.hasAttribute && t.hasAttribute('data-prec')) { UI.pilot.recruit = t.value; }
     else if (t.hasAttribute && t.hasAttribute('data-pdef')) { UI.pilot.defLevel = Number(t.value); }
     else if (t.hasAttribute && t.hasAttribute('data-pdefend')) { UI.pilot.defend = t.checked; }
+    else if (t.hasAttribute && t.hasAttribute('data-pconv')) { UI.pilot.convoy = t.checked; }
+    else if (t.hasAttribute && t.hasAttribute('data-phub')) { UI.pilot.hub = t.value; }
     else if (t.hasAttribute && t.hasAttribute('data-ptech')) { UI.pilot.tech = t.checked; }
     else if (t.hasAttribute && t.hasAttribute('data-mmax')) { UI.mass.max = t.checked; renderModal(); }
     else if (t.dataset && t.dataset.msrc) { if (t.checked) delete UI.mass.off[t.dataset.msrc]; else UI.mass.off[t.dataset.msrc] = true; updateMassPlan(); }

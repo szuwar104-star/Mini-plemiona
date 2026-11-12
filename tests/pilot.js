@@ -143,5 +143,21 @@ function twoVillages() {
   console.log('   po 48 h: wioski ' + own.length + ', pkt budynków ' + buildingPts(s) + ', wojsko ' + armyPop(s) + ', statystyki ' + JSON.stringify(s.pilot.stats));
 }
 
+// 9. Konwoje do stolicy
+{
+  const { s, A, B } = twoVillages();
+  Object.values(s.villages).forEach(v => { if (v.owner === 'player') { v.buildings.market = 5; v.buildings.storage = 10; v.buildings.hq = 10; } });
+  const cap = E.storageCap(B);
+  B.res = { wood: cap, clay: cap, iron: cap }; A.res = { wood: 100, clay: 100, iron: 100 };
+  const r = MP.Pilot.configure(s, { on: true, build: false, recruit: 'off', tech: false, convoy: true, hub: A.id }, s.now);
+  ok(r.ok && s.auto.on && s.auto.hub === A.id, 'konwoje włączone przez bota, stolica = A');
+  E.advance(s, s.now + 40 * MIN);
+  ok(A.res.wood > 1000 || s.movements.some(m => m.type === 'transport' && m.to === A.id), 'nadwyżki z B trafiają do stolicy (' + Math.round(A.res.wood) + ' drewna)');
+  ok(B.res.wood < cap, 'B oddała nadwyżkę');
+  ok(MP.Pilot.configure(s, { convoy: true, hub: 'nieistnieje' }, s.now).ok === false, 'obca stolica odrzucona');
+  MP.Pilot.configure(s, { convoy: false }, s.now);
+  ok(!s.auto.on, 'wyłączenie konwojów w bocie wyłącza Konwoje');
+}
+
 if (fails) { console.error('\nBłędy: ' + fails); process.exit(1); }
 console.log('\nWszystkie testy Autopilota przeszły.');
