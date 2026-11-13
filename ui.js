@@ -1509,7 +1509,7 @@
     const s = st(), p = s.pilot || {}, D = C.PILOT.defaults;
     return { on: p.on !== undefined ? p.on : true, build: p.build !== undefined ? p.build : D.build, recruit: p.recruit || D.recruit,
       tech: p.tech !== undefined ? p.tech : D.tech, defend: p.defend !== undefined ? p.defend : D.defend, garrison: p.garrison !== undefined ? p.garrison : D.garrison, supply: p.supply !== undefined ? p.supply : D.supply, defLevel: p.defLevel || D.defLevel,
-      tickSec: p.tickSec || C.PILOT.tickSec, settle: !!p.settle, settleMax: p.settleMax || 0, massMin: p.massMin == null ? D.massMin : p.massMin, split: !!p.split, splitRatio: p.splitRatio || D.splitRatio, attack: !!p.attack, farm: !!p.farm, wonder: !!p.wonder, convoy: !!p.convoy, hub: p.hub || (s.auto && s.auto.hub) || (autoDefaults().hub) };
+      tickSec: p.tickSec || C.PILOT.tickSec, eco: p.eco !== undefined ? p.eco : D.eco, settle: !!p.settle, settleMax: p.settleMax || 0, massMin: p.massMin == null ? D.massMin : p.massMin, split: !!p.split, splitRatio: p.splitRatio || D.splitRatio, attack: !!p.attack, farm: !!p.farm, wonder: !!p.wonder, convoy: !!p.convoy, hub: p.hub || (s.auto && s.auto.hub) || (autoDefaults().hub) };
   }
   function pilotModal() {
     const s = st(), g = UI.pilot, p = s.pilot;
@@ -1546,6 +1546,7 @@
         '<span class="pil-range"><input type="range" min="0" max="' + (steps.length - 1) + '" step="1" value="' + tIdx + '" data-ptick><output data-ptickout>' + steps[tIdx] + ' s</output></span>'));
 
     const eco = sec('market', 'Gospodarka',
+      row('data-peco', g.eco, 'hq', 'Szybki start (faza ekonomiczna)', 'Od pierwszej wioski do ' + C.PILOT.eco.villages + ' wiosek (albo ' + C.PILOT.eco.maxHours + ' h gry): surowce i Ratusz przed wojskiem, minimalna obrona (poza wioskami blisko wrogów), badania produkcji, osadnicy na wolne pola i podbój wolnych osad małą armią. Po ataku na Twoją wioskę bot wraca do zwykłej obrony') +
       row('data-pbuild', g.build, 'hq', 'Rozbudowa budynków', 'We wszystkich wioskach') +
       row('data-psup', g.supply, 'market', 'Zasilanie wiosek surowcami', 'Bogatsze wioski dopełniają magazyny wiosek, którym brakuje na budowę, do 80% (wymaga Targowiska)') +
       row('data-ptech', g.tech, 'scroll', 'Technologia', 'Kupuje monety z nadwyżek i bada drzewko (wymaga Targowiska)') +
@@ -1583,6 +1584,7 @@
         (L ? '<p class="pil-cap">Ostatnia tura</p><div class="pil-tiles">' + tile('budowy', L.built) + tile('wojsko', fmt(L.recruited)) + tile('posiłki', L.support) + tile('badania', L.research) + tile('osadnicy', L.settled || 0) + (p.attack ? tile('ataki', L.attacked || 0) : '') + '</div>' : '') +
         (on && p.attack && p.warWhy ? note('noble', 'Podbój', mins(p.warWhy.t), p.warWhy.key === 'sent' ? p.warWhy.text : 'brak fali – ' + p.warWhy.text) : '') +
         (on && p.farm && p.farmInfo ? note('axe', 'Grabież', mins(p.farmInfo.t), p.farmInfo.text) : '') +
+        (on && p.eco !== false ? '<p class="pil-cap">Szybki start: ' + (p.ecoNow ? 'trwa (' + E.villagesOf(s, 'player').length + ' / ' + C.PILOT.eco.villages + ' wiosek)' : 'zakończony albo wstrzymany (zwykłe zasady Autopilota)') + '</p>' : '') +
         '<p class="pil-cap">Łącznie od włączenia</p><div class="pil-tiles tot">' +
         tile('budowy', fmt(stat.built || 0)) + tile('wojsko', fmt(stat.recruited || 0)) + tile('posiłki', fmt(stat.support || 0)) + tile('zasilone surowce', fmt(stat.supplied || 0)) +
         tile('badania', fmt(stat.research || 0)) + tile('monety', fmt(stat.coins || 0)) + tile('nowe osady', fmt(stat.settled || 0)) +
@@ -2756,6 +2758,7 @@
     else if (t.hasAttribute && t.hasAttribute('data-pmass')) { UI.pilot.massMin = Number(t.value); }
     else if (t.hasAttribute && t.hasAttribute('data-psplitn')) { UI.pilot.splitRatio = Number(t.value); }
     else if (t.hasAttribute && t.hasAttribute('data-psup')) { UI.pilot.supply = t.checked; }
+    else if (t.hasAttribute && t.hasAttribute('data-peco')) { UI.pilot.eco = t.checked; }
     else if (t.hasAttribute && t.hasAttribute('data-pset')) { UI.pilot.settle = t.checked; }
     else if (t.hasAttribute && t.hasAttribute('data-patk')) { UI.pilot.attack = t.checked; }
     else if (t.hasAttribute && t.hasAttribute('data-pfarm')) { UI.pilot.farm = t.checked; }

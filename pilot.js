@@ -18,6 +18,9 @@
    7. Podział wiosek (opcja „split”) – wioski dzielą się na OFENSYWNE (tylko wojska ataku, z nich wychodzą wszystkie ataki
       i grabieże) i DEFENSYWNE (tylko obrona, szkolona aż do zapełnienia farmy w 90%; stąd idą posiłki i garnizony, w tym dla wiosek ofensywnych). Na jedną
       ofensywną przypada splitRatio defensywnych. Armia ataku z wiosek defensywnych przechodzi na stałe do ofensywnych.
+   0. Faza ekonomiczna (opcja „eco”) – od pierwszej wioski do PILOT.eco.villages wiosek (albo PILOT.eco.maxHours godzin gry): budowa surowców
+      i Ratusza przed wojskiem, minimalna obrona (poza wioskami przygranicznymi/atakowanymi), badania produkcji, osadnicy na wolne pola
+      (także przy wyłączonej opcji Osadnicy) i podbój wolnych osad małą armią. Po ataku na Twoją wioskę faza „śpi” (PILOT.eco.calmMin).
    Bot nie podgląda sił wroga bez zwiadu (tak jak Ty: „siła nieznana”). Wszystkie liczby: C.PILOT.
    ========================================================================= */
 (function (root) {
@@ -41,6 +44,19 @@
     return Object.values(state.villages).some(o => o.owner && o.owner !== 'player' && E.dist(o, v) <= P().garrisonRange &&
       !(MP.Diplomacy && MP.Diplomacy.blocked(state, o.owner, 'player', t)));
   }
+
+  // Faza ekonomiczna (PILOT.eco): 'on' | 'off' (wyłączona w ustawieniach) | 'villages' (bot ma już dość wiosek) | 'time' (gra za stara) |
+  // 'calm' (niedawny atak na gracza – zwykła obrona). Liczona raz na turę i zapamiętywana w p.ecoNow (true/false) dla reszty funkcji.
+  function ecoStatus(state, p, vs, t) {
+    const X = P().eco;
+    if (p.eco === false) return 'off';
+    if (vs.length >= X.villages) return 'villages';
+    if (t - (state.created || 0) > X.maxHours * 3600000) return 'time';
+    const last = Object.keys(p.threat || {}).reduce((m, id) => Math.max(m, p.threat[id]), 0);
+    if (last && t - last < X.calmMin * 60000) return 'calm';
+    return 'on';
+  }
+  const ECO_WHY = { off: 'wyłączona', villages: 'bot ma już wystarczająco wiosek', time: 'minął limit czasu fazy', calm: 'atak na Twoją wioskę – zwykła obrona', on: 'trwa' };
 
   function note(state, p, t, text) {
     p.log.push({ t, text });
@@ -212,7 +228,9 @@
   /* ---------- 2. budowa ---------- */
   function buildVillage(state, v, p, t, acts) {
     const depth = Math.min(P().buildDepth, E.queueMax(v, 'build'));
-    const W = P().buildWeights;
+    const eco = !!p.ecoNow;
+    let W = eco ? P().eco.buildWeights : P().buildWeights;
+    if (eco && !exposed(state, v, t)) { W = Object.assign({}, W); delete W.wall; }      // spokojna wioska nie buduje muru w fazie ekonomicznej
     let saving = null;
     for (let guard = 0; guard < 12 && v.buildQueue.length < depth; guard++) {
       const urgent = [];
@@ -318,35 +336,55 @@
   }
 
   /* ---------- 3. wojsko ---------- */
+  // Armia na podbój wolnych osad w fazie ekonomicznej: najwyżej eco.armyPower siły na każde 4 wioski (najmniej raz), tylko w wioskach z Koszarami
+  // ≥ eco.armyBarracks i tylko dopóki w zasięgu leży wolna osada. Liczy się wojsko w domu i w kolejce.
+  function ecoArmyWanted(state, p, v) {
+    const X = P().eco;
+    if (!(v.buildings.barracks >= X.armyBarracks)) return false;
+    if (!Object.values(state.villages).some(o => o.owner === null && E.dist(o, v) <= P().war.range)) return false;
+    const ups = E.upgradesOf(state, 'player'), vs = own(state);
+    let have = 0;
+    vs.forEach(h => {
+      have += attPower(state, h);
+      h.recruitQueue.forEach(e => { if (isAtt(e.unit)) { const q = E.emptyUnits(); q[e.unit] = e.count - e.done; have += E.attackPower(q, ups); } });
+    });
+    return have < X.armyPower * Math.max(1, Math.ceil(vs.length / 4));
+  }
+
   function recruitVillage(state, v, p, t, reserve, threatened, acts) {
     if (v.recruitQueue.length >= Math.min(P().recruitDepth, E.queueMax(v, 'recruit'))) return;
     const ups = E.upgradesOf(state, 'player');
+    const eco = !!p.ecoNow;
     const full = storeRatio(v) > P().storeSpend;
     // wioska defensywna szkoli obrońców, dopóki farma nie jest zapełniona w split.defPopFill (liczy też kolejkę) – zanim surowce trafią na monety
-    const fillDef = roleOf(p, v) === 'def' && popRatio(state, v) < P().split.defPopFill;
+    const fillDef = !eco && roleOf(p, v) === 'def' && popRatio(state, v) < P().split.defPopFill;
     const free = threatened || full;          // bez rezerwy na budynek
-    const share = free || fillDef ? 1 : P().recruitShare;
+    const share = free || fillDef ? 1 : (eco ? P().eco.recruitShare : P().recruitShare);
     const spend = {};
     E.RES.forEach(r => { spend[r] = Math.max(0, v.res[r] - (reserve && !free ? reserve[r] : 0)) * share; });
     const afford = (U, cap) => Math.min.apply(null, E.RES.map(r => U.cost[r] > 0 ? Math.floor(spend[r] / U.cost[r]) : Infinity).concat([cap]));
 
     // kilku zwiadowców chroni przed wrogim zwiadem
-    if (P().scouts > 0 && !threatened) {
+    const scoutsWant = eco ? P().eco.scouts : P().scouts;
+    if (scoutsWant > 0 && !threatened) {
       let have = v.units.scout || 0;
       v.recruitQueue.forEach(e => { if (e.unit === 'scout') have += e.count - e.done; });
       const ri = E.recruitInfo(state, v, 'scout');
-      if (have < P().scouts && ri.ok) {
-        const n = Math.min(P().scouts - have, afford(C.UNITS.scout, ri.max));
+      if (have < scoutsWant && ri.ok) {
+        const n = Math.min(scoutsWant - have, afford(C.UNITS.scout, ri.max));
         if (n >= 1 && E.queueRecruit(state, v, 'scout', n, t).ok !== false) { acts.recruited += n; return; }
       }
     }
 
     const border = p.garrison !== false && exposed(state, v, t);
-    const target = E.points(v) * p.defLevel * (threatened ? 1.5 : 1) * (border ? P().garrisonGoal : 1);
+    const target = E.points(v) * p.defLevel * (threatened ? 1.5 : 1) * (border ? P().garrisonGoal : 1) * (eco && !border && !threatened ? P().eco.defFactor : 1);
     const needDef = E.villageDefenseDef(v, null, ups) < target;
     const split = roleOf(p, v);
     let role;
-    if (split === 'off') role = 'att';                       // wioska ofensywna: tylko jednostki ataku (obronę dostarczają defensywne)
+    if (eco && split !== 'def' && !needDef) {                // faza ekonomiczna: wojsko ataku tylko na podbój wolnych osad, nadwyżka z pełnego magazynu na obronę
+      role = ecoArmyWanted(state, p, v) ? 'att' : (full ? 'def' : null);
+      if (!role) return;
+    } else if (split === 'off') role = 'att';                       // wioska ofensywna: tylko jednostki ataku (obronę dostarczają defensywne)
     else if (needDef) role = 'def';
     else if (split === 'def') { if (full || fillDef) role = 'def'; else return; }   // defensywna: nigdy jednostek ataku
     else if (p.recruit === 'balanced' || p.attack || p.farm) role = 'att';
@@ -424,7 +462,7 @@
     return node.id === 'drill' || node.id === 'e2_drill' || p.recruit === 'balanced' || !!p.attack || !!p.farm || splitOn(p);
   }
   function techOrder(p) {
-    const out = P().techPriority.slice();
+    const out = (p.ecoNow ? P().eco.techPriority.concat(P().techPriority) : P().techPriority).slice();
     C.TECH.nodes.slice().sort((a, b) => a.base - b.base).forEach(n => { out.push([n.id, n.max]); });
     return out.filter(([id]) => { const n = E.techNode(id); return n && techAllowed(n, p); });
   }
@@ -529,7 +567,8 @@
   }
   // Wysyła gotowych osadników, a gdy żadnego nie ma w grze – zleca kolejnego. Zwraca { id, cost }: wioska, która odkłada surowce na osadnika.
   function settleStep(state, p, vs, t, threatened, acts) {
-    const cap = p.settleMax > 0 ? p.settleMax : Infinity;      // puste = bez limitu (gra toczy się dalej także po osiągnięciu celu)
+    // puste = bez limitu (gra toczy się dalej także po osiągnięciu celu); przy wyłączonej opcji Osadnicy faza ekonomiczna zakłada wioski do eco.villages
+    const cap = p.settle ? (p.settleMax > 0 ? p.settleMax : Infinity) : P().eco.villages;
     if (p.settleRetry && t < p.settleRetry) return null;       // niedawno nie było wolnych pól – nie skanuj mapy co minutę
     let memo = {};
     const spotOf = v => (v.id in memo ? memo[v.id] : (memo[v.id] = findSpot(state, v)));
@@ -556,7 +595,7 @@
       if (threatened[v.id]) return no('atakowane');
       if (v.buildings.hq < U.hq) return no('Ratusz poniżej ' + U.hq);
       if (v.buildings.barracks < U.barracks) return no('brak Koszar');
-      if (E.villageDefenseDef(v, null, ups) < E.points(v) * p.defLevel * P().settleDefMin) return no('za słaba obrona');
+      if (E.villageDefenseDef(v, null, ups) < E.points(v) * p.defLevel * P().settleDefMin * (p.ecoNow ? P().eco.defFactor : 1)) return no('za słaba obrona');
       if (v.recruitQueue.length >= E.queueMax(v, 'recruit')) return no('pełna kolejka wojska');
       if (E.RES.some(r => U.cost[r] > E.storageCap(v))) return no('za mały magazyn');
       cands.push({ v, ready: Math.min.apply(null, E.RES.map(r => v.res[r] / U.cost[r])) });
@@ -651,7 +690,7 @@
     if (r === 'def') return false;                                         // z wiosek defensywnych nic nie wychodzi na wroga
     if (r === 'off') return v.loyalty >= C.LOYALTY.max;                    // ofensywna nie ma obrony – chronią ją posiłki i garnizon z defensywnych
     return v.loyalty >= C.LOYALTY.max &&
-      E.villageDefenseDef(v, null, E.upgradesOf(state, 'player')) >= E.points(v) * p.defLevel * P().garrisonGoal * 0.8;
+      E.villageDefenseDef(v, null, E.upgradesOf(state, 'player')) >= E.points(v) * p.defLevel * P().garrisonGoal * 0.8 * (p.ecoNow ? P().eco.defFactor : 1);
   }
 
   // Armia ataku (i Dowódcy) z zaplecza wędruje na stałe do najsilniejszej wioski – rozproszona nie zdobędzie obsadzonej wioski.
@@ -719,7 +758,8 @@
   }
 
   function warStep(state, p, vs, t, threatened, acts) {
-    const W = P().war;
+    // faza ekonomiczna bez opcji Podbój: tylko wolne osady, od niskiego progu siły (bez Dowódców)
+    const W = p.ecoNow ? Object.assign({}, P().war, { minPower: P().eco.minPower }) : P().war;
     p.ops = p.ops || {}; p.fail = p.fail || {}; p.spied = p.spied || {}; p.pending = p.pending || [];
     warReports(state, p, t, acts);
     trainStep(state, p, t, acts);
@@ -727,7 +767,7 @@
 
     // cele: wioski frakcji (bez paktu) oraz wolne osady (te zdobywa się zwykłą armią – każda wygrana obniża poparcie)
     const foesAll = Object.values(state.villages).filter(o => o.owner !== 'player');
-    const foes = foesAll.filter(o => o.owner === null || !foeBlocked(state, o, t));
+    const foes = foesAll.filter(o => o.owner === null || (p.attack && !foeBlocked(state, o, t)));
     if (!foes.length) return warWhy(state, p, t, 'foes', 'brak wrogich wiosek ani wolnych osad bez paktu o nieagresji na mapie');
     const out = state.movements.filter(m => m.type === 'attack' && m.owner === 'player');
     const busy = new Set(out.map(m => m.to));
@@ -957,6 +997,9 @@
     const acts = { built: 0, recruited: 0, support: 0, research: 0, coins: 0, recalled: 0, settled: 0, garrisoned: 0, supplied: 0, attacked: 0, spied: 0, conquered: 0, farmed: 0 };
     const threatened = {};
 
+    const eco = ecoStatus(state, p, vs, t), ecoNow = eco === 'on';
+    if (!!p.ecoNow !== ecoNow) note(state, p, t, ecoNow ? 'Faza ekonomiczna: start – gospodarka i szybka ekspansja' : 'Faza ekonomiczna: koniec (' + ECO_WHY[eco] + ')');
+    p.ecoNow = ecoNow;
     assignRoles(state, p, vs);
     defend(state, p, vs, t, acts, threatened);
     garrison(state, p, vs, t, acts, threatened);
@@ -970,7 +1013,7 @@
       reserves[wv.v.id] = { wood: Math.max(cur.wood, wv.cost.wood), clay: Math.max(cur.clay, wv.cost.clay), iron: Math.max(cur.iron, wv.cost.iron) };
     }
     if (p.build || wv) supply(state, p, vs, t, reserves, threatened, acts);
-    if (p.settle) {
+    if (p.settle || ecoNow) {
       const sv = settleStep(state, p, vs, t, threatened, acts);
       if (sv) {
         const cur = reserves[sv.id] || { wood: 0, clay: 0, iron: 0 };
@@ -987,7 +1030,7 @@
     if (p.recruit !== 'off') vs.forEach(v => recruitVillage(state, v, p, t, reserves[v.id], !!threatened[v.id], acts));
     shield(state, p, vs, t, threatened, acts);
     if (p.tech) manageTech(state, p, vs, t, acts);
-    if (p.attack) warStep(state, p, vs, t, threatened, acts);
+    if (p.attack || ecoNow) warStep(state, p, vs, t, threatened, acts);
     if (p.roles && !p.attack) gather(state, p, vs, t, threatened);      // przy podboju zbiórkę robi warStep
     if (p.farm) farmStep(state, p, vs, t, threatened, acts);
     recall(state, p, t, acts);
@@ -1013,6 +1056,7 @@
     if (cfg.attack !== undefined) o.attack = !!cfg.attack;
     if (cfg.farm !== undefined) o.farm = !!cfg.farm;
     if (cfg.wonder !== undefined) o.wonder = !!cfg.wonder;
+    if (cfg.eco !== undefined) o.eco = !!cfg.eco;
     if (cfg.split !== undefined) o.split = !!cfg.split;
     if (cfg.massMin !== undefined) { const n = Math.floor(Number(cfg.massMin)); o.massMin = n >= 1000 && n <= 200000 ? n : 0; }
     if (cfg.splitRatio !== undefined) { const n = Math.floor(Number(cfg.splitRatio)); if (n >= 1 && n <= 10) o.splitRatio = n; }

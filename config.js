@@ -332,7 +332,7 @@
     },
     // Autopilot (pilot.js): bot rozwijający Twoje wioski. Czasy w sekundach/minutach CZASU GRY.
     PILOT: {
-      defaults: { on: false, build: true, recruit: 'defense', tech: true, defend: true, garrison: true, supply: true, defLevel: 40, convoy: false, hub: null, settle: false, settleMax: 0, attack: false, farm: false, split: false, splitRatio: 3, wonder: false, tickSec: 60, massMin: 10000 },
+      defaults: { on: false, build: true, recruit: 'defense', tech: true, defend: true, garrison: true, supply: true, defLevel: 40, convoy: false, hub: null, settle: false, settleMax: 0, attack: false, farm: false, split: false, splitRatio: 3, wonder: false, tickSec: 60, massMin: 10000, eco: true },
       tickSec: 60,               // domyślnie co ile sekund bot sprawdza wioski (gracz zmienia to suwakiem w ustawieniach)
       tickSteps: [15, 30, 60, 90, 120, 180], // dozwolone wartości suwaka „Częstotliwość pracy”
       alertDelaySec: 1,          // po wykryciu nowego ataku bot działa po tylu sekundach
@@ -423,6 +423,23 @@
         cooldownMin: 20,         // przerwa przed ponownym grabieniem tego samego celu
         waveScouts: 1,           // zwiadowca w fali odświeża obraz celu po bitwie
         spyScouts: 10, spyMin: 3, spyEveryMin: 20, spyPerTurn: 20, intelMaxMin: 60, wallGuess: 4
+      },
+      // Faza ekonomiczna (opcja „eco”, domyślnie włączona): od pierwszej wioski bot stawia na gospodarkę i szybką ekspansję –
+      // budowa surowców i Ratusza przed wojskiem, minimalna obrona (poza wioskami przygranicznymi i atakowanymi), badania produkcji,
+      // osadnicy na wolne pola oraz podbój wolnych osad małą armią. Faza trwa, dopóki bot ma mniej niż `villages` wiosek
+      // i od startu gry minęło mniej niż `maxHours` godzin; po ataku na Twoją wioskę robi przerwę (`calmMin`) i wraca do zwykłej obrony.
+      eco: {
+        villages: 12,            // faza kończy się, gdy bot ma tyle wiosek (osadnicy zakładają je do tego limitu także przy wyłączonej opcji Osadnicy)
+        maxHours: 36,            // ...albo po tylu godzinach od startu gry
+        calmMin: 30,             // po ataku na wioskę gracza faza „śpi” tyle minut (zwykła obrona)
+        buildWeights: { hq: 1.3, wood: 1.7, clay: 1.7, iron: 1.5, farm: 1.1, barracks: 0.45, market: 0.4, wall: 0.1 },
+        defFactor: 0.3,          // cel obrony wioski NIEprzygranicznej = zwykły cel × ta wartość (przygraniczne i atakowane bez zmian)
+        recruitShare: 0.2,       // jaką część nadwyżki wydaje na wojsko (reszta idzie na budowę)
+        scouts: 5,               // tylu zwiadowców trzyma wioska (zwykle PILOT.scouts)
+        armyPower: 1500,         // armia ataku (siła) na podbój wolnych osad – na każde 4 wioski (najmniej raz) – dopiero gdy Koszary ≥ armyBarracks
+        armyBarracks: 2,
+        minPower: 400,           // minimalna siła ataku wioski, z której bot zwiadowuje i atakuje wolne osady
+        techPriority: [['tools', 2], ['store', 2], ['p_wood', 3], ['p_clay', 3], ['p_iron', 3], ['build', 3], ['agri', 3], ['trade', 2], ['tools', 5], ['p_wood', 6], ['p_clay', 6], ['p_iron', 6], ['store', 5], ['build', 6]]
       },
       buildWeights: { hq: 1, wood: 1.1, clay: 1.1, iron: 1.1, farm: 1, barracks: 0.8, market: 0.5, wall: 0.7 },
       techPriority: [['militia', 2], ['tools', 2], ['trade', 1], ['store', 3], ['u_spear', 3], ['u_archer', 3], ['u_guard', 3],
