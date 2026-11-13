@@ -87,6 +87,7 @@
 
   MP.CONFIG = {
     SAVE_VERSION: 9,
+    SPEEDS: [1, 2, 5, 10, 20, 50, 100], // dozwolone prędkości gry (suwak w Menu)
 
     // Poziomy trudności – mnożniki dla gracza i AI.
     // playerProd / aiProd: produkcja surowców; graceMinutes: ochrona gracza na starcie;

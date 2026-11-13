@@ -32,9 +32,21 @@
     },
 
     // Czas gry: rzeczywisty minus czas spędzony w pauzie (w pauzie stoi w miejscu).
-    clock() { return this.state ? E.gameClock(this.state, Date.now()) : Date.now(); },
+    // Odcinek, w którym zegar uciekł (zamknięta gra, uśpiony telefon), liczy się w tempie ×1 (Engine.rebaseClock).
+    clock() {
+      if (!this.state) return Date.now();
+      const real = Date.now();
+      E.rebaseClock(this.state, real);
+      return E.gameClock(this.state, real);
+    },
     // Czas z gry -> czas na zegarku (do wyświetlania godzin w raportach).
-    wall(ts) { return ts + (this.state && this.state.skew || 0); },
+    wall(ts) { return this.state ? E.wallTime(this.state, ts) : ts; },
+    speed() { return this.state ? E.speedOf(this.state) : 1; },
+    setSpeed(x) {
+      if (!this.state || !E.setSpeed(this.state, Date.now(), x)) return false;
+      this.dirty = true; UI().invalidate(); UI().render(); this.save();
+      return true;
+    },
     paused() { return !!(this.state && this.state.paused); },
 
     pause() {

@@ -1560,7 +1560,62 @@
 
   /* ---------- pauza: zegarek gry zatrzymany, po wznowieniu liczony dalej od tego samego momentu ---------- */
   // skew = łączny czas spędzony w pauzie; czas gry = czas rzeczywisty - skew.
-  function gameClock(state, real) { return state.paused ? state.now : real - (state.skew || 0); }
+  // Gdy gracz zmienił prędkość gry, zegar liczy się od kotwicy state.clk = { g: czas gry, r: czas rzeczywisty, s: mnożnik }:
+  // czas gry = g + (czas rzeczywisty - r) * s. Dawne zapisy bez kotwicy działają po staremu (skew).
+  // state.clkLog trzyma poprzednie odcinki [g, r, s], żeby godziny w raportach zostały poprawne po zmianie prędkości.
+  function gameClock(state, real) {
+    if (state.paused) return state.now;
+    const k = state.clk;
+    if (k) return k.g + (real - k.r) * k.s;
+    return real - (state.skew || 0);
+  }
+  function setAnchor(state, g, r, s) {
+    if (!state.clk) {
+      state.clkLog = [[0, state.skew || 0, 1]]; // dotychczasowy odcinek ×1: zegarek = czas gry + skew
+    } else {
+      state.clkLog = state.clkLog || [];
+      state.clkLog.push([state.clk.g, state.clk.r, state.clk.s]);
+    }
+    if (state.clkLog.length > 300) state.clkLog.splice(0, state.clkLog.length - 300);
+    state.clk = { g: g, r: r, s: s };
+  }
+  function speedOf(state) { return state.clk && state.speed > 0 ? state.speed : 1; }
+  // Ustawia prędkość gry (mnożnik upływu czasu). Działa też w pauzie – zacznie obowiązywać po wznowieniu.
+  function setSpeed(state, real, speed) {
+    const allowed = C.SPEEDS || [1];
+    let s = Number(speed);
+    if (!Number.isFinite(s)) return false;
+    s = allowed.reduce((best, x) => Math.abs(x - s) < Math.abs(best - s) ? x : best, allowed[0]);
+    if (s === speedOf(state)) return false;
+    if (!state.paused) advance(state, gameClock(state, real));
+    state.speed = s;
+    setAnchor(state, state.now, real, s);
+    state.clkSeen = real;
+    return true;
+  }
+  // Gdy zegar rzeczywisty uciekł do przodu (zamknięta gra, uśpiony telefon, ukryta karta), ten odcinek liczy się
+  // w normalnym tempie ×1 – przyspieszenie działa tylko, gdy gra faktycznie chodzi. Wołać przed gameClock.
+  function rebaseClock(state, real) {
+    if (state.clk && !state.paused && state.speed > 1) {
+      const seen = Number(state.clkSeen);
+      if (Number.isFinite(seen) && real - seen > 20000) {
+        const gap = real - seen;
+        const gSeen = gameClock(state, seen);
+        setAnchor(state, gSeen, seen, 1);
+        setAnchor(state, gSeen + gap, real, state.speed);
+      }
+    }
+    state.clkSeen = real;
+  }
+  // Czas gry -> czas na zegarku (do wyświetlania godzin).
+  function wallTime(state, ts) {
+    const k = state.clk;
+    if (!k) return ts + (state.skew || 0);
+    const segs = (state.clkLog || []).concat([[k.g, k.r, k.s]]);
+    let seg = segs[0];
+    for (let i = segs.length - 1; i >= 0; i--) if (segs[i][0] <= ts) { seg = segs[i]; break; }
+    return seg[1] + (ts - seg[0]) / seg[2];
+  }
   function pauseGame(state, real) {
     if (state.paused) return false;
     advance(state, gameClock(state, real));
@@ -1570,7 +1625,12 @@
   function resumeGame(state, real) {
     if (!state.paused) return false;
     const from = Number(state.pausedReal);
-    state.skew = (state.skew || 0) + (Number.isFinite(from) ? Math.max(0, real - from) : 0);
+    if (state.clk) {
+      setAnchor(state, state.now, real, speedOf(state));
+      state.clkSeen = real;
+    } else {
+      state.skew = (state.skew || 0) + (Number.isFinite(from) ? Math.max(0, real - from) : 0);
+    }
     state.paused = false; state.pausedReal = null;
     return true;
   }
@@ -1586,7 +1646,7 @@
     newGame, worldOf, winVillages, productionPerMin, storageCap, popCap, popMult, popUsed, tickVillage,
     notice, addReport, newId, checkWin, changeOwner,
     buildInfo, queueBuild, wonderLevel, wonderQueued, wonderVillage, wonderInfo, queueWonder, checkWonder, epochDone, recruitInfo, queueRecruit, recruitPer,
-    travelTime, slowest, sendAttack, sendSpy, advance, nextEvent, gameClock, pauseGame, resumeGame,
+    travelTime, slowest, sendAttack, sendSpy, advance, nextEvent, gameClock, pauseGame, resumeGame, setSpeed, speedOf, rebaseClock, wallTime,
     unitsPop, supportRoom, sendSupport, withdrawSupport, defenders, defenseFrom, villageDefense, villageDefenseDef,
     merchantsTotal, merchantsBusy, merchantsFree, merchantTime, sendTransport, planGather, sendGather, planTroops, sendTroops, planRecruitAll, recruitAll, incomingRes, settleCheck, sendSettler
   };

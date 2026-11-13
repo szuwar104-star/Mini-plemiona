@@ -1926,6 +1926,7 @@
       '<p class="muted seg-note">Kurs bazowy, bez Twoich badań; tylko wioski AI z Targowiskiem, nie częściej niż co kilka minut. Zmiana działa od razu.</p></section>' +
       '<section><h3>Poziom trudności</h3>' + diffPicker(s.difficulty, 'set-diff') +
       '<p class="muted seg-note">' + E.diff(s).desc + ' Zmiana działa od razu.</p></section>' +
+      speedSection(s) +
       '<section><h3>Zapis gry</h3><p class="muted">Gra zapisuje się sama. Czas płynie także przy zamkniętej grze – AI rozwija się wtedy dalej. ' +
       'Jeśli chcesz wrócić dokładnie do tego momentu (np. jutro albo na innym urządzeniu), wstrzymaj grę: czas stoi, dopóki jej nie wznowisz.</p>' +
       '<div class="actions left">' + (s.paused ? '<button class="btn" data-act="resume">Wznów grę</button>' : '<button class="btn" data-act="pause">Wstrzymaj grę</button>') +
@@ -1948,6 +1949,15 @@
       '<li>Przez pierwsze ' + E.diff(s).graceMinutes + ' minut frakcje AI Cię nie atakują. ' + Math.round(E.diff(s).lootProtect * 100) + '% pojemności magazynu jest ukryte przed łupieżcami.</li></ul></section>' +
       '<section><h3>Nowa gra</h3><div class="actions left"><button class="btn danger" data-act="new-game">Zacznij od nowa</button></div></section>' +
       '<div class="actions"><button class="btn" data-act="close">Wróć do gry</button></div>';
+  }
+
+  // Suwak prędkości gry: mnożnik upływu czasu (budowa, produkcja, marsze, AI i Autopilot liczą się szybciej).
+  function speedSection(s) {
+    const steps = C.SPEEDS, cur = E.speedOf(s), idx = Math.max(0, steps.indexOf(cur));
+    return '<section><h3>Prędkość gry</h3><label class="opt opt-field"><span class="opt-ico">' + ico('scroll') + '</span><span class="opt-txt"><b>Przyspieszenie czasu</b>' +
+      '<small>Wszystko dzieje się szybciej: budowa, produkcja, marsze wojsk, AI i Autopilot. Przydatne, by szybko sprawdzić, jak rozwinie się gra na Autopilocie. ' +
+      'Czas, gdy gra jest zamknięta lub uśpiona, płynie normalnie (×1). Pamiętaj, że przy dużej prędkości AI też rozwija się szybciej, a Ty masz mniej czasu na reakcję.</small></span>' +
+      '<span class="pil-range"><input type="range" min="0" max="' + (steps.length - 1) + '" step="1" value="' + idx + '" data-speed><output data-speedout>×' + cur + '</output></span></label></section>';
   }
 
   // Moc konta gracza: punkty budynków + wojska oraz siła ataku i obrony całej armii.
@@ -2148,6 +2158,7 @@
     renderHeader();
     renderNav();
     const pb = $('#pausebar'); if (pb) pb.hidden = !s.paused;
+    const sp = E.speedOf(s), sb = $('#speedbar'); if (sb) { sb.hidden = sp <= 1 || !!s.paused; const sv = $('#speedval'); if (sv) sv.textContent = sp; }
     document.querySelectorAll('.screen').forEach(el => { el.hidden = el.id !== 'screen-' + UI.screen; });
     if (UI.screen === 'village') renderVillage();
     else if (UI.screen === 'army') renderArmy();
@@ -2638,6 +2649,7 @@
         break;
       }
       case 'pause': if (MP.Game.pause()) toast('info', 'Gra wstrzymana – czas nie płynie.'); renderModal(); break;
+      case 'speed-reset': if (MP.Game.setSpeed(1)) toast('info', 'Prędkość gry: ×1.'); renderModal(); break;
       case 'resume': if (MP.Game.resume()) toast('info', 'Gra wznowiona.'); renderModal(); break;
       case 'export-pause': {
         MP.Game.pause();
@@ -2701,6 +2713,9 @@
     if (t.dataset.rin) UI.recruit[t.dataset.rin] = t.value;
     if (t.dataset.ain) { UI.atk[t.dataset.ain] = t.value; updateAttackSummary(); }
     if (t.dataset.fin) { UI.form[t.dataset.fin] = t.value; updateFormSummary(); }
+    if (t.hasAttribute && t.hasAttribute('data-speed')) {
+      const out = t.parentNode.querySelector('[data-speedout]'); if (out) out.textContent = '×' + (C.SPEEDS[Number(t.value)] || 1);
+    }
     if (t.hasAttribute && t.hasAttribute('data-ptick')) {
       const sec = C.PILOT.tickSteps[Number(t.value)] || C.PILOT.tickSec; UI.pilot.tickSec = sec;
       const out = t.parentNode.querySelector('[data-ptickout]'); if (out) out.textContent = sec + ' s';
@@ -2711,6 +2726,7 @@
   }
   function onChange(e) {
     const t = e.target;
+    if (t.hasAttribute && t.hasAttribute('data-speed')) { MP.Game.setSpeed(C.SPEEDS[Number(t.value)] || 1); return; }
     if (t.id === 'villageSelect') { UI.vid = t.value; UI.recruit = {}; invalidate(); render(); }
     else if (t.id === 'atkFrom') { UI.modal.from = t.value; renderModal(); }
     else if (t.hasAttribute && t.hasAttribute('data-from')) { UI.modal.from = t.value; renderModal(); }
