@@ -2,6 +2,8 @@
 'use strict';
 require('../config.js'); require('../engine.js'); require('../diplomacy.js'); require('../ai.js'); require('../pilot.js'); require('../database.js');
 const E = MP.Engine, C = MP.CONFIG;
+// Ten test sprawdza zwykłe zasady Autopilota, więc faza ekonomiczna (szybki start) jest w nim domyślnie wyłączona – jej własny test: tests/eco.js
+{ const configure = MP.Pilot.configure; MP.Pilot.configure = (s, cfg, t) => configure(s, Object.assign({ eco: false }, cfg), t); }
 let fails = 0;
 const ok = (c, msg) => { if (!c) { fails++; console.error('BŁĄD: ' + msg); } else console.log('ok: ' + msg); };
 
